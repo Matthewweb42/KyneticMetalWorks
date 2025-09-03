@@ -1,0 +1,1566 @@
+// Store last preview mouse coordinates
+let lastPreviewMouse = null;
+    lastPreviewMouse = { x: mouseX, y: mouseY };
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kynetic Metalworks - 2D Profile Designer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #8b8b8b;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: #57626b;
+            color: white;
+            padding: 20px 30px;
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .logo {
+            width: 200px;
+            height: auto;
+            flex-shrink: 0;
+        }
+
+        .header-text {
+            flex: 1;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 5px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .top-controls {
+            background: #f8f9fa;
+            padding: 20px 30px;
+            border-bottom: 2px solid #e9ecef;
+            display: flex;
+            gap: 30px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .profile-info {
+            flex: 1;
+            display: flex;
+            gap: 20px;
+            align-items: center;
+        }
+
+        .input-field {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .input-field label {
+            font-weight: 600;
+            color: #2c3e50;
+            font-size: 14px;
+        }
+
+        .input-field input {
+            padding: 8px 12px;
+            border: 2px solid #e9ecef;
+            border-radius: 6px;
+            font-size: 14px;
+            transition: border-color 0.3s ease;
+        }
+
+        .input-field input:focus {
+            outline: none;
+            border-color: #3498db;
+            box-shadow: 0 0 10px rgba(52, 152, 219, 0.2);
+        }
+
+        .side-indicator {
+            display: flex;
+            align-items: center;
+            margin-right: 20px;
+        }
+
+        .toggle-label {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 600;
+            color: #2c3e50;
+            cursor: pointer;
+        }
+
+        .side-toggle {
+            position: relative;
+            width: 80px;
+            height: 32px;
+            background: #e9ecef;
+            border-radius: 16px;
+            overflow: hidden;
+            border: 2px solid #ddd;
+        }
+
+        .side-toggle input[type="checkbox"] {
+            display: none;
+        }
+
+        .toggle-slider {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            transition: all 0.3s ease;
+        }
+
+        .toggle-slider::before {
+            content: '';
+            position: absolute;
+            width: 50%;
+            height: 100%;
+            background: linear-gradient(135deg, #95a5a6, #7f8c8d);
+            border-radius: 14px;
+            transition: all 0.3s ease;
+            transform: translateX(0);
+            z-index: 1;
+        }
+
+        .side-toggle input:checked + .toggle-slider::before {
+            transform: translateX(100%);
+            background: linear-gradient(135deg, #3498db, #2980b9);
+        }
+
+        .side-label {
+            position: absolute;
+            width: 50%;
+            text-align: center;
+            font-size: 12px;
+            font-weight: bold;
+            color: white;
+            z-index: 2;
+            transition: all 0.3s ease;
+        }
+
+        .side-label.left {
+            left: 0;
+        }
+
+        .side-label.right {
+            right: 0;
+        }
+
+        .side-toggle input:not(:checked) + .toggle-slider .side-label.left {
+            color: white;
+        }
+
+        .side-toggle input:not(:checked) + .toggle-slider .side-label.right {
+            color: #666;
+        }
+
+        .side-toggle input:checked + .toggle-slider .side-label.left {
+            color: #666;
+        }
+
+        .side-toggle input:checked + .toggle-slider .side-label.right {
+            color: white;
+        }
+
+        .mode-controls {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .mode-toggle {
+            display: flex;
+            background: #e9ecef;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .mode-btn {
+            padding: 10px 20px;
+            border: none;
+            background: transparent;
+            color: #6c757d;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .mode-btn.active {
+            background: #3498db;
+            color: white;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #3498db, #2980b9);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: linear-gradient(135deg, #2980b9, #1f6591);
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(52, 152, 219, 0.3);
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #27ae60, #229954);
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: linear-gradient(135deg, #229954, #1e8449);
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(39, 174, 96, 0.3);
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #e74c3c, #c0392b);
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: linear-gradient(135deg, #c0392b, #a93226);
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(231, 76, 60, 0.3);
+        }
+
+        .main-content {
+            height: calc(100vh - 300px);
+            min-height: 500px;
+        }
+
+        .canvas-container {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            background: #ffffff;
+            overflow: hidden;
+        }
+
+        .canvas-container.edit-mode #canvas {
+            cursor: default;
+        }
+
+        #canvas {
+            cursor: crosshair;
+            background: 
+                radial-gradient(circle, #e8e8e8 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+
+        .measurement-label {
+            fill: #3498db;
+            font-size: 12px;
+            font-weight: bold;
+            font-family: 'Segoe UI', sans-serif;
+            pointer-events: none;
+            user-select: none;
+            transition: all 0.3s ease;
+        }
+
+        .angle-label {
+            fill: #e67e22;
+            font-size: 12px;
+            font-weight: bold;
+            font-family: 'Segoe UI', sans-serif;
+            pointer-events: none;
+            user-select: none;
+            transition: all 0.3s ease;
+        }
+
+        .edit-mode .measurement-label,
+        .edit-mode .angle-label {
+            pointer-events: all;
+            cursor: pointer;
+        }
+
+        .edit-mode .measurement-label:hover {
+            fill: #e74c3c;
+            font-size: 14px;
+        }
+
+        .edit-mode .angle-label:hover {
+            fill: #9b59b6;
+            font-size: 14px;
+        }
+
+        .clickable-bg {
+            fill: rgba(255, 255, 255, 0.8);
+            stroke: rgba(52, 152, 219, 0.5);
+            stroke-width: 1;
+            rx: 3;
+            ry: 3;
+            pointer-events: all;
+            cursor: pointer;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .edit-mode .clickable-bg {
+            opacity: 1;
+        }
+
+        .edit-mode .clickable-bg:hover {
+            fill: rgba(52, 152, 219, 0.1);
+            stroke: rgba(52, 152, 219, 0.8);
+            stroke-width: 2;
+        }
+
+        .angle-arc {
+            stroke: #f39c12;
+            stroke-width: 1;
+            fill: none;
+            stroke-dasharray: 3,3;
+            opacity: 0.8;
+        }
+
+        .edit-popup {
+            position: absolute;
+            background: white;
+            border: 2px solid #3498db;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            z-index: 1000;
+            min-width: 250px;
+            display: none;
+        }
+
+        .edit-popup h4 {
+            margin: 0 0 15px 0;
+            color: #2c3e50;
+            font-size: 16px;
+        }
+
+        .edit-popup .input-group {
+            margin-bottom: 15px;
+        }
+
+        .edit-popup .input-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: #2c3e50;
+            font-weight: 600;
+        }
+
+        .edit-popup .input-group input {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #e9ecef;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+
+        .edit-popup .btn {
+            width: 48%;
+            margin-right: 4%;
+        }
+
+        .edit-popup .btn:last-child {
+            margin-right: 0;
+        }
+
+        .point {
+            fill: #3498db;
+            stroke: white;
+            stroke-width: 2;
+            cursor: pointer;
+        }
+
+        .point:hover {
+            fill: #2980b9;
+            stroke-width: 3;
+        }
+
+        .point.draggable {
+            cursor: grab;
+            stroke-width: 3;
+            r: 8;
+        }
+
+        .point.dragging {
+            cursor: grabbing;
+            fill: #e74c3c;
+            stroke-width: 4;
+        }
+
+        .line {
+            stroke: #2c3e50;
+            stroke-width: 3;
+            fill: none;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+
+        .preview-line {
+            stroke: #95a5a6;
+            stroke-width: 2;
+            fill: none;
+            stroke-dasharray: 5,5;
+        }
+
+        .hem-curve {
+            stroke: #ff6b35;
+            stroke-width: 3;
+            fill: none;
+            stroke-linecap: round;
+        }
+
+        .hem-parallel {
+            stroke: #ff6b35;
+            stroke-width: 2;
+            fill: none;
+            stroke-dasharray: 3,3;
+            opacity: 0.8;
+        }
+
+        .coating-hash {
+            stroke: #e74c3c;
+            stroke-width: 1;
+            stroke-linecap: round;
+            opacity: 0.8;
+        }
+
+        .status {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: #2c3e50;
+            color: white;
+            padding: 10px 20px;
+            font-size: 14px;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .coords {
+            font-family: monospace;
+        }
+
+        @media (max-width: 768px) {
+            .top-controls {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .profile-info {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <img class="logo" src="Kynetic Logo.webp" alt="Kynetic Logo" style="width:200px;height:auto;flex-shrink:0;border-radius:10px;box-shadow:0 4px 12px rgba(0,0,0,0.15);">
+            <div class="header-text">
+                <h1>2D Profile Designer</h1>
+                <p>Precision Metal Forming Solutions</p>
+            </div>
+        </div>
+        
+        <div class="top-controls">
+            <div class="profile-info">
+                <div class="input-field">
+                    <label for="profileName">Profile Name</label>
+                    <input type="text" id="profileName" placeholder="Enter profile name">
+                </div>
+                <div class="input-field">
+                    <label for="profileDescription">Description</label>
+                    <input type="text" id="profileDescription" placeholder="Enter description">
+                </div>
+                <div class="input-field">
+                    <label>Total Material Usage</label>
+                    <div style="padding: 8px 12px; background: #e9ecef; border-radius: 6px; font-weight: bold; color: #2d5a5c;">
+                        <span id="totalLength">0.00"</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="mode-controls">
+                <div class="side-indicator">
+                    <label class="toggle-label">
+                        <span>Colored Side:</span>
+                        <div class="side-toggle">
+                            <input type="checkbox" id="sideToggle" onchange="toggleCoatedSide()">
+                            <div class="toggle-slider">
+                                <span class="side-label left">A</span>
+                                <span class="side-label right">B</span>
+                            </div>
+                        </div>
+                    </label>
+                </div>
+                <div class="mode-toggle">
+                    <button class="mode-btn active" onclick="setMode('create')" id="createModeBtn">Create</button>
+                    <button class="mode-btn" onclick="setMode('edit')" id="editModeBtn">Edit</button>
+                </div>
+
+                <button class="btn btn-success" onclick="finishProfile()">Finish Profile</button>
+                <button class="btn btn-primary" onclick="downloadProfileImage()">Download Image</button>
+                <button class="btn btn-danger" onclick="clearCanvas()">Clear All</button>
+            </div>
+        </div>
+        
+        <div class="main-content">
+            <div class="canvas-container" id="canvasContainer">
+                <svg id="canvas" width="100%" height="100%">
+                    <defs>
+                        <marker id="arrowhead" markerWidth="10" markerHeight="7" 
+                                refX="9" refY="3.5" orient="auto">
+                            <polygon points="0 0, 10 3.5, 0 7" fill="#4a7c7e" />
+                        </marker>
+                    </defs>
+                    <g id="grid"></g>
+                    <g id="lines"></g>
+                    <g id="points"></g>
+                    <g id="labels"></g>
+                </svg>
+                
+                <!-- Edit Popup -->
+                <div id="editPopup" class="edit-popup">
+                    <h4 id="popupTitle">Edit Element</h4>
+                    <div class="input-group">
+                        <label id="popupLabel">Value:</label>
+                        <input type="number" id="popupInput" step="0.125" placeholder="Enter value">
+                    </div>
+                    <div>
+                        <button class="btn btn-primary" onclick="applyPopupEdit()">Apply</button>
+                        <button class="btn btn-danger" onclick="closeEditPopup()">Cancel</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="status">
+            <span id="mode">Click on the canvas to start drawing your profile</span>
+            <span class="coords" id="coordinates">Mouse: (0, 0)</span>
+        </div>
+    </div>
+
+    <script>
+        function downloadProfileImage() {
+            const svg = document.getElementById('canvas');
+            const serializer = new XMLSerializer();
+            let source = serializer.serializeToString(svg);
+            // Add name space
+            if(!source.match(/^<svg[^>]+xmlns="http\:\/\/www\.w3\.org\/2000\/svg"/)){
+                source = source.replace(/^<svg/, '<svg xmlns="http://www.w3.org/2000/svg"');
+            }
+            // Convert SVG to image
+            const svgBlob = new Blob([source], {type: 'image/svg+xml;charset=utf-8'});
+            const url = URL.createObjectURL(svgBlob);
+            const img = new Image();
+            img.onload = function() {
+                const canvasEl = document.createElement('canvas');
+                canvasEl.width = svg.clientWidth;
+                canvasEl.height = svg.clientHeight;
+                const ctx = canvasEl.getContext('2d');
+                ctx.drawImage(img, 0, 0);
+                URL.revokeObjectURL(url);
+                canvasEl.toBlob(function(blob) {
+                    const a = document.createElement('a');
+                    a.download = 'profile.png';
+                    a.href = URL.createObjectURL(blob);
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                }, 'image/png');
+            };
+            img.src = url;
+        }
+        let isDrawing = true; // Auto-start drawing
+        let isEditMode = false;
+        let isDragging = false;
+        let dragPointIndex = -1;
+        let currentEditElement = null;
+        let coatedSideRight = false; // false = left/top coated, true = right/bottom coated
+        let points = [];
+        let scale = 20; // pixels per inch
+        let offset = { x: 50, y: 50 };
+
+        const canvas = document.getElementById('canvas');
+        const pointsGroup = document.getElementById('points');
+        const linesGroup = document.getElementById('lines');
+        const labelsGroup = document.getElementById('labels');
+
+        function closeEditPopup() {
+            const popup = document.getElementById('editPopup');
+            popup.style.display = 'none';
+            currentEditElement = null;
+        }
+
+        function applyPopupEdit() {
+            if (!currentEditElement) return;
+            
+            const input = document.getElementById('popupInput');
+            const newValue = parseFloat(input.value);
+            
+            if (isNaN(newValue)) {
+                alert('Please enter a valid number.');
+                return;
+            }
+            
+            if (currentEditElement.type === 'length') {
+                applyLengthEditByIndex(currentEditElement.index, newValue);
+            } else if (currentEditElement.type === 'angle') {
+                applyAngleEditByIndex(currentEditElement.index, newValue);
+            }
+            
+            redrawProfile();
+            updateStats();
+            closeEditPopup();
+        }
+
+        // Canvas event listeners
+        canvas.addEventListener('mousemove', handleMouseMove);
+        canvas.addEventListener('click', handleCanvasClick);
+        canvas.addEventListener('mousedown', handleMouseDown);
+        canvas.addEventListener('mouseup', handleMouseUp);
+
+        function handleMouseMove(e) {
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            
+            // Convert to inches
+            const inchX = ((x - offset.x) / scale).toFixed(2);
+            const inchY = (((canvas.clientHeight - y) - offset.y) / scale).toFixed(2);
+            
+            document.getElementById('coordinates').textContent = `Mouse: (${inchX}", ${inchY}")`;
+            
+            // Handle dragging in edit mode
+            if (isDragging && dragPointIndex >= 0) {
+                points[dragPointIndex] = { x: x, y: y };
+                redrawProfile();
+                return;
+            }
+            
+            // Show preview line when drawing
+            if (isDrawing && points.length > 0 && !isEditMode) {
+                showPreviewLine(x, y);
+            }
+        }
+
+        function handleMouseDown(e) {
+            if (!isEditMode) return;
+            
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            
+            // Check if clicking on a point
+            for (let i = 0; i < points.length; i++) {
+                const point = points[i];
+                const distance = Math.sqrt((x - point.x) ** 2 + (y - point.y) ** 2);
+                if (distance <= 12) {
+                    isDragging = true;
+                    dragPointIndex = i;
+                    closeEditPopup();
+                    
+                    const pointElement = document.querySelector(`circle[data-index="${i}"]`);
+                    if (pointElement) {
+                        pointElement.classList.add('dragging');
+                    }
+                    break;
+                }
+            }
+        }
+
+        function handleMouseUp(e) {
+            if (isDragging) {
+                isDragging = false;
+                
+                const allPoints = document.querySelectorAll('.point');
+                allPoints.forEach(point => point.classList.remove('dragging'));
+                
+                dragPointIndex = -1;
+                redrawProfile();
+            }
+        }
+
+        function handleCanvasClick(e) {
+            if (isDragging) return;
+            if (isEditMode) return;
+            if (!isDrawing) return;
+            // Only block clicks on interactive elements (points, labels, popups)
+            const ignoreTags = ['circle', 'rect', 'text', 'foreignObject'];
+            if (ignoreTags.includes(e.target.tagName)) return;
+            // Accept clicks anywhere inside the SVG
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            addPoint(x, y);
+        }
+
+
+        function addPoint(x, y) {
+            const point = { x: x, y: y };
+            // Prevent line crossing
+            if (points.length > 1) {
+                const newLine = { start: points[points.length - 1], end: point };
+                for (let i = 0; i < points.length - 2; i++) {
+                    const lineA = { start: points[i], end: points[i + 1] };
+                    if (doLinesIntersect(lineA.start, lineA.end, newLine.start, newLine.end)) {
+                        alert('Lines cannot cross!');
+                        return;
+                    }
+                }
+            }
+            points.push(point);
+
+            drawPoint(point, points.length - 1);
+
+            if (points.length > 1) {
+                drawLine(points[points.length - 2], point, points.length - 2);
+                drawMeasurements();
+
+                // Check angle for Hem logic
+                if (points.length > 2) {
+                    const angle = calculateVertexAngle(points.length - 2);
+                    if (angle < 20) {
+                        setTimeout(() => showHemPopup(points.length - 1), 200);
+                    }
+                }
+            }
+
+            updateStats();
+            clearPreviewLine();
+        }
+
+        // Helper function to check if two line segments intersect
+        function doLinesIntersect(p1, p2, p3, p4) {
+            function ccw(a, b, c) {
+                return (c.y - a.y) * (b.x - a.x) > (b.y - a.y) * (c.x - a.x);
+            }
+            return (ccw(p1, p3, p4) !== ccw(p2, p3, p4)) && (ccw(p1, p2, p3) !== ccw(p1, p2, p4));
+        }
+
+        // Hem popup logic
+        function showHemPopup(pointIndex) {
+            // Create popup HTML
+            let hemPopup = document.getElementById('hemPopup');
+            if (!hemPopup) {
+                hemPopup = document.createElement('div');
+                hemPopup.id = 'hemPopup';
+                hemPopup.style.position = 'fixed';
+                hemPopup.style.left = '50%';
+                hemPopup.style.top = '50%';
+                hemPopup.style.transform = 'translate(-50%, -50%)';
+                hemPopup.style.background = 'white';
+                hemPopup.style.border = '2px solid #3498db';
+                hemPopup.style.borderRadius = '10px';
+                hemPopup.style.padding = '24px';
+                hemPopup.style.zIndex = '2000';
+                hemPopup.style.boxShadow = '0 10px 30px rgba(0,0,0,0.3)';
+                hemPopup.innerHTML = `
+                    <h3 style="margin-bottom:12px;">Hem Creation</h3>
+                    <div style="margin-bottom:10px;">
+                        <label>Hem Type:</label>
+                        <select id="hemTypeSelect">
+                            <option value="open">Open Hem</option>
+                            <option value="closed">Closed Hem</option>
+                        </select>
+                    </div>
+                    <div style="margin-bottom:10px;">
+                        <label>Hem Length (inches):</label>
+                        <input type="number" id="hemLengthInput" min="0.125" step="0.125" value="1">
+                    </div>
+                    <div id="openHemExtra" style="margin-bottom:10px;">
+                        <label>Open Amount (inches):</label>
+                        <input type="number" id="openAmountInput" min="0" step="0.125" value="0.25">
+                    </div>
+                    <div style="margin-top:16px;display:flex;gap:10px;">
+                        <button class="btn btn-primary" onclick="applyHemPopup(${pointIndex})">Apply</button>
+                        <button class="btn btn-danger" onclick="closeHemPopup()">Cancel</button>
+                    </div>
+                `;
+                document.body.appendChild(hemPopup);
+                document.getElementById('hemTypeSelect').addEventListener('change', function() {
+                    document.getElementById('openHemExtra').style.display = this.value === 'open' ? 'block' : 'none';
+                });
+            } else {
+                hemPopup.style.display = 'block';
+            }
+        }
+
+        function closeHemPopup() {
+            const hemPopup = document.getElementById('hemPopup');
+            if (hemPopup) hemPopup.style.display = 'none';
+        }
+
+        function applyHemPopup(pointIndex) {
+            const hemType = document.getElementById('hemTypeSelect').value;
+            const hemLength = parseFloat(document.getElementById('hemLengthInput').value);
+            let openAmount = 0;
+            if (hemType === 'open') {
+                openAmount = parseFloat(document.getElementById('openAmountInput').value);
+            }
+            // Remove the last point (second line of hem) from data
+            if (points.length > 1) {
+                points.splice(pointIndex, 1);
+                // Ensure the hem popup disappears immediately after deletion
+                closeHemPopup();
+            }
+            // Remove the last SVG line (phantom line)
+            const lastLine = linesGroup.querySelector('line[data-index="' + (pointIndex - 1) + '"]');
+            if (lastLine) {
+                lastLine.remove();
+            }
+            redrawProfile();
+            // Simple hem visualization: thick orange arc and bold 'HEM' label
+            if (points.length > 1) {
+                const start = points[points.length - 2];
+                const end = points[points.length - 1];
+                const dx = end.x - start.x;
+                const dy = end.y - start.y;
+                const segLen = Math.sqrt(dx * dx + dy * dy);
+                if (segLen > 0) {
+                    // Arc parameters
+                    const arcRadius = 18;
+                    const dirX = dx / segLen;
+                    const dirY = dy / segLen;
+                    const perpX = -dirY;
+                    const perpY = dirX;
+                    // Arc center offset from end
+                    const arcCenter = {
+                        x: end.x + perpX * arcRadius,
+                        y: end.y + perpY * arcRadius
+                    };
+                    // Arc start/end
+                    const arcStart = {
+                        x: end.x,
+                        y: end.y
+                    };
+                    const arcEnd = {
+                        x: end.x + dirX * 20 + perpX * arcRadius,
+                        y: end.y + dirY * 20 + perpY * arcRadius
+                    };
+                    // Draw the arc
+                    const arcPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                    const arcD = `M ${arcStart.x} ${arcStart.y} Q ${arcCenter.x} ${arcCenter.y} ${arcEnd.x} ${arcEnd.y}`;
+                    arcPath.setAttribute('d', arcD);
+                    arcPath.setAttribute('stroke', '#ff6b35');
+                    arcPath.setAttribute('stroke-width', '8');
+                    arcPath.setAttribute('fill', 'none');
+                    arcPath.setAttribute('class', 'hem-arc');
+                    linesGroup.appendChild(arcPath);
+                    // Add big 'HEM' label
+                    const hemLabel = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                    hemLabel.setAttribute('x', arcEnd.x + perpX * 18);
+                    hemLabel.setAttribute('y', arcEnd.y + perpY * 18);
+                    hemLabel.setAttribute('fill', '#ff6b35');
+                    hemLabel.setAttribute('font-size', '36');
+                    hemLabel.setAttribute('font-family', 'Segoe UI, Arial, sans-serif');
+                    hemLabel.setAttribute('font-weight', 'bold');
+                    hemLabel.setAttribute('text-anchor', 'middle');
+                    hemLabel.setAttribute('dominant-baseline', 'central');
+                    hemLabel.textContent = 'HEM';
+                    linesGroup.appendChild(hemLabel);
+                }
+            }
+            // Force switch to edit mode and prevent further drawing
+            setMode('edit');
+        }
+
+        // Update drawHem to use new parameters
+        function drawHem(pointIndex, hemType, hemLength, openAmount) {
+            const hemPoint = points[pointIndex];
+            const prevPoint = points[pointIndex - 1];
+            const dx = hemPoint.x - prevPoint.x;
+            const dy = hemPoint.y - prevPoint.y;
+            const length = Math.sqrt(dx * dx + dy * dy);
+            if (length === 0) return;
+            const dirX = dx / length;
+            const dirY = dy / length;
+            const perpX = -dirY;
+            const perpY = dirX;
+            // Use hemLength for parallel return line
+            const hemRadius = 15; // fixed radius for curve
+            const parallelLength = hemLength * scale;
+            const curveCenter = {
+                x: hemPoint.x + perpX * hemRadius,
+                y: hemPoint.y + perpY * hemRadius
+            };
+            const arcStart = {
+                x: curveCenter.x - perpX * hemRadius,
+                y: curveCenter.y - perpY * hemRadius
+            };
+            const arcEnd = {
+                x: curveCenter.x + perpX * hemRadius,
+                y: curveCenter.y + perpY * hemRadius
+            };
+            const curve = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            const pathData = `M ${arcStart.x} ${arcStart.y} A ${hemRadius} ${hemRadius} 0 0 1 ${arcEnd.x} ${arcEnd.y}`;
+            curve.setAttribute('d', pathData);
+            curve.setAttribute('class', 'hem-curve');
+            linesGroup.appendChild(curve);
+            // Draw parallel return line
+            const parallelStart = arcEnd;
+            const parallelEnd = {
+                x: parallelStart.x - dirX * parallelLength,
+                y: parallelStart.y - dirY * parallelLength
+            };
+            const parallelLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            parallelLine.setAttribute('x1', parallelStart.x);
+            parallelLine.setAttribute('y1', parallelStart.y);
+            parallelLine.setAttribute('x2', parallelEnd.x);
+            parallelLine.setAttribute('y2', parallelEnd.y);
+            parallelLine.setAttribute('class', 'hem-parallel');
+            linesGroup.appendChild(parallelLine);
+            // For open hems, add a small gap indicator
+            if (hemType === 'open') {
+                const gapSize = openAmount * scale;
+                const gapLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                gapLine.setAttribute('x1', parallelEnd.x - perpX * gapSize);
+                gapLine.setAttribute('y1', parallelEnd.y - perpY * gapSize);
+                gapLine.setAttribute('x2', parallelEnd.x + perpX * gapSize);
+                gapLine.setAttribute('y2', parallelEnd.y + perpY * gapSize);
+                gapLine.setAttribute('stroke', '#ff6b35');
+                gapLine.setAttribute('stroke-width', '2');
+                linesGroup.appendChild(gapLine);
+            }
+            // Optionally: visually thicken the end of the triggering line
+            const triggerLine = document.querySelector(`line[data-index="${pointIndex-1}"]`);
+            if (triggerLine) {
+                triggerLine.setAttribute('stroke-width', '7');
+                triggerLine.setAttribute('stroke', '#ff6b35');
+            }
+        }
+
+        function drawPoint(point, index) {
+            const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+            circle.setAttribute('cx', point.x);
+            circle.setAttribute('cy', point.y);
+            circle.setAttribute('r', isEditMode ? 8 : 6);
+            circle.setAttribute('class', isEditMode ? 'point draggable' : 'point');
+            circle.setAttribute('data-index', index);
+            pointsGroup.appendChild(circle);
+        }
+
+        function drawLine(start, end, index) {
+            const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            line.setAttribute('x1', start.x);
+            line.setAttribute('y1', start.y);
+            line.setAttribute('x2', end.x);
+            line.setAttribute('y2', end.y);
+            line.setAttribute('class', 'line');
+            line.setAttribute('data-index', index);
+            linesGroup.appendChild(line);
+            
+            // Add coating hash marks
+            drawCoatingHashes(start, end);
+        }
+
+        function drawCoatingHashes(start, end) {
+            const dx = end.x - start.x;
+            const dy = end.y - start.y;
+            const length = Math.sqrt(dx * dx + dy * dy);
+            
+            if (length < 20) return;
+            
+            const dirX = dx / length;
+            const dirY = dy / length;
+            
+            const perpX = -dirY;
+            const perpY = dirX;
+            
+            const hashOffset = coatedSideRight ? 8 : -8;
+            const offsetX = perpX * hashOffset;
+            const offsetY = perpY * hashOffset;
+            
+            const hashSpacing = 15;
+            const hashLength = 6;
+            const numHashes = Math.floor(length / hashSpacing);
+            
+            for (let i = 1; i < numHashes; i++) {
+                const t = i / numHashes;
+                const lineX = start.x + dx * t;
+                const lineY = start.y + dy * t;
+                
+                const hash1X = lineX + offsetX - perpX * hashLength/2;
+                const hash1Y = lineY + offsetY - perpY * hashLength/2;
+                const hash2X = lineX + offsetX + perpX * hashLength/2;
+                const hash2Y = lineY + offsetY + perpY * hashLength/2;
+                
+                const hash = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                hash.setAttribute('x1', hash1X);
+                hash.setAttribute('y1', hash1Y);
+                hash.setAttribute('x2', hash2X);
+                hash.setAttribute('y2', hash2Y);
+                hash.setAttribute('class', 'coating-hash');
+                linesGroup.appendChild(hash);
+            }
+        }
+
+        function showPreviewLine(mouseX, mouseY) {
+            clearPreviewLine();
+            if (points.length === 0) return;
+            const lastPoint = points[points.length - 1];
+            // Draw preview (phantom) line
+            let previewLine = document.getElementById('preview');
+            if (!previewLine) {
+                previewLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                previewLine.setAttribute('id', 'preview');
+                previewLine.setAttribute('class', 'preview-line');
+                linesGroup.appendChild(previewLine);
+            }
+            previewLine.setAttribute('x1', lastPoint.x);
+            previewLine.setAttribute('y1', lastPoint.y);
+            previewLine.setAttribute('x2', mouseX);
+            previewLine.setAttribute('y2', mouseY);
+
+            // Calculate preview length
+            const deltaX = (mouseX - lastPoint.x) / scale;
+            const deltaY = (lastPoint.y - mouseY) / scale;
+            const length = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+            const midX = (lastPoint.x + mouseX) / 2;
+            const midY = (lastPoint.y + mouseY) / 2 - 18; // above the line
+
+            // Add or update preview length label
+            let lengthLabel = document.getElementById('preview-length-label');
+            if (!lengthLabel) {
+                lengthLabel = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                lengthLabel.setAttribute('id', 'preview-length-label');
+                lengthLabel.setAttribute('class', 'measurement-label');
+                lengthLabel.setAttribute('text-anchor', 'middle');
+                lengthLabel.setAttribute('dominant-baseline', 'central');
+                linesGroup.appendChild(lengthLabel);
+            }
+            lengthLabel.setAttribute('x', midX);
+            lengthLabel.setAttribute('y', midY);
+            lengthLabel.textContent = `${length.toFixed(3)}"`;
+
+            // Calculate preview angle
+            if (points.length > 1) {
+                const prev = points[points.length - 2];
+                const last = points[points.length - 1];
+                const mousePt = { x: mouseX, y: mouseY };
+                // Use the same logic as calculateVertexAngle
+                const vec1 = { x: prev.x - last.x, y: prev.y - last.y };
+                const vec2 = { x: mousePt.x - last.x, y: mousePt.y - last.y };
+                const dot = vec1.x * vec2.x + vec1.y * vec2.y;
+                const mag1 = Math.sqrt(vec1.x * vec1.x + vec1.y * vec1.y);
+                const mag2 = Math.sqrt(vec2.x * vec2.x + vec2.y * vec2.y);
+                let angle = 0;
+                if (mag1 > 0 && mag2 > 0) {
+                    angle = Math.acos(dot / (mag1 * mag2)) * 180 / Math.PI;
+                }
+                // Place angle label at the previous vertex
+                let angleLabel = document.getElementById('preview-angle-label');
+                if (!angleLabel) {
+                    angleLabel = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                    angleLabel.setAttribute('id', 'preview-angle-label');
+                    angleLabel.setAttribute('class', 'angle-label');
+                    angleLabel.setAttribute('text-anchor', 'middle');
+                    angleLabel.setAttribute('dominant-baseline', 'central');
+                    linesGroup.appendChild(angleLabel);
+                }
+                angleLabel.setAttribute('x', last.x);
+                angleLabel.setAttribute('y', last.y - 28);
+                angleLabel.textContent = `${angle.toFixed(1)}°`;
+            } else {
+                // Remove angle label if not needed
+                const angleLabel = document.getElementById('preview-angle-label');
+                if (angleLabel) angleLabel.remove();
+            }
+        }
+
+        function clearPreviewLine() {
+            const preview = document.getElementById('preview');
+            if (preview) {
+                preview.remove();
+            }
+        }
+
+        function drawMeasurements() {
+            labelsGroup.innerHTML = '';
+            
+            const lineCount = points.length - 1;
+            
+            // Draw length measurements
+            for (let i = 0; i < lineCount; i++) {
+                const current = points[i];
+                const next = points[i + 1];
+                const deltaX = (next.x - current.x) / scale;
+                const deltaY = (current.y - next.y) / scale;
+                const length = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+                const midX = (current.x + next.x) / 2;
+                const midY = (current.y + next.y) / 2;
+                createClickableLabel(midX, midY, `${length.toFixed(3)}"`, 'measurement-label', 'length', i);
+            }
+            
+            // Draw angle measurements for interior vertices
+            for (let i = 1; i < points.length - 1; i++) {
+                const current = points[i];
+                const prev = points[i - 1];
+                const next = points[i + 1];
+                const angle = calculateVertexAngle(i);
+                createClickableLabel(current.x + 25, current.y - 25, `${angle.toFixed(1)}°`, 'angle-label', 'angle', i - 1);
+                drawAngleArc(prev, current, next, angle);
+            }
+        }
+
+        function createClickableLabel(x, y, text, className, type, index) {
+            // Create background rectangle for better clicking
+            const bg = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+            const textWidth = text.length * 8;
+            bg.setAttribute('x', x - textWidth/2 - 4);
+            bg.setAttribute('y', y - 8);
+            bg.setAttribute('width', textWidth + 8);
+            bg.setAttribute('height', 16);
+            bg.setAttribute('class', 'clickable-bg');
+            bg.setAttribute('data-type', type);
+            bg.setAttribute('data-index', index);
+            
+            // Create text element
+            const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            label.setAttribute('x', x);
+            label.setAttribute('y', y);
+            label.setAttribute('class', className);
+            label.setAttribute('text-anchor', 'middle');
+            label.setAttribute('dominant-baseline', 'central');
+            label.setAttribute('data-type', type);
+            label.setAttribute('data-index', index);
+            label.textContent = text;
+            
+            // Add click handlers to both elements
+            const clickHandler = function(e) {
+                if (!isEditMode) return;
+                e.stopPropagation();
+                e.preventDefault();
+                showEditPopup(e, type, index, text);
+            };
+            
+            bg.addEventListener('click', clickHandler);
+            label.addEventListener('click', clickHandler);
+            
+            labelsGroup.appendChild(bg);
+            labelsGroup.appendChild(label);
+        }
+
+        function showEditPopup(event, type, index, currentValue) {
+            const popup = document.getElementById('editPopup');
+            const title = document.getElementById('popupTitle');
+            const label = document.getElementById('popupLabel');
+            const input = document.getElementById('popupInput');
+            
+            currentEditElement = { type: type, index: index };
+            
+            if (type === 'length') {
+                title.textContent = `Edit Line ${index + 1} Length`;
+                label.textContent = 'Length (inches):';
+                input.value = parseFloat(currentValue.replace('"', '')).toFixed(3);
+            } else {
+                title.textContent = `Edit Vertex ${index + 1} Angle`;
+                label.textContent = 'Angle (degrees):';
+                input.value = parseFloat(currentValue.replace('°', '')).toFixed(1);
+            }
+            
+            // Get the position of the clicked element
+            const targetElement = event.target;
+            const canvasRect = canvas.getBoundingClientRect();
+            
+            let elementX, elementY;
+            
+            if (targetElement.tagName === 'text') {
+                elementX = parseFloat(targetElement.getAttribute('x'));
+                elementY = parseFloat(targetElement.getAttribute('y'));
+            } else if (targetElement.tagName === 'rect') {
+                const rectX = parseFloat(targetElement.getAttribute('x'));
+                const rectY = parseFloat(targetElement.getAttribute('y'));
+                const rectWidth = parseFloat(targetElement.getAttribute('width'));
+                const rectHeight = parseFloat(targetElement.getAttribute('height'));
+                elementX = rectX + rectWidth / 2;
+                elementY = rectY + rectHeight / 2;
+            }
+            
+            const pageX = canvasRect.left + elementX;
+            const pageY = canvasRect.top + elementY;
+            
+            popup.style.left = (pageX + 30) + 'px';
+            popup.style.top = (pageY - 25) + 'px';
+            
+            popup.style.display = 'block';
+            const popupRect = popup.getBoundingClientRect();
+            
+            if (popupRect.right > window.innerWidth) {
+                popup.style.left = (pageX - popupRect.width - 30) + 'px';
+            }
+            
+            if (popupRect.bottom > window.innerHeight) {
+                popup.style.top = (pageY - popupRect.height - 10) + 'px';
+            }
+            
+            if (popupRect.top < 0) {
+                popup.style.top = (pageY + 30) + 'px';
+            }
+            
+            setTimeout(() => {
+                input.focus();
+                input.select();
+            }, 100);
+        }
+
+        function drawAngleArc(prevPoint, centerPoint, nextPoint, angle) {
+            const vec1 = { x: prevPoint.x - centerPoint.x, y: prevPoint.y - centerPoint.y };
+            const vec2 = { x: nextPoint.x - centerPoint.x, y: nextPoint.y - centerPoint.y };
+            
+            const angle1 = Math.atan2(vec1.y, vec1.x);
+            const angle2 = Math.atan2(vec2.y, vec2.x);
+            
+            let startAngle = angle1;
+            let endAngle = angle2;
+            
+            let angleDiff = endAngle - startAngle;
+            if (angleDiff > Math.PI) {
+                angleDiff -= 2 * Math.PI;
+            } else if (angleDiff < -Math.PI) {
+                angleDiff += 2 * Math.PI;
+            }
+            
+            if (Math.abs(angleDiff) > Math.PI) {
+                [startAngle, endAngle] = [endAngle, startAngle];
+                angleDiff = endAngle - startAngle;
+                if (angleDiff > Math.PI) {
+                    angleDiff -= 2 * Math.PI;
+                } else if (angleDiff < -Math.PI) {
+                    angleDiff += 2 * Math.PI;
+                }
+            }
+            
+            const radius = 20;
+            
+            const startX = centerPoint.x + radius * Math.cos(startAngle);
+            const startY = centerPoint.y + radius * Math.sin(startAngle);
+            const endX = centerPoint.x + radius * Math.cos(endAngle);
+            const endY = centerPoint.y + radius * Math.sin(endAngle);
+            
+            const largeArcFlag = Math.abs(angleDiff) > Math.PI ? 1 : 0;
+            const sweepFlag = angleDiff > 0 ? 1 : 0;
+            
+            const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            const pathData = `M ${startX} ${startY} A ${radius} ${radius} 0 ${largeArcFlag} ${sweepFlag} ${endX} ${endY}`;
+            path.setAttribute('d', pathData);
+            path.setAttribute('class', 'angle-arc');
+            
+            labelsGroup.appendChild(path);
+        }
+
+        function calculateVertexAngle(vertexIndex) {
+            const current = points[vertexIndex];
+            const prev = points[vertexIndex - 1];
+            const next = points[vertexIndex + 1];
+            
+            const vec1 = { x: prev.x - current.x, y: prev.y - current.y };
+            const vec2 = { x: next.x - current.x, y: next.y - current.y };
+            
+            const dot = vec1.x * vec2.x + vec1.y * vec2.y;
+            const mag1 = Math.sqrt(vec1.x * vec1.x + vec1.y * vec1.y);
+            const mag2 = Math.sqrt(vec2.x * vec2.x + vec2.y * vec2.y);
+            
+            let angle = Math.acos(dot / (mag1 * mag2)) * 180 / Math.PI;
+            return angle;
+        }
+
+        function toggleCoatedSide() {
+            coatedSideRight = document.getElementById('sideToggle').checked;
+            redrawProfile();
+            
+            const sideText = coatedSideRight ? 'Side B Colored' : 'Side A Colored';
+            const currentMode = isEditMode ? 'Edit Mode' : 'Create Mode';
+            document.getElementById('mode').textContent = `${currentMode} - ${sideText}`;
+        }
+
+        function setMode(mode) {
+            const createBtn = document.getElementById('createModeBtn');
+            const editBtn = document.getElementById('editModeBtn');
+            const canvasContainer = document.getElementById('canvasContainer');
+            
+            if (mode === 'create') {
+                isEditMode = false;
+                isDrawing = true;
+                isDragging = false;
+                dragPointIndex = -1;
+                
+                createBtn.classList.add('active');
+                editBtn.classList.remove('active');
+                canvasContainer.classList.remove('edit-mode');
+                
+                const sideText = coatedSideRight ? 'Side B Colored' : 'Side A Colored';
+                document.getElementById('mode').textContent = `Create Mode - ${sideText}: Click on canvas to add points`;
+                
+                closeEditPopup();
+                redrawProfile();
+                
+            } else if (mode === 'edit') {
+                if (points.length < 2) {
+                    alert('Need at least 2 points to enter edit mode.');
+                    setMode('create');
+                    return;
+                }
+                
+                isEditMode = true;
+                isDrawing = false;
+                
+                createBtn.classList.remove('active');
+                editBtn.classList.add('active');
+                canvasContainer.classList.add('edit-mode');
+                
+                const sideText = coatedSideRight ? 'Side B Colored' : 'Side A Colored';
+                document.getElementById('mode').textContent = `Edit Mode - ${sideText}: Click measurements to edit, drag vertices to move`;
+                
+                redrawProfile();
+            }
+        }
+
+        function finishProfile() {
+            if (points.length < 2) {
+                alert('Need at least 2 points to finish the profile.');
+                return;
+            }
+            
+            isDrawing = false;
+            document.getElementById('mode').textContent = 'Profile finished. Use Edit mode to make changes.';
+            drawMeasurements();
+            updateStats();
+            clearPreviewLine();
+        }
+
+        function redrawProfile() {
+            pointsGroup.innerHTML = '';
+            linesGroup.innerHTML = '';
+            
+            points.forEach((point, index) => {
+                drawPoint(point, index);
+            });
+            
+            for (let i = 0; i < points.length - 1; i++) {
+                drawLine(points[i], points[i + 1], i);
+            }
+            
+            drawMeasurements();
+        }
+
+        function drawHem(pointIndex, hemType) {
+            const hemPoint = points[pointIndex];
+            const prevPoint = points[pointIndex - 1];
+            
+            // Calculate direction of the incoming line
+            const dx = hemPoint.x - prevPoint.x;
+            const dy = hemPoint.y - prevPoint.y;
+            const length = Math.sqrt(dx * dx + dy * dy);
+            
+            if (length === 0) return;
+            
+            // Normalize direction
+            const dirX = dx / length;
+            const dirY = dy / length;
+            
+            // Calculate perpendicular direction (90 degrees)
+            const perpX = -dirY;
+            const perpY = dirX;
+            
+            // Hem dimensions
+            const hemRadius = 15; // Radius of the 180-degree curve
+            const parallelLength = 30; // Length of parallel return line
+            
+            // Calculate curve center point
+            const curveCenter = {
+                x: hemPoint.x + perpX * hemRadius,
+                y: hemPoint.y + perpY * hemRadius
+            };
+            
+            // Calculate the 180-degree arc endpoints
+            const arcStart = {
+                x: curveCenter.x - perpX * hemRadius,
+                y: curveCenter.y - perpY * hemRadius
+            };
+            const arcEnd = {
+                x: curveCenter.x + perpX * hemRadius,
+                y: curveCenter.y + perpY * hemRadius
+            };
+            
+            // Draw the 180-degree curve
+            const curve = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            const pathData = `M ${arcStart.x} ${arcStart.y} A ${hemRadius} ${hemRadius} 0 0 1 ${arcEnd.x} ${arcEnd.y}`;
+            curve.setAttribute('d', pathData);
+            curve.setAttribute('class', 'hem-curve');
+            linesGroup.appendChild(curve);
+            
+            // Draw parallel return line
+            const parallelStart = arcEnd;
+            const parallelEnd = {
+                x: parallelStart.x - dirX * parallelLength,
+                y: parallelStart.y - dirY * parallelLength
+            };
+            
+            const parallelLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            parallelLine.setAttribute('x1', parallelStart.x);
+            parallelLine.setAttribute('y1', parallelStart.y);
+            parallelLine.setAttribute('x2', parallelEnd.x);
+            parallelLine.setAttribute('y2', parallelEnd.y);
+            parallelLine.setAttribute('class', 'hem-parallel');
+            linesGroup.appendChild(parallelLine);
+            
+            // For open hems, add a small gap indicator
+            if (hemType === 'open') {
+                const gapSize = 3;
+                const gapLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                gapLine.setAttribute('x1', parallelEnd.x - perpX * gapSize);
+                gapLine.setAttribute('y1', parallelEnd.y - perpY * gapSize);
+                gapLine.setAttribute('x2', parallelEnd.x + perpX * gapSize);
+                gapLine.setAttribute('y2', parallelEnd.y + perpY * gapSize);
+                gapLine.setAttribute('stroke', '#ff6b35');
+                gapLine.setAttribute('stroke-width', '2');
+                linesGroup.appendChild(gapLine);
+            }
+        }
+
+        function clearCanvas() {
+            points = [];
+            pointsGroup.innerHTML = '';
+            linesGroup.innerHTML = '';
+            labelsGroup.innerHTML = '';
+            isDrawing = true;
+            isEditMode = false;
+            isDragging = false;
+            dragPointIndex = -1;
+            
+            setMode('create');
+            
+            closeEditPopup();
+            
+            document.getElementById('profileName').value = '';
+            document.getElementById('profileDescription').value = '';
+            document.getElementById('mode').textContent = 'Click on the canvas to start drawing your profile';
+            updateStats();
+            clearPreviewLine();
+        }
+
+        function updateStats() {
+            let totalLength = 0;
+            for (let i = 0; i < points.length - 1; i++) {
+                const current = points[i];
+                const next = points[i + 1];
+                const deltaX = (next.x - current.x) / scale;
+                const deltaY = (current.y - next.y) / scale;
+                totalLength += Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+            }
+            
+            document.getElementById('totalLength').textContent = `${totalLength.toFixed(3)}"`;
+        }
+
+        function applyLengthEditByIndex(lineIndex, newLength) {
+            const startPoint = points[lineIndex];
+            const endPoint = points[lineIndex + 1];
+            
+            const deltaX = endPoint.x - startPoint.x;
+            const deltaY = endPoint.y - startPoint.y;
+            const currentLength = Math.sqrt(deltaX * deltaX + deltaY * deltaY) / scale;
+            
+            if (currentLength === 0) return;
+            
+            const ratio = (newLength * scale) / (currentLength * scale);
+            const newEndPoint = {
+                x: startPoint.x + deltaX * ratio,
+                y: startPoint.y + deltaY * ratio
+            };
+            
+            points[lineIndex + 1] = newEndPoint;
+        }
+
+        function applyAngleEditByIndex(vertexIndex, newAngle) {
+            const actualVertexIndex = vertexIndex + 1;
+            const maxVertices = Math.max(0, points.length - 2);
+            if (maxVertices === 0 || actualVertexIndex >= points.length - 1) return;
+            
+            const currentPoint = points[actualVertexIndex];
+            const prevPoint = points[actualVertexIndex - 1];
+            const nextPoint = points[actualVertexIndex + 1];
+            
+            const deltaX = nextPoint.x - currentPoint.x;
+            const deltaY = nextPoint.y - currentPoint.y;
+            const lineLength = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+            
+            const prevAngle = Math.atan2(prevPoint.y - currentPoint.y, prevPoint.x - currentPoint.x);
+            const newAngleRad = prevAngle + Math.PI - (newAngle * Math.PI / 180);
+            
+            points[actualVertexIndex + 1] = {
+                x: currentPoint.x + Math.cos(newAngleRad) * lineLength,
+                y: currentPoint.y + Math.sin(newAngleRad) * lineLength
+            };
+        }
+
+        // Initialize canvas size
+        function resizeCanvas() {
+            const container = document.querySelector('.canvas-container');
+            canvas.setAttribute('width', container.clientWidth);
+            canvas.setAttribute('height', container.clientHeight);
+        }
+
+        // Close popup when clicking outside
+        document.addEventListener('click', function(e) {
+            const editPopup = document.getElementById('editPopup');
+            
+            if (editPopup.style.display === 'block' && !editPopup.contains(e.target)) {
+                closeEditPopup();
+            }
+        });
+
+        // Handle Enter key in popup input
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' && document.getElementById('editPopup').style.display === 'block') {
+                applyPopupEdit();
+            }
+            if (e.key === 'Escape' && document.getElementById('editPopup').style.display === 'block') {
+                closeEditPopup();
+            }
+        });
+
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+    </script>
+</body>
+</html>

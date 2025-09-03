@@ -1,0 +1,91 @@
+<t t-name="website.draw">
+    <t t-call="website.layout">
+        <div id="wrap" class="oe_structure">
+            <div class="container">
+                <div class="header">
+                    <img class="logo" src="Kynetic Logo.webp" alt="Kynetic Logo" style="width:200px;height:auto;flex-shrink:0;border-radius:10px;box-shadow:0 4px 12px rgba(0,0,0,0.15);">
+                    <div class="header-text">
+                        <h1>2D Profile Designer</h1>
+                        <p>Precision Metal Forming Solutions</p>
+                    </div>
+                </div>
+                <div class="top-controls">
+                    <div class="profile-info">
+                        <div class="input-field">
+                            <label for="profileName">Profile Name</label>
+                            <input type="text" id="profileName" placeholder="Enter profile name">
+                        </div>
+                        <div class="input-field">
+                            <label for="profileDescription">Description</label>
+                            <input type="text" id="profileDescription" placeholder="Enter description">
+                        </div>
+                        <div class="input-field">
+                            <label>Total Material Usage</label>
+                            <div style="padding: 8px 12px; background: #e9ecef; border-radius: 6px; font-weight: bold; color: #2d5a5c;">
+                                <span id="totalLength">0.00"</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mode-controls">
+                        <div class="side-indicator">
+                            <label class="toggle-label">
+                                <span>Colored Side:</span>
+                                <div class="side-toggle">
+                                    <input type="checkbox" id="sideToggle" onchange="toggleCoatedSide()">
+                                    <div class="toggle-slider">
+                                        <span class="side-label left">A</span>
+                                        <span class="side-label right">B</span>
+                                    </div>
+                                </div>
+                            </label>
+                        </div>
+                        <div class="mode-toggle">
+                            <button class="mode-btn active" onclick="setMode('create')" id="createModeBtn">Create</button>
+                            <button class="mode-btn" onclick="setMode('edit')" id="editModeBtn">Edit</button>
+                        </div>
+                        <button class="btn btn-success" onclick="finishProfile()">Finish Profile</button>
+                        <button class="btn btn-primary" onclick="downloadProfileImage()">Download Image</button>
+                        <button class="btn btn-danger" onclick="clearCanvas()">Clear All</button>
+                    </div>
+                </div>
+                <div class="main-content">
+                    <div class="canvas-container" id="canvasContainer">
+                        <svg id="canvas" width="100%" height="100%">
+                            <defs>
+                                <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+                                    <polygon points="0 0, 10 3.5, 0 7" fill="#4a7c7e" />
+                                </marker>
+                            </defs>
+                            <g id="grid"></g>
+                            <g id="lines"></g>
+                            <g id="points"></g>
+                            <g id="labels"></g>
+                        </svg>
+                        <!-- Edit Popup -->
+                        <div id="editPopup" class="edit-popup">
+                            <h4 id="popupTitle">Edit Element</h4>
+                            <div class="input-group">
+                                <label id="popupLabel">Value:</label>
+                                <input type="number" id="popupInput" step="0.125" placeholder="Enter value">
+                            </div>
+                            <div>
+                                <button class="btn btn-primary" onclick="applyPopupEdit()">Apply</button>
+                                <button class="btn btn-danger" onclick="closeEditPopup()">Cancel</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="status">
+                    <span id="mode">Click on the canvas to start drawing your profile</span>
+                    <span class="coords" id="coordinates">Mouse: (0, 0)</span>
+                </div>
+                <style>
+                    /* All CSS from your profile.html goes here */
+                </style>
+                <script type="text/javascript">
+                    // All JS from your profile.html goes here
+                </script>
+            </div>
+        </div>
+    </t>
+</t>
