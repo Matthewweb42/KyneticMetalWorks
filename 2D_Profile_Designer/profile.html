@@ -1,6 +1,3 @@
-// Store last preview mouse coordinates
-let lastPreviewMouse = null;
-    lastPreviewMouse = { x: mouseX, y: mouseY };
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -68,11 +65,13 @@ let lastPreviewMouse = null;
             display: flex;
             gap: 30px;
             align-items: center;
-            flex-wrap: wrap;
+            flex-wrap: nowrap;
+            min-width: 0;
         }
 
         .profile-info {
-            flex: 1;
+            flex: 1 1 auto;
+            min-width: 0;
             display: flex;
             gap: 20px;
             align-items: center;
@@ -82,6 +81,7 @@ let lastPreviewMouse = null;
             display: flex;
             flex-direction: column;
             gap: 5px;
+            min-width: 0;
         }
 
         .input-field label {
@@ -195,9 +195,11 @@ let lastPreviewMouse = null;
         }
 
         .mode-controls {
+            flex-shrink: 0;
             display: flex;
             gap: 15px;
             align-items: center;
+            min-width: 0;
         }
 
         .mode-toggle {
@@ -426,7 +428,7 @@ let lastPreviewMouse = null;
         }
 
         .line {
-            stroke: #2c3e50;
+            stroke: #b0b4b9;
             stroke-width: 3;
             fill: none;
             stroke-linecap: round;
@@ -483,11 +485,37 @@ let lastPreviewMouse = null;
             .top-controls {
                 flex-direction: column;
                 align-items: stretch;
+                flex-wrap: wrap;
             }
             
             .profile-info {
                 flex-direction: column;
             }
+        }
+
+        /* Line Cross Popup */
+        #lineCrossPopup {
+            position: fixed;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            border: 2px solid #e74c3c;
+            border-radius: 10px;
+            padding: 24px;
+            z-index: 3000;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            display: none;
+        }
+
+        #lineCrossPopup h3 {
+            color: #e74c3c;
+            margin-bottom: 12px;
+        }
+
+        #lineCrossPopup .btn {
+            width: 100%;
+            margin-top: 12px;
         }
     </style>
 </head>
@@ -672,7 +700,8 @@ let lastPreviewMouse = null;
             
             // Handle dragging in edit mode
             if (isDragging && dragPointIndex >= 0) {
-                points[dragPointIndex] = { x: x, y: y };
+                // Preserve custom properties like isHem
+                points[dragPointIndex] = { ...points[dragPointIndex], x: x, y: y };
                 redrawProfile();
                 return;
             }
@@ -743,28 +772,21 @@ let lastPreviewMouse = null;
                 for (let i = 0; i < points.length - 2; i++) {
                     const lineA = { start: points[i], end: points[i + 1] };
                     if (doLinesIntersect(lineA.start, lineA.end, newLine.start, newLine.end)) {
-                        alert('Lines cannot cross!');
+                        showLineCrossPopup();
                         return;
                     }
                 }
             }
             points.push(point);
-
             drawPoint(point, points.length - 1);
-
             if (points.length > 1) {
                 drawLine(points[points.length - 2], point, points.length - 2);
-                drawMeasurements();
-
-                // Check angle for Hem logic
-                if (points.length > 2) {
-                    const angle = calculateVertexAngle(points.length - 2);
-                    if (angle < 20) {
-                        setTimeout(() => showHemPopup(points.length - 1), 200);
-                    }
-                }
+                clearPreviewLine(); // Remove preview line and label immediately
+                drawMeasurements(); // Draw permanent label
+                // Remove preview angle label immediately
+                const angleLabel = document.getElementById('preview-angle-label');
+                if (angleLabel) angleLabel.remove();
             }
-
             updateStats();
             clearPreviewLine();
         }
@@ -777,52 +799,9 @@ let lastPreviewMouse = null;
             return (ccw(p1, p3, p4) !== ccw(p2, p3, p4)) && (ccw(p1, p2, p3) !== ccw(p1, p2, p4));
         }
 
-        // Hem popup logic
+        // Remove all Hem logic from showHemPopup
         function showHemPopup(pointIndex) {
-            // Create popup HTML
-            let hemPopup = document.getElementById('hemPopup');
-            if (!hemPopup) {
-                hemPopup = document.createElement('div');
-                hemPopup.id = 'hemPopup';
-                hemPopup.style.position = 'fixed';
-                hemPopup.style.left = '50%';
-                hemPopup.style.top = '50%';
-                hemPopup.style.transform = 'translate(-50%, -50%)';
-                hemPopup.style.background = 'white';
-                hemPopup.style.border = '2px solid #3498db';
-                hemPopup.style.borderRadius = '10px';
-                hemPopup.style.padding = '24px';
-                hemPopup.style.zIndex = '2000';
-                hemPopup.style.boxShadow = '0 10px 30px rgba(0,0,0,0.3)';
-                hemPopup.innerHTML = `
-                    <h3 style="margin-bottom:12px;">Hem Creation</h3>
-                    <div style="margin-bottom:10px;">
-                        <label>Hem Type:</label>
-                        <select id="hemTypeSelect">
-                            <option value="open">Open Hem</option>
-                            <option value="closed">Closed Hem</option>
-                        </select>
-                    </div>
-                    <div style="margin-bottom:10px;">
-                        <label>Hem Length (inches):</label>
-                        <input type="number" id="hemLengthInput" min="0.125" step="0.125" value="1">
-                    </div>
-                    <div id="openHemExtra" style="margin-bottom:10px;">
-                        <label>Open Amount (inches):</label>
-                        <input type="number" id="openAmountInput" min="0" step="0.125" value="0.25">
-                    </div>
-                    <div style="margin-top:16px;display:flex;gap:10px;">
-                        <button class="btn btn-primary" onclick="applyHemPopup(${pointIndex})">Apply</button>
-                        <button class="btn btn-danger" onclick="closeHemPopup()">Cancel</button>
-                    </div>
-                `;
-                document.body.appendChild(hemPopup);
-                document.getElementById('hemTypeSelect').addEventListener('change', function() {
-                    document.getElementById('openHemExtra').style.display = this.value === 'open' ? 'block' : 'none';
-                });
-            } else {
-                hemPopup.style.display = 'block';
-            }
+            // No Hem popup logic
         }
 
         function closeHemPopup() {
@@ -831,142 +810,13 @@ let lastPreviewMouse = null;
         }
 
         function applyHemPopup(pointIndex) {
-            const hemType = document.getElementById('hemTypeSelect').value;
-            const hemLength = parseFloat(document.getElementById('hemLengthInput').value);
-            let openAmount = 0;
-            if (hemType === 'open') {
-                openAmount = parseFloat(document.getElementById('openAmountInput').value);
-            }
-            // Remove the last point (second line of hem) from data
-            if (points.length > 1) {
-                points.splice(pointIndex, 1);
-                // Ensure the hem popup disappears immediately after deletion
-                closeHemPopup();
-            }
-            // Remove the last SVG line (phantom line)
-            const lastLine = linesGroup.querySelector('line[data-index="' + (pointIndex - 1) + '"]');
-            if (lastLine) {
-                lastLine.remove();
-            }
+            closeHemPopup();
             redrawProfile();
-            // Simple hem visualization: thick orange arc and bold 'HEM' label
-            if (points.length > 1) {
-                const start = points[points.length - 2];
-                const end = points[points.length - 1];
-                const dx = end.x - start.x;
-                const dy = end.y - start.y;
-                const segLen = Math.sqrt(dx * dx + dy * dy);
-                if (segLen > 0) {
-                    // Arc parameters
-                    const arcRadius = 18;
-                    const dirX = dx / segLen;
-                    const dirY = dy / segLen;
-                    const perpX = -dirY;
-                    const perpY = dirX;
-                    // Arc center offset from end
-                    const arcCenter = {
-                        x: end.x + perpX * arcRadius,
-                        y: end.y + perpY * arcRadius
-                    };
-                    // Arc start/end
-                    const arcStart = {
-                        x: end.x,
-                        y: end.y
-                    };
-                    const arcEnd = {
-                        x: end.x + dirX * 20 + perpX * arcRadius,
-                        y: end.y + dirY * 20 + perpY * arcRadius
-                    };
-                    // Draw the arc
-                    const arcPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-                    const arcD = `M ${arcStart.x} ${arcStart.y} Q ${arcCenter.x} ${arcCenter.y} ${arcEnd.x} ${arcEnd.y}`;
-                    arcPath.setAttribute('d', arcD);
-                    arcPath.setAttribute('stroke', '#ff6b35');
-                    arcPath.setAttribute('stroke-width', '8');
-                    arcPath.setAttribute('fill', 'none');
-                    arcPath.setAttribute('class', 'hem-arc');
-                    linesGroup.appendChild(arcPath);
-                    // Add big 'HEM' label
-                    const hemLabel = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-                    hemLabel.setAttribute('x', arcEnd.x + perpX * 18);
-                    hemLabel.setAttribute('y', arcEnd.y + perpY * 18);
-                    hemLabel.setAttribute('fill', '#ff6b35');
-                    hemLabel.setAttribute('font-size', '36');
-                    hemLabel.setAttribute('font-family', 'Segoe UI, Arial, sans-serif');
-                    hemLabel.setAttribute('font-weight', 'bold');
-                    hemLabel.setAttribute('text-anchor', 'middle');
-                    hemLabel.setAttribute('dominant-baseline', 'central');
-                    hemLabel.textContent = 'HEM';
-                    linesGroup.appendChild(hemLabel);
-                }
-            }
-            // Force switch to edit mode and prevent further drawing
-            setMode('edit');
         }
 
         // Update drawHem to use new parameters
         function drawHem(pointIndex, hemType, hemLength, openAmount) {
-            const hemPoint = points[pointIndex];
-            const prevPoint = points[pointIndex - 1];
-            const dx = hemPoint.x - prevPoint.x;
-            const dy = hemPoint.y - prevPoint.y;
-            const length = Math.sqrt(dx * dx + dy * dy);
-            if (length === 0) return;
-            const dirX = dx / length;
-            const dirY = dy / length;
-            const perpX = -dirY;
-            const perpY = dirX;
-            // Use hemLength for parallel return line
-            const hemRadius = 15; // fixed radius for curve
-            const parallelLength = hemLength * scale;
-            const curveCenter = {
-                x: hemPoint.x + perpX * hemRadius,
-                y: hemPoint.y + perpY * hemRadius
-            };
-            const arcStart = {
-                x: curveCenter.x - perpX * hemRadius,
-                y: curveCenter.y - perpY * hemRadius
-            };
-            const arcEnd = {
-                x: curveCenter.x + perpX * hemRadius,
-                y: curveCenter.y + perpY * hemRadius
-            };
-            const curve = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-            const pathData = `M ${arcStart.x} ${arcStart.y} A ${hemRadius} ${hemRadius} 0 0 1 ${arcEnd.x} ${arcEnd.y}`;
-            curve.setAttribute('d', pathData);
-            curve.setAttribute('class', 'hem-curve');
-            linesGroup.appendChild(curve);
-            // Draw parallel return line
-            const parallelStart = arcEnd;
-            const parallelEnd = {
-                x: parallelStart.x - dirX * parallelLength,
-                y: parallelStart.y - dirY * parallelLength
-            };
-            const parallelLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-            parallelLine.setAttribute('x1', parallelStart.x);
-            parallelLine.setAttribute('y1', parallelStart.y);
-            parallelLine.setAttribute('x2', parallelEnd.x);
-            parallelLine.setAttribute('y2', parallelEnd.y);
-            parallelLine.setAttribute('class', 'hem-parallel');
-            linesGroup.appendChild(parallelLine);
-            // For open hems, add a small gap indicator
-            if (hemType === 'open') {
-                const gapSize = openAmount * scale;
-                const gapLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-                gapLine.setAttribute('x1', parallelEnd.x - perpX * gapSize);
-                gapLine.setAttribute('y1', parallelEnd.y - perpY * gapSize);
-                gapLine.setAttribute('x2', parallelEnd.x + perpX * gapSize);
-                gapLine.setAttribute('y2', parallelEnd.y + perpY * gapSize);
-                gapLine.setAttribute('stroke', '#ff6b35');
-                gapLine.setAttribute('stroke-width', '2');
-                linesGroup.appendChild(gapLine);
-            }
-            // Optionally: visually thicken the end of the triggering line
-            const triggerLine = document.querySelector(`line[data-index="${pointIndex-1}"]`);
-            if (triggerLine) {
-                triggerLine.setAttribute('stroke-width', '7');
-                triggerLine.setAttribute('stroke', '#ff6b35');
-            }
+            // No Hem drawing logic
         }
 
         function drawPoint(point, index) {
@@ -1055,8 +905,9 @@ let lastPreviewMouse = null;
             const deltaX = (mouseX - lastPoint.x) / scale;
             const deltaY = (lastPoint.y - mouseY) / scale;
             const length = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
-            const midX = (lastPoint.x + mouseX) / 2;
-            const midY = (lastPoint.y + mouseY) / 2 - 18; // above the line
+            // Move label off the line, above it in white space
+            const midX = (lastPoint.x + mouseX) / 2; // 12px left of center
+            const midY = (lastPoint.y + mouseY) / 2 - 24; // 24px above the line
 
             // Add or update preview length label
             let lengthLabel = document.getElementById('preview-length-label');
@@ -1066,6 +917,7 @@ let lastPreviewMouse = null;
                 lengthLabel.setAttribute('class', 'measurement-label');
                 lengthLabel.setAttribute('text-anchor', 'middle');
                 lengthLabel.setAttribute('dominant-baseline', 'central');
+
                 linesGroup.appendChild(lengthLabel);
             }
             lengthLabel.setAttribute('x', midX);
@@ -1077,7 +929,6 @@ let lastPreviewMouse = null;
                 const prev = points[points.length - 2];
                 const last = points[points.length - 1];
                 const mousePt = { x: mouseX, y: mouseY };
-                // Use the same logic as calculateVertexAngle
                 const vec1 = { x: prev.x - last.x, y: prev.y - last.y };
                 const vec2 = { x: mousePt.x - last.x, y: mousePt.y - last.y };
                 const dot = vec1.x * vec2.x + vec1.y * vec2.y;
@@ -1087,7 +938,7 @@ let lastPreviewMouse = null;
                 if (mag1 > 0 && mag2 > 0) {
                     angle = Math.acos(dot / (mag1 * mag2)) * 180 / Math.PI;
                 }
-                // Place angle label at the previous vertex
+                // Place angle label at the previous vertex, above it
                 let angleLabel = document.getElementById('preview-angle-label');
                 if (!angleLabel) {
                     angleLabel = document.createElementNS('http://www.w3.org/2000/svg', 'text');
@@ -1098,7 +949,7 @@ let lastPreviewMouse = null;
                     linesGroup.appendChild(angleLabel);
                 }
                 angleLabel.setAttribute('x', last.x);
-                angleLabel.setAttribute('y', last.y - 28);
+                angleLabel.setAttribute('y', last.y - 44); // 44px above vertex
                 angleLabel.textContent = `${angle.toFixed(1)}°`;
             } else {
                 // Remove angle label if not needed
@@ -1116,18 +967,16 @@ let lastPreviewMouse = null;
 
         function drawMeasurements() {
             labelsGroup.innerHTML = '';
-            
             const lineCount = points.length - 1;
-            
-            // Draw length measurements
             for (let i = 0; i < lineCount; i++) {
                 const current = points[i];
                 const next = points[i + 1];
                 const deltaX = (next.x - current.x) / scale;
                 const deltaY = (current.y - next.y) / scale;
                 const length = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+                // Move permanent label off the line, above it in white space
                 const midX = (current.x + next.x) / 2;
-                const midY = (current.y + next.y) / 2;
+                const midY = (current.y + next.y) / 2 - 24;
                 createClickableLabel(midX, midY, `${length.toFixed(3)}"`, 'measurement-label', 'length', i);
             }
             
@@ -1384,78 +1233,7 @@ let lastPreviewMouse = null;
         }
 
         function drawHem(pointIndex, hemType) {
-            const hemPoint = points[pointIndex];
-            const prevPoint = points[pointIndex - 1];
-            
-            // Calculate direction of the incoming line
-            const dx = hemPoint.x - prevPoint.x;
-            const dy = hemPoint.y - prevPoint.y;
-            const length = Math.sqrt(dx * dx + dy * dy);
-            
-            if (length === 0) return;
-            
-            // Normalize direction
-            const dirX = dx / length;
-            const dirY = dy / length;
-            
-            // Calculate perpendicular direction (90 degrees)
-            const perpX = -dirY;
-            const perpY = dirX;
-            
-            // Hem dimensions
-            const hemRadius = 15; // Radius of the 180-degree curve
-            const parallelLength = 30; // Length of parallel return line
-            
-            // Calculate curve center point
-            const curveCenter = {
-                x: hemPoint.x + perpX * hemRadius,
-                y: hemPoint.y + perpY * hemRadius
-            };
-            
-            // Calculate the 180-degree arc endpoints
-            const arcStart = {
-                x: curveCenter.x - perpX * hemRadius,
-                y: curveCenter.y - perpY * hemRadius
-            };
-            const arcEnd = {
-                x: curveCenter.x + perpX * hemRadius,
-                y: curveCenter.y + perpY * hemRadius
-            };
-            
-            // Draw the 180-degree curve
-            const curve = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-            const pathData = `M ${arcStart.x} ${arcStart.y} A ${hemRadius} ${hemRadius} 0 0 1 ${arcEnd.x} ${arcEnd.y}`;
-            curve.setAttribute('d', pathData);
-            curve.setAttribute('class', 'hem-curve');
-            linesGroup.appendChild(curve);
-            
-            // Draw parallel return line
-            const parallelStart = arcEnd;
-            const parallelEnd = {
-                x: parallelStart.x - dirX * parallelLength,
-                y: parallelStart.y - dirY * parallelLength
-            };
-            
-            const parallelLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-            parallelLine.setAttribute('x1', parallelStart.x);
-            parallelLine.setAttribute('y1', parallelStart.y);
-            parallelLine.setAttribute('x2', parallelEnd.x);
-            parallelLine.setAttribute('y2', parallelEnd.y);
-            parallelLine.setAttribute('class', 'hem-parallel');
-            linesGroup.appendChild(parallelLine);
-            
-            // For open hems, add a small gap indicator
-            if (hemType === 'open') {
-                const gapSize = 3;
-                const gapLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-                gapLine.setAttribute('x1', parallelEnd.x - perpX * gapSize);
-                gapLine.setAttribute('y1', parallelEnd.y - perpY * gapSize);
-                gapLine.setAttribute('x2', parallelEnd.x + perpX * gapSize);
-                gapLine.setAttribute('y2', parallelEnd.y + perpY * gapSize);
-                gapLine.setAttribute('stroke', '#ff6b35');
-                gapLine.setAttribute('stroke-width', '2');
-                linesGroup.appendChild(gapLine);
-            }
+            // Remove all Hem logic from drawHem
         }
 
         function clearCanvas() {
@@ -1508,7 +1286,7 @@ let lastPreviewMouse = null;
                 y: startPoint.y + deltaY * ratio
             };
             
-            points[lineIndex + 1] = newEndPoint;
+            points[lineIndex + 1] = { ...endPoint, x: newEndPoint.x, y: newEndPoint.y };
         }
 
         function applyAngleEditByIndex(vertexIndex, newAngle) {
@@ -1527,10 +1305,7 @@ let lastPreviewMouse = null;
             const prevAngle = Math.atan2(prevPoint.y - currentPoint.y, prevPoint.x - currentPoint.x);
             const newAngleRad = prevAngle + Math.PI - (newAngle * Math.PI / 180);
             
-            points[actualVertexIndex + 1] = {
-                x: currentPoint.x + Math.cos(newAngleRad) * lineLength,
-                y: currentPoint.y + Math.sin(newAngleRad) * lineLength
-            };
+            points[actualVertexIndex + 1] = { ...points[actualVertexIndex + 1], x: newX, y: newY };
         }
 
         // Initialize canvas size
@@ -1561,6 +1336,37 @@ let lastPreviewMouse = null;
 
         window.addEventListener('resize', resizeCanvas);
         resizeCanvas();
+
+        function showLineCrossPopup() {
+            let popup = document.getElementById('lineCrossPopup');
+            if (!popup) {
+                popup = document.createElement('div');
+                popup.id = 'lineCrossPopup';
+                popup.style.position = 'fixed';
+                popup.style.left = '50%';
+                popup.style.top = '50%';
+                popup.style.transform = 'translate(-50%, -50%)';
+                popup.style.background = 'white';
+                popup.style.border = '2px solid #e74c3c';
+                popup.style.borderRadius = '10px';
+                popup.style.padding = '24px';
+                popup.style.zIndex = '3000';
+                popup.style.boxShadow = '0 10px 30px rgba(0,0,0,0.3)';
+                popup.innerHTML = `
+                    <h3 style="color:#e74c3c;margin-bottom:12px;">Invalid Action</h3>
+                    <div style="margin-bottom:16px;">Lines cannot cross. Please adjust your profile.</div>
+                    <button class="btn btn-danger" onclick="closeLineCrossPopup()">Close</button>
+                `;
+                document.body.appendChild(popup);
+            } else {
+                popup.style.display = 'block';
+            }
+        }
+
+        function closeLineCrossPopup() {
+            const popup = document.getElementById('lineCrossPopup');
+            if (popup) popup.style.display = 'none';
+        }
     </script>
 </body>
 </html>

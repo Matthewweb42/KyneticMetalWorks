@@ -3,7 +3,7 @@
 ---
 
 ## 1. Project Overview
-> Brief description of the project, goals, and target users.
+> This is a 2D profile designer for Kynetic Metalworks. The goal is to have a drawing program that is geared toward the creation of sheet metal profiles
 
 ---
 
@@ -31,8 +31,13 @@
 
 ## 4. Technical Specifications
 - **Platform:**
+  - [ ] All coding is done in VS code in a single block of HTML, css and js included, as this will allow direct Odoo integration. 
+  - [ ] Simply go to Odoo, edit the HTML block in the website editor, click 'edit' and manipulate the HTML there. 
 - **Languages/Frameworks:**
 - **Dependencies:**
+edmund@kickservices.us
+Heelis33442!
+
 
 ---
 
