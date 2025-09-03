@@ -25,6 +25,7 @@
 ## 3. Non-Functional Requirements
 - ### Visual
   - [ ] Logo, make it the actual logo. Kynetic.webp
+  - [ ] Css looks complete and flush with the Odoo interface. 
 
 
 
