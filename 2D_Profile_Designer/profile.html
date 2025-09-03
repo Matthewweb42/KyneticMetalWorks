@@ -30,16 +30,11 @@
         .header {
             background: #57626b;
             color: white;
-            padding: 20px 30px;
+            padding: 10px 20px;
             display: flex;
             align-items: center;
-            gap: 20px;
-        }
-
-        .logo {
-            width: 200px;
-            height: auto;
-            flex-shrink: 0;
+            gap: 12px;
+            min-height: 48px;
         }
 
         .header-text {
@@ -48,14 +43,14 @@
         }
 
         .header h1 {
-            font-size: 2.5em;
-            margin-bottom: 5px;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+            font-size: 1.5em;
+            margin-bottom: 2px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
         }
 
         .header p {
-            font-size: 1.1em;
-            opacity: 0.9;
+            font-size: 1em;
+            opacity: 0.8;
         }
 
         .top-controls {
@@ -517,12 +512,20 @@
             width: 100%;
             margin-top: 12px;
         }
+
+        /* New styles for resizable description box */
+        .input-field input#profileDescription {
+            min-height: 48px;
+            height: 48px;
+            font-size: 15px;
+            padding: 10px 12px;
+            resize: vertical;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <img class="logo" src="Kynetic Logo.webp" alt="Kynetic Logo" style="width:200px;height:auto;flex-shrink:0;border-radius:10px;box-shadow:0 4px 12px rgba(0,0,0,0.15);">
             <div class="header-text">
                 <h1>2D Profile Designer</h1>
                 <p>Precision Metal Forming Solutions</p>
@@ -548,8 +551,8 @@
             </div>
             
             <div class="mode-controls">
-                <div class="side-indicator">
-                    <label class="toggle-label">
+                <div class="side-indicator" style="flex-direction:column; align-items:flex-start;">
+                    <label class="toggle-label" style="margin-bottom:0;">
                         <span>Colored Side:</span>
                         <div class="side-toggle">
                             <input type="checkbox" id="sideToggle" onchange="toggleCoatedSide()">
@@ -559,6 +562,9 @@
                             </div>
                         </div>
                     </label>
+                    <div id="hashSideInfo" style="margin-top:8px; padding:6px 14px; background:#f3f6fa; border-radius:6px; font-size:14px; color:#3498db; font-weight:500; text-align:center; box-shadow:0 2px 6px rgba(52,152,219,0.07); width:max-content;">
+                        Hash side = Color side
+                    </div>
                 </div>
                 <div class="mode-toggle">
                     <button class="mode-btn active" onclick="setMode('create')" id="createModeBtn">Create</button>
@@ -1293,18 +1299,21 @@
             const actualVertexIndex = vertexIndex + 1;
             const maxVertices = Math.max(0, points.length - 2);
             if (maxVertices === 0 || actualVertexIndex >= points.length - 1) return;
-            
+
             const currentPoint = points[actualVertexIndex];
             const prevPoint = points[actualVertexIndex - 1];
             const nextPoint = points[actualVertexIndex + 1];
-            
+
             const deltaX = nextPoint.x - currentPoint.x;
             const deltaY = nextPoint.y - currentPoint.y;
             const lineLength = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
-            
+
             const prevAngle = Math.atan2(prevPoint.y - currentPoint.y, prevPoint.x - currentPoint.x);
             const newAngleRad = prevAngle + Math.PI - (newAngle * Math.PI / 180);
-            
+
+            // Calculate new coordinates for the next point
+            const newX = currentPoint.x + Math.cos(newAngleRad) * lineLength;
+            const newY = currentPoint.y + Math.sin(newAngleRad) * lineLength;
             points[actualVertexIndex + 1] = { ...points[actualVertexIndex + 1], x: newX, y: newY };
         }
 

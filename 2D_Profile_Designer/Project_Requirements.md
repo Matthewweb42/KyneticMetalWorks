@@ -18,6 +18,7 @@
   - [ ] When the profile is done, allow image download/creation with all the coorosponding information. 
 - ### Line rules
   - [ ] Lines cannot cross. 
+  - [ ] Lines snap to perfect horizontal or vertical so that it looks flush and even with the borders of the canvas. 
 
 ---
 
@@ -55,8 +56,7 @@ Heelis33442!
 
 ---
 
-## 7. References
-- [ ] Link or document 1
-- [ ] Link or document 2
-
+## 7. ToDo
+- [ ] Saved images actually work. v1.2
+- [ ] Hem stuff v1.3
 ---
