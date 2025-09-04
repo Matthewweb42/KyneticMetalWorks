@@ -650,7 +650,8 @@
         let dragPointIndex = -1;
         let currentEditElement = null;
         let coatedSideRight = false; // false = left/top coated, true = right/bottom coated
-        let points = [];
+    let points = [];
+    // ...existing code...
         let scale = 20; // pixels per inch
         let offset = { x: 50, y: 50 };
 
@@ -795,6 +796,15 @@
             }
             updateStats();
             clearPreviewLine();
+            // Hem detection: if a new angle < 30° is created, show the hem popup
+            if (points.length > 2) {
+                // The new vertex is at points.length - 2 (the previous point)
+                const vertexIndex = points.length - 2;
+                const angle = calculateVertexAngle(vertexIndex);
+                if (angle < 30) {
+                    showHemPopup(vertexIndex);
+                }
+            }
         }
 
         // Helper function to check if two line segments intersect
@@ -805,10 +815,185 @@
             return (ccw(p1, p3, p4) !== ccw(p2, p3, p4)) && (ccw(p1, p2, p3) !== ccw(p1, p2, p4));
         }
 
-        // Remove all Hem logic from showHemPopup
+        // Custom modal for Hem prompt
         function showHemPopup(pointIndex) {
-            // No Hem popup logic
+            let modal = document.getElementById('hemPromptModal');
+            if (!modal) {
+                modal = document.createElement('div');
+                modal.id = 'hemPromptModal';
+                modal.innerHTML = `
+                    <div class="hem-modal-content">
+                        <div class="hem-modal-title">Create Hem?</div>
+                        <div class="hem-modal-body">Do you want to make a hem at this angle?</div>
+                        <div class="hem-modal-actions">
+                            <button id="hemYesBtn">Yes</button>
+                            <button id="hemNoBtn">No</button>
+                        </div>
+                    </div>
+                `;
+                document.body.appendChild(modal);
+                // Add CSS if not present
+                if (!document.getElementById('hemModalStyle')) {
+                    const style = document.createElement('style');
+                    style.id = 'hemModalStyle';
+                    style.textContent = `
+                        #hemPromptModal {
+                            position: fixed;
+                            top: 0; left: 0; right: 0; bottom: 0;
+                            background: rgba(0,0,0,0.3);
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            z-index: 9999;
+                        }
+                        .hem-modal-content {
+                            background: #fff;
+                            border-radius: 10px;
+                            box-shadow: 0 4px 24px rgba(0,0,0,0.18);
+                            padding: 32px 28px 20px 28px;
+                            min-width: 320px;
+                            text-align: center;
+                        }
+                        .hem-modal-title {
+                            font-size: 1.3em;
+                            font-weight: bold;
+                            margin-bottom: 12px;
+                        }
+                        .hem-modal-body {
+                            margin-bottom: 18px;
+                        }
+                        .hem-modal-actions {
+                            display: flex;
+                            gap: 18px;
+                            justify-content: center;
+                        }
+                        .hem-modal-actions button {
+                            font-size: 1em;
+                            padding: 7px 22px;
+                            border-radius: 6px;
+                            border: none;
+                            background: #57626b;
+                            color: #fff;
+                            cursor: pointer;
+                            transition: background 0.2s;
+                        }
+                        .hem-modal-actions button:hover {
+                            background: #2d3338;
+                        }
+                    `;
+                    document.head.appendChild(style);
+                }
+            } else {
+                modal.style.display = 'flex';
+            }
+            // Button handlers
+            document.getElementById('hemYesBtn').onclick = function() {
+                modal.style.display = 'none';
+                showSimpleHemDetailsModal(pointIndex);
+            };
+            document.getElementById('hemNoBtn').onclick = function() {
+                modal.style.display = 'none';
+            };
         }
+        // Simple modal for hem details
+    function showSimpleHemDetailsModal(pointIndex) {
+            let modal = document.getElementById('hemDetailsModal');
+            if (!modal) {
+                modal = document.createElement('div');
+                modal.id = 'hemDetailsModal';
+                modal.innerHTML = `
+                    <div class="hem-modal-content">
+                        <div class="hem-modal-title">Hem Details</div>
+                        <div class="hem-modal-body">
+                            <div style="margin-bottom:12px;">
+                                <label>Length of Hem? <input id="hemLengthInput" type="number" min="0" step="0.1" style="width:80px;" /></label>
+                            </div>
+                            <div style="margin-bottom:12px;">
+                                <label>Open or Closed Hem? 
+                                    <select id="hemTypeSelect">
+                                        <option value="closed">Closed</option>
+                                        <option value="open">Open</option>
+                                    </select>
+                                </label>
+                            </div>
+                            <div id="openAmountRow" style="margin-bottom:12px; display:none;">
+                                <label>If open, by how much? <input id="hemOpenAmountInput" type="number" min="0" step="0.1" style="width:80px;" /></label>
+                            </div>
+                        </div>
+                        <div class="hem-modal-actions">
+                            <button id="hemDetailsOkBtn">OK</button>
+                            <button id="hemDetailsCancelBtn">Cancel</button>
+                        </div>
+                    </div>
+                `;
+                // Use same modal CSS as yes/no modal
+                modal.style.position = 'fixed';
+                modal.style.top = '0';
+                modal.style.left = '0';
+                modal.style.right = '0';
+                modal.style.bottom = '0';
+                modal.style.background = 'rgba(0,0,0,0.3)';
+                modal.style.display = 'flex';
+                modal.style.alignItems = 'center';
+                modal.style.justifyContent = 'center';
+                modal.style.zIndex = '9999';
+                document.body.appendChild(modal);
+            } else {
+                modal.style.display = 'flex';
+            }
+            // Show/hide open amount row
+            const hemTypeSelect = document.getElementById('hemTypeSelect');
+            const openAmountRow = document.getElementById('openAmountRow');
+            hemTypeSelect.onchange = function() {
+                if (hemTypeSelect.value === 'open') {
+                    openAmountRow.style.display = '';
+                } else {
+                    openAmountRow.style.display = 'none';
+                }
+            };
+            document.getElementById('hemDetailsCancelBtn').onclick = function() {
+                modal.style.display = 'none';
+            };
+            document.getElementById('hemDetailsOkBtn').onclick = function() {
+                const length = parseFloat(document.getElementById('hemLengthInput').value);
+                const type = document.getElementById('hemTypeSelect').value;
+                let openAmount = null;
+                if (type === 'open') {
+                    openAmount = document.getElementById('hemOpenAmountInput').value;
+                }
+                modal.style.display = 'none';
+
+                // Change the most recent line's length to the specified hem length
+                // The most recent line is the last one added: index = points.length - 2
+                if (!isNaN(length) && points.length > 1) {
+                    applyLengthEditByIndex(points.length - 2, length);
+                    alert('Hem function called!');
+                }
+
+                }
+
+                // Redraw profile to update the SVG
+                redrawProfile();
+
+                // Turn the most recent line orange
+                // Find the SVG line element for the most recent line
+                const lineIndex = points.length - 2;
+                const lineEl = document.querySelector(`line[data-index="${lineIndex}"]`);
+                if (lineEl) {
+                    lineEl.setAttribute('stroke', '#ff6b35');
+                }
+
+                // Update the measurement label for the most recent line to orange
+                // Find the label by data-type and data-index
+                const labelEl = document.querySelector(`text.measurement-label[data-type="length"][data-index="${lineIndex}"]`);
+                if (labelEl) {
+                    labelEl.setAttribute('fill', '#ff6b35');
+                }
+
+                // After hem creation, enter edit mode
+                setMode('edit');
+            };
+        
 
         function closeHemPopup() {
             const hemPopup = document.getElementById('hemPopup');
