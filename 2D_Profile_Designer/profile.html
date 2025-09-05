@@ -906,7 +906,7 @@
                         <div class="hem-modal-title">Hem Details</div>
                         <div class="hem-modal-body">
                             <div style="margin-bottom:12px;">
-                                <label>Length of Hem? <input id="hemLengthInput" type="number" min="0" step="0.1" style="width:80px;" /></label>
+                                <label>Length of Hem? <input id="hemLengthInput" type="number" min="0" step="0.1" style="width:80px;" /> in</label>
                             </div>
                             <div style="margin-bottom:12px;">
                                 <label>Open or Closed Hem? 
@@ -917,7 +917,7 @@
                                 </label>
                             </div>
                             <div id="openAmountRow" style="margin-bottom:12px; display:none;">
-                                <label>If open, by how much? <input id="hemOpenAmountInput" type="number" min="0" step="0.1" style="width:80px;" /></label>
+                                <label>If open, by how much? <input id="hemOpenAmountInput" type="number" min="0" step="0.1" style="width:80px;" /> in</label>
                             </div>
                         </div>
                         <div class="hem-modal-actions">
@@ -967,7 +967,117 @@
                 // The most recent line is the last one added: index = points.length - 2
                 if (!isNaN(length) && points.length > 1) {
                     applyLengthEditByIndex(points.length - 2, length);
-                    alert('Hem function called!');
+                    // Set hem vertex index so label is only shown when hem is created
+                    window.hemVertexIndex = points.length - 2;
+                    // Store hem info for display
+                    window.hemInfo = {
+                        index: points.length - 2,
+                        length: length,
+                        type: type,
+                        openAmount: openAmount
+                    };
+                    redrawProfile();
+                    addHemArcAtVertex(points.length - 2);
+                    // Draw info box below hem vertex
+                    showHemInfoBox(window.hemInfo);
+        // Draw a little info box below the hem vertex with the entered details
+        function showHemInfoBox(hemInfo) {
+            if (!hemInfo) return;
+            const vertex = points[hemInfo.index];
+            if (!vertex) return;
+            // Remove any previous info box
+            const oldBox = document.getElementById('hem-info-box');
+            if (oldBox) oldBox.remove();
+            // Create SVG group for the info box
+            const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+            group.setAttribute('id', 'hem-info-box');
+            // Box position: 60px below vertex
+            const boxX = vertex.x;
+            const boxY = vertex.y + 60;
+            // Info text stacked vertically
+            const lines = [`Length: ${hemInfo.length} in`, `Type: ${hemInfo.type}`];
+            if (hemInfo.type === 'open' && hemInfo.openAmount) {
+                lines.push(`Open: ${hemInfo.openAmount} in`);
+            }
+            // Calculate box size based on text
+            const fontSize = 13;
+            const padding = 16;
+            const lineHeight = fontSize + 5;
+            const boxHeight = lines.length * lineHeight + padding;
+            // Estimate width from longest line (8px per char + padding)
+            const maxLineLength = Math.max(...lines.map(l => l.length));
+            const boxWidth = maxLineLength * 8 + padding;
+            // Box background
+            const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+            rect.setAttribute('x', boxX - boxWidth/2);
+            rect.setAttribute('y', boxY - boxHeight/2);
+            rect.setAttribute('width', boxWidth);
+            rect.setAttribute('height', boxHeight);
+            rect.setAttribute('rx', 8);
+            rect.setAttribute('fill', '#fffbe6');
+            rect.setAttribute('stroke', '#ff6b35');
+            rect.setAttribute('stroke-width', '2');
+            group.appendChild(rect);
+            // Draw each line of text
+            lines.forEach((line, idx) => {
+                const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                text.setAttribute('x', boxX);
+                text.setAttribute('y', boxY - boxHeight/2 + padding/2 + lineHeight/2 + idx * lineHeight);
+                text.setAttribute('text-anchor', 'middle');
+                text.setAttribute('font-size', fontSize);
+                text.setAttribute('fill', '#ff6b35');
+                text.textContent = line;
+                group.appendChild(text);
+            });
+            // Add to linesGroup so it appears with the lines
+            linesGroup.appendChild(group);
+        }
+
+
+
+        // Draw an orange arc at the specified vertex (between its neighbors)
+        function addHemArcAtVertex(vertexIndex) {
+            // Only draw if vertex has both previous and next points
+            if (vertexIndex <= 0 || vertexIndex >= points.length - 1) return;
+            const prev = points[vertexIndex - 1];
+            const center = points[vertexIndex];
+            const next = points[vertexIndex + 1];
+            if (!prev || !center || !next) return;
+            const r = 24; // arc radius in px
+            // Calculate directions
+            const v1 = { x: prev.x - center.x, y: prev.y - center.y };
+            const v2 = { x: next.x - center.x, y: next.y - center.y };
+            // Normalize
+            const len1 = Math.sqrt(v1.x * v1.x + v1.y * v1.y);
+            const len2 = Math.sqrt(v2.x * v2.x + v2.y * v2.y);
+            if (len1 === 0 || len2 === 0) return;
+            const n1 = { x: v1.x / len1, y: v1.y / len1 };
+            const n2 = { x: v2.x / len2, y: v2.y / len2 };
+            // Start/end points for arc
+            const startX = center.x + n1.x * r;
+            const startY = center.y + n1.y * r;
+            const endX = center.x + n2.x * r;
+            const endY = center.y + n2.y * r;
+            // Calculate angle between vectors
+            let angle1 = Math.atan2(n1.y, n1.x);
+            let angle2 = Math.atan2(n2.y, n2.x);
+            let angleDiff = angle2 - angle1;
+            if (angleDiff <= 0) angleDiff += 2 * Math.PI;
+            // Always use large arc flag
+            const largeArcFlag = 1;
+            // If angleDiff < Math.PI, reverse sweep flag so arc is always >180deg
+            const sweepFlag = (angleDiff < Math.PI) ? 0 : 1;
+            // SVG arc path
+            const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            const d = `M ${startX} ${startY} A ${r} ${r} 0 ${largeArcFlag} ${sweepFlag} ${endX} ${endY}`;
+            path.setAttribute('d', d);
+            path.setAttribute('stroke', '#ff6b35');
+            path.setAttribute('stroke-width', '4');
+            path.setAttribute('fill', 'none');
+            path.setAttribute('class', 'hem-curve');
+            // Add to linesGroup so it appears with the lines
+            linesGroup.appendChild(path);
+        }
                 }
 
                 }
@@ -1176,9 +1286,21 @@
                 const current = points[i];
                 const prev = points[i - 1];
                 const next = points[i + 1];
-                const angle = calculateVertexAngle(i);
-                createClickableLabel(current.x + 25, current.y - 25, `${angle.toFixed(1)}°`, 'angle-label', 'angle', i - 1);
-                drawAngleArc(prev, current, next, angle);
+                let labelText;
+                // Only show 'HEM' if hemVertexIndex is set and matches this vertex
+                if (typeof window.hemVertexIndex !== 'undefined' && i === window.hemVertexIndex) {
+                    labelText = 'HEM';
+                    console.log('HEM label set at vertex', i, 'with points.length', points.length, 'hemVertexIndex', window.hemVertexIndex);
+                } else {
+                    const angle = calculateVertexAngle(i);
+                    labelText = `${angle.toFixed(1)}°`;
+                }
+                createClickableLabel(current.x + 25, current.y - 25, labelText, 'angle-label', 'angle', i - 1);
+                // Draw arc for angle (optional, keep as before)
+                if (labelText !== 'HEM') {
+                    const angle = calculateVertexAngle(i);
+                    drawAngleArc(prev, current, next, angle);
+                }
             }
         }
 
@@ -1403,6 +1525,8 @@
             
             isDrawing = false;
             document.getElementById('mode').textContent = 'Profile finished. Use Edit mode to make changes.';
+            // Clear hem vertex index when finishing profile
+            window.hemVertexIndex = undefined;
             drawMeasurements();
             updateStats();
             clearPreviewLine();
@@ -1436,7 +1560,8 @@
             isEditMode = false;
             isDragging = false;
             dragPointIndex = -1;
-            
+            // Clear hem vertex index when starting a new profile
+            window.hemVertexIndex = undefined;
             setMode('create');
             
             closeEditPopup();
