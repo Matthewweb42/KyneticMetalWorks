@@ -571,7 +571,6 @@
                     <button class="mode-btn" onclick="setMode('edit')" id="editModeBtn">Edit</button>
                 </div>
 
-                <button class="btn btn-success" onclick="finishProfile()">Finish Profile</button>
                 <button class="btn btn-primary" onclick="downloadProfileImage()">Download Image</button>
                 <button class="btn btn-danger" onclick="clearCanvas()">Clear All</button>
             </div>
@@ -614,36 +613,79 @@
     </div>
 
     <script>
-        function downloadProfileImage() {
-            const svg = document.getElementById('canvas');
-            const serializer = new XMLSerializer();
-            let source = serializer.serializeToString(svg);
-            // Add name space
-            if(!source.match(/^<svg[^>]+xmlns="http\:\/\/www\.w3\.org\/2000\/svg"/)){
-                source = source.replace(/^<svg/, '<svg xmlns="http://www.w3.org/2000/svg"');
-            }
-            // Convert SVG to image
-            const svgBlob = new Blob([source], {type: 'image/svg+xml;charset=utf-8'});
-            const url = URL.createObjectURL(svgBlob);
-            const img = new Image();
-            img.onload = function() {
-                const canvasEl = document.createElement('canvas');
-                canvasEl.width = svg.clientWidth;
-                canvasEl.height = svg.clientHeight;
-                const ctx = canvasEl.getContext('2d');
-                ctx.drawImage(img, 0, 0);
-                URL.revokeObjectURL(url);
-                canvasEl.toBlob(function(blob) {
-                    const a = document.createElement('a');
-                    a.download = 'profile.png';
-                    a.href = URL.createObjectURL(blob);
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
-                }, 'image/png');
-            };
-            img.src = url;
+async function downloadProfileImage() {
+    const container = document.querySelector('.canvas-container');
+    
+    if (!container) {
+        console.error('Canvas container not found');
+        return;
+    }
+    
+    try {
+        // Load html2canvas if not available
+        if (typeof html2canvas === 'undefined') {
+            console.log('Loading html2canvas...');
+            await loadHtml2Canvas();
         }
+        
+        console.log('Taking screenshot...');
+        const canvas = await html2canvas(container, {
+            backgroundColor: 'white',
+            scale: 2, // Higher resolution for crisp image
+            useCORS: true,
+            allowTaint: true,
+            logging: false,
+            width: container.offsetWidth,
+            height: container.offsetHeight,
+            scrollX: 0,
+            scrollY: 0
+        });
+        
+        // Download the canvas as PNG
+        canvas.toBlob((blob) => {
+            if (!blob) {
+                console.error('Failed to create blob from canvas');
+                return;
+            }
+            
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.download = 'profile.png';
+            a.href = url;
+            a.style.display = 'none';
+            
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            
+            setTimeout(() => URL.revokeObjectURL(url), 100);
+        }, 'image/png', 1.0);
+        
+    } catch (error) {
+        console.error('Screenshot failed:', error);
+        alert('Screenshot failed: ' + error.message);
+    }
+}
+
+function loadHtml2Canvas() {
+    return new Promise((resolve, reject) => {
+        if (typeof html2canvas !== 'undefined') {
+            resolve();
+            return;
+        }
+        
+        const script = document.createElement('script');
+        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+        script.onload = () => {
+            console.log('html2canvas loaded successfully');
+            resolve();
+        };
+        script.onerror = () => {
+            reject(new Error('Failed to load html2canvas library'));
+        };
+        document.head.appendChild(script);
+    });
+}
         let isDrawing = true; // Auto-start drawing
         let isEditMode = false;
         let isDragging = false;
@@ -707,8 +749,31 @@
             
             // Handle dragging in edit mode
             if (isDragging && dragPointIndex >= 0) {
-                // Preserve custom properties like isHem
+                // Save old position
+                const oldPoint = { ...points[dragPointIndex] };
                 points[dragPointIndex] = { ...points[dragPointIndex], x: x, y: y };
+
+                // Check for line crossing after move
+                let crossed = false;
+                for (let i = 0; i < points.length - 1; i++) {
+                    for (let j = 0; j < points.length - 1; j++) {
+                        if (Math.abs(i - j) <= 1) continue; // skip adjacent lines
+                        const lineA = { start: points[i], end: points[i + 1] };
+                        const lineB = { start: points[j], end: points[j + 1] };
+                        if (doLinesIntersect(lineA.start, lineA.end, lineB.start, lineB.end)) {
+                            crossed = true;
+                            break;
+                        }
+                    }
+                    if (crossed) break;
+                }
+                if (crossed) {
+                    points[dragPointIndex] = oldPoint;
+                    showLineCrossPopup();
+                    redrawProfile();
+                    return;
+                }
+
                 redrawProfile();
                 return;
             }
@@ -772,7 +837,28 @@
 
 
         function addPoint(x, y) {
-            const point = { x: x, y: y };
+            let snapX = x, snapY = y;
+            // Snap to vertical/horizontal if close enough
+            if (points.length > 0) {
+                const last = points[points.length - 1];
+                const dx = x - last.x;
+                const dy = y - last.y;
+                const angle = Math.atan2(dy, dx) * 180 / Math.PI;
+                // Normalize angle to [0, 360)
+                let normAngle = angle;
+                if (normAngle < 0) normAngle += 360;
+                // Snap thresholds (degrees)
+                const threshold = 10;
+                // Snap to horizontal (0 or 180)
+                if ((Math.abs(normAngle) < threshold) || (Math.abs(normAngle - 180) < threshold)) {
+                    snapY = last.y;
+                }
+                // Snap to vertical (90 or 270)
+                else if ((Math.abs(normAngle - 90) < threshold) || (Math.abs(normAngle - 270) < threshold)) {
+                    snapX = last.x;
+                }
+            }
+            const point = { x: snapX, y: snapY };
             // Prevent line crossing
             if (points.length > 1) {
                 const newLine = { start: points[points.length - 1], end: point };
@@ -983,30 +1069,102 @@
         // Draw a little info box below the hem vertex with the entered details
         function showHemInfoBox(hemInfo) {
             if (!hemInfo) return;
+
             const vertex = points[hemInfo.index];
             if (!vertex) return;
             // Remove any previous info box
             const oldBox = document.getElementById('hem-info-box');
             if (oldBox) oldBox.remove();
-            // Create SVG group for the info box
-            const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-            group.setAttribute('id', 'hem-info-box');
-            // Box position: 60px below vertex
-            const boxX = vertex.x;
-            const boxY = vertex.y + 60;
             // Info text stacked vertically
             const lines = [`Length: ${hemInfo.length} in`, `Type: ${hemInfo.type}`];
             if (hemInfo.type === 'open' && hemInfo.openAmount) {
                 lines.push(`Open: ${hemInfo.openAmount} in`);
             }
-            // Calculate box size based on text
             const fontSize = 13;
             const padding = 16;
             const lineHeight = fontSize + 5;
             const boxHeight = lines.length * lineHeight + padding;
-            // Estimate width from longest line (8px per char + padding)
             const maxLineLength = Math.max(...lines.map(l => l.length));
             const boxWidth = maxLineLength * 8 + padding;
+
+            // Try several candidate positions for the info box
+            const candidateOffsets = [
+                { x: 0, y: 60 },    // below
+                { x: 0, y: -60 },   // above
+                { x: 80, y: 0 },    // right
+                { x: -80, y: 0 },   // left
+                { x: 80, y: 60 },   // bottom-right
+                { x: -80, y: 60 },  // bottom-left
+                { x: 80, y: -60 },  // top-right
+                { x: -80, y: -60 }  // top-left
+            ];
+
+            // Get all points and lines bounding boxes
+            const elements = [];
+            // Points
+            points.forEach(pt => {
+                elements.push({
+                    x: pt.x - 10,
+                    y: pt.y - 10,
+                    width: 20,
+                    height: 20
+                });
+            });
+            // Lines
+            for (let i = 0; i < points.length - 1; i++) {
+                const x1 = points[i].x, y1 = points[i].y;
+                const x2 = points[i+1].x, y2 = points[i+1].y;
+                // Bounding box for line
+                const minX = Math.min(x1, x2) - 6;
+                const minY = Math.min(y1, y2) - 6;
+                const maxX = Math.max(x1, x2) + 6;
+                const maxY = Math.max(y1, y2) + 6;
+                elements.push({
+                    x: minX,
+                    y: minY,
+                    width: maxX - minX,
+                    height: maxY - minY
+                });
+            }
+
+            // Find a candidate position that does not overlap any element
+            let boxX = vertex.x;
+            let boxY = vertex.y + 60;
+            let found = false;
+            for (const offset of candidateOffsets) {
+                const testX = vertex.x + offset.x;
+                const testY = vertex.y + offset.y;
+                const testBox = {
+                    x: testX - boxWidth/2,
+                    y: testY - boxHeight/2,
+                    width: boxWidth,
+                    height: boxHeight
+                };
+                // Check for overlap
+                let overlaps = false;
+                for (const el of elements) {
+                    if (
+                        testBox.x < el.x + el.width &&
+                        testBox.x + testBox.width > el.x &&
+                        testBox.y < el.y + el.height &&
+                        testBox.y + testBox.height > el.y
+                    ) {
+                        overlaps = true;
+                        break;
+                    }
+                }
+                if (!overlaps) {
+                    boxX = testX;
+                    boxY = testY;
+                    found = true;
+                    break;
+                }
+            }
+            // If all positions overlap, use below vertex as fallback
+
+            // Create SVG group for the info box
+            const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+            group.setAttribute('id', 'hem-info-box');
             // Box background
             const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
             rect.setAttribute('x', boxX - boxWidth/2);
@@ -1545,6 +1703,7 @@
             }
             
             drawMeasurements();
+            updateStats(); // Ensure material usage updates after any change
         }
 
         function drawHem(pointIndex, hemType) {
@@ -1602,7 +1761,20 @@
                 y: startPoint.y + deltaY * ratio
             };
             
+            // Temporarily update the point and check for line crossing
+            const oldEndPoint = { ...points[lineIndex + 1] };
             points[lineIndex + 1] = { ...endPoint, x: newEndPoint.x, y: newEndPoint.y };
+            // Check for line crossing
+            for (let i = 0; i < points.length - 2; i++) {
+                if (i === lineIndex - 1 || i === lineIndex || i === lineIndex + 1) continue; // skip adjacent lines
+                const lineA = { start: points[i], end: points[i + 1] };
+                const newLine = { start: points[lineIndex], end: points[lineIndex + 1] };
+                if (doLinesIntersect(lineA.start, lineA.end, newLine.start, newLine.end)) {
+                    points[lineIndex + 1] = oldEndPoint;
+                    showLineCrossPopup();
+                    return;
+                }
+            }
         }
 
         function applyAngleEditByIndex(vertexIndex, newAngle) {
@@ -1619,12 +1791,26 @@
             const lineLength = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
 
             const prevAngle = Math.atan2(prevPoint.y - currentPoint.y, prevPoint.x - currentPoint.x);
-            const newAngleRad = prevAngle + Math.PI - (newAngle * Math.PI / 180);
+            // Set the angle directly to newAngle (relative to previous segment)
+            const newAngleRad = prevAngle + (newAngle * Math.PI / 180);
 
             // Calculate new coordinates for the next point
             const newX = currentPoint.x + Math.cos(newAngleRad) * lineLength;
             const newY = currentPoint.y + Math.sin(newAngleRad) * lineLength;
+            // Temporarily update the point and check for line crossing
+            const oldNextPoint = { ...points[actualVertexIndex + 1] };
             points[actualVertexIndex + 1] = { ...points[actualVertexIndex + 1], x: newX, y: newY };
+            // Check for line crossing
+            for (let i = 0; i < points.length - 2; i++) {
+                if (i === actualVertexIndex - 1 || i === actualVertexIndex || i === actualVertexIndex + 1) continue; // skip adjacent lines
+                const lineA = { start: points[i], end: points[i + 1] };
+                const newLine = { start: points[actualVertexIndex], end: points[actualVertexIndex + 1] };
+                if (doLinesIntersect(lineA.start, lineA.end, newLine.start, newLine.end)) {
+                    points[actualVertexIndex + 1] = oldNextPoint;
+                    showLineCrossPopup();
+                    return;
+                }
+            }
         }
 
         // Initialize canvas size
