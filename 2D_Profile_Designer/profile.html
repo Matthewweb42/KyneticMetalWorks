@@ -655,9 +655,7 @@ async function downloadProfileImage() {
             a.style.display = 'none';
             
             document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            
+            a.click();            
             setTimeout(() => URL.revokeObjectURL(url), 100);
         }, 'image/png', 1.0);
         
@@ -752,6 +750,31 @@ function loadHtml2Canvas() {
                 // Save old position
                 const oldPoint = { ...points[dragPointIndex] };
                 points[dragPointIndex] = { ...points[dragPointIndex], x: x, y: y };
+
+                // If dragging the hem's previous vertex, update the hem endpoint to keep length and angle fixed
+                if (typeof window.hemVertexIndex !== 'undefined' && dragPointIndex === window.hemVertexIndex) {
+                    // Calculate the new endpoint for the hem line
+                    const hemInfo = window.hemInfo;
+                    if (hemInfo && points.length > hemInfo.index + 1) {
+                        // Get the previous vertex (hem base)
+                        const base = points[hemInfo.index];
+                        // Get the original direction and length
+                        const origEnd = points[hemInfo.index + 1];
+                        const dx = origEnd.x - oldPoint.x;
+                        const dy = origEnd.y - oldPoint.y;
+                        const length = Math.sqrt(dx * dx + dy * dy);
+                        // Use the hem length from hemInfo if available
+                        const hemLength = hemInfo.length || length;
+                        // Calculate the angle
+                        const angle = Math.atan2(dy, dx);
+                        // Calculate new endpoint
+                        const newEnd = {
+                            x: base.x + Math.cos(angle) * hemLength * scale,
+                            y: base.y + Math.sin(angle) * hemLength * scale
+                        };
+                        points[hemInfo.index + 1] = newEnd;
+                    }
+                }
 
                 // Check for line crossing after move
                 let crossed = false;
@@ -1187,6 +1210,30 @@ function loadHtml2Canvas() {
                 text.textContent = line;
                 group.appendChild(text);
             });
+            // Add edit button in edit mode
+            if (isEditMode) {
+                const editBtn = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                // Move the button further right (e.g., +20px more)
+                editBtn.setAttribute('x', boxX + boxWidth/2 + 2);
+                editBtn.setAttribute('y', boxY - boxHeight/2 + 18);
+                editBtn.setAttribute('font-size', '15');
+                editBtn.setAttribute('fill', '#3498db');
+                editBtn.setAttribute('cursor', 'pointer');
+                editBtn.setAttribute('text-anchor', 'start');
+                editBtn.textContent = '\u270E'; // Pencil icon
+                editBtn.setAttribute('id', 'hem-edit-btn');
+                editBtn.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    // Overlay the modal, but do NOT remove the hem info box
+                    let modal = document.getElementById('hemDetailsModal');
+                    if (!modal) {
+                        showSimpleHemDetailsModal(hemInfo.index);
+                    } else {
+                        modal.style.display = 'flex';
+                    }
+                });
+                group.appendChild(editBtn);
+            }
             // Add to linesGroup so it appears with the lines
             linesGroup.appendChild(group);
         }
@@ -1279,6 +1326,10 @@ function loadHtml2Canvas() {
         }
 
         function drawPoint(point, index) {
+            // If a Hem was just created, skip drawing the last vertex (dot)
+            if (typeof window.hemVertexIndex !== 'undefined' && index === points.length - 1 && window.hemVertexIndex === points.length - 2) {
+                return;
+            }
             const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
             circle.setAttribute('cx', point.x);
             circle.setAttribute('cy', point.y);
@@ -1428,6 +1479,10 @@ function loadHtml2Canvas() {
             labelsGroup.innerHTML = '';
             const lineCount = points.length - 1;
             for (let i = 0; i < lineCount; i++) {
+                // Hide the blue line length label for the last line if it is a Hem
+                if (typeof window.hemVertexIndex !== 'undefined' && i === points.length - 2 && window.hemVertexIndex === points.length - 2) {
+                    continue;
+                }
                 const current = points[i];
                 const next = points[i + 1];
                 const deltaX = (next.x - current.x) / scale;
@@ -1485,17 +1540,23 @@ function loadHtml2Canvas() {
             label.setAttribute('data-index', index);
             label.textContent = text;
             
-            // Add click handlers to both elements
-            const clickHandler = function(e) {
-                if (!isEditMode) return;
-                e.stopPropagation();
-                e.preventDefault();
-                showEditPopup(e, type, index, text);
-            };
-            
-            bg.addEventListener('click', clickHandler);
-            label.addEventListener('click', clickHandler);
-            
+            // Prevent editing if label is 'HEM' and type is 'angle'
+            if (!(type === 'angle' && text === 'HEM')) {
+                const clickHandler = function(e) {
+                    if (!isEditMode) return;
+                    e.stopPropagation();
+                    e.preventDefault();
+                    showEditPopup(e, type, index, text);
+                };
+                bg.addEventListener('click', clickHandler);
+                label.addEventListener('click', clickHandler);
+            } else {
+                // Make non-editable visually
+                bg.style.cursor = 'default';
+                label.style.cursor = 'default';
+                bg.style.pointerEvents = 'none';
+                label.style.pointerEvents = 'none';
+            }
             labelsGroup.appendChild(bg);
             labelsGroup.appendChild(label);
         }
