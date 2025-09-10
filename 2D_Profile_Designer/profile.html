@@ -3,620 +3,434 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kynetic Metalworks - 2D Profile Designer</title>
+    <title>Sheet Metal Profile Designer</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: #8b8b8b;
-            min-height: 100vh;
-            padding: 20px;
+            background: #f4f6f8;
+            margin: 0;
+            padding: 0;
         }
-
         .container {
-            max-width: 1400px;
-            margin: 0 auto;
-            background: white;
-            border-radius: 15px;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
-            overflow: hidden;
+            max-width: 1200px;
+            margin: 40px auto;
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.12);
+            padding: 32px 24px;
         }
-
         .header {
-            background: #57626b;
-            color: white;
-            padding: 10px 20px;
             display: flex;
             align-items: center;
-            gap: 12px;
-            min-height: 48px;
-        }
-
-        .header-text {
-            flex: 1;
-            text-align: center;
-        }
-
-        .header h1 {
-            font-size: 1.5em;
-            margin-bottom: 2px;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
-        }
-
-        .header p {
-            font-size: 1em;
-            opacity: 0.8;
-        }
-
-        .top-controls {
-            background: #f8f9fa;
-            padding: 20px 30px;
-            border-bottom: 2px solid #e9ecef;
-            display: flex;
-            gap: 30px;
-            align-items: center;
-            flex-wrap: nowrap;
-            min-width: 0;
-        }
-
-        .profile-info {
-            flex: 1 1 auto;
-            min-width: 0;
-            display: flex;
-            gap: 20px;
-            align-items: center;
-        }
-
-        .input-field {
-            display: flex;
-            flex-direction: column;
-            gap: 5px;
-            min-width: 0;
-        }
-
-        .input-field label {
-            font-weight: 600;
-            color: #2c3e50;
-            font-size: 14px;
-        }
-
-        .input-field input {
-            padding: 8px 12px;
-            border: 2px solid #e9ecef;
-            border-radius: 6px;
-            font-size: 14px;
-            transition: border-color 0.3s ease;
-        }
-
-        .input-field input:focus {
-            outline: none;
-            border-color: #3498db;
-            box-shadow: 0 0 10px rgba(52, 152, 219, 0.2);
-        }
-
-        .side-indicator {
-            display: flex;
-            align-items: center;
-            margin-right: 20px;
-        }
-
-        .toggle-label {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            font-weight: 600;
-            color: #2c3e50;
-            cursor: pointer;
-        }
-
-        .side-toggle {
-            position: relative;
-            width: 80px;
-            height: 32px;
-            background: #e9ecef;
-            border-radius: 16px;
-            overflow: hidden;
-            border: 2px solid #ddd;
-        }
-
-        .side-toggle input[type="checkbox"] {
-            display: none;
-        }
-
-        .toggle-slider {
-            position: relative;
-            width: 100%;
-            height: 100%;
-            display: flex;
-            align-items: center;
-            transition: all 0.3s ease;
-        }
-
-        .toggle-slider::before {
-            content: '';
-            position: absolute;
-            width: 50%;
-            height: 100%;
-            background: linear-gradient(135deg, #95a5a6, #7f8c8d);
-            border-radius: 14px;
-            transition: all 0.3s ease;
-            transform: translateX(0);
-            z-index: 1;
-        }
-
-        .side-toggle input:checked + .toggle-slider::before {
-            transform: translateX(100%);
-            background: linear-gradient(135deg, #3498db, #2980b9);
-        }
-
-        .side-label {
-            position: absolute;
-            width: 50%;
-            text-align: center;
-            font-size: 12px;
-            font-weight: bold;
-            color: white;
-            z-index: 2;
-            transition: all 0.3s ease;
-        }
-
-        .side-label.left {
-            left: 0;
-        }
-
-        .side-label.right {
-            right: 0;
-        }
-
-        .side-toggle input:not(:checked) + .toggle-slider .side-label.left {
-            color: white;
-        }
-
-        .side-toggle input:not(:checked) + .toggle-slider .side-label.right {
-            color: #666;
-        }
-
-        .side-toggle input:checked + .toggle-slider .side-label.left {
-            color: #666;
-        }
-
-        .side-toggle input:checked + .toggle-slider .side-label.right {
-            color: white;
-        }
-
-        .mode-controls {
-            flex-shrink: 0;
-            display: flex;
-            gap: 15px;
-            align-items: center;
-            min-width: 0;
-        }
-
-        .mode-toggle {
-            display: flex;
-            background: #e9ecef;
-            border-radius: 8px;
-            overflow: hidden;
-        }
-
-        .mode-btn {
-            padding: 10px 20px;
-            border: none;
-            background: transparent;
-            color: #6c757d;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-
-        .mode-btn.active {
-            background: #3498db;
-            color: white;
-        }
-
-        .btn {
-            padding: 10px 20px;
-            border: none;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 14px;
-            font-weight: 600;
-            transition: all 0.3s ease;
-        }
-
-        .btn-primary {
-            background: linear-gradient(135deg, #3498db, #2980b9);
-            color: white;
-        }
-
-        .btn-primary:hover {
-            background: linear-gradient(135deg, #2980b9, #1f6591);
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(52, 152, 219, 0.3);
-        }
-
-        .btn-success {
-            background: linear-gradient(135deg, #27ae60, #229954);
-            color: white;
-        }
-
-        .btn-success:hover {
-            background: linear-gradient(135deg, #229954, #1e8449);
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(39, 174, 96, 0.3);
-        }
-
-        .btn-danger {
-            background: linear-gradient(135deg, #e74c3c, #c0392b);
-            color: white;
-        }
-
-        .btn-danger:hover {
-            background: linear-gradient(135deg, #c0392b, #a93226);
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(231, 76, 60, 0.3);
-        }
-
-        .main-content {
-            height: calc(100vh - 300px);
-            min-height: 500px;
-        }
-
-        .canvas-container {
-            width: 100%;
-            height: 100%;
-            position: relative;
-            background: #ffffff;
-            overflow: hidden;
-        }
-
-        .canvas-container.edit-mode #canvas {
-            cursor: default;
-        }
-
-        #canvas {
-            cursor: crosshair;
-            background: 
-                radial-gradient(circle, #e8e8e8 1px, transparent 1px);
-            background-size: 20px 20px;
-        }
-
-        .measurement-label {
-            fill: #3498db;
-            font-size: 12px;
-            font-weight: bold;
-            font-family: 'Segoe UI', sans-serif;
-            pointer-events: none;
-            user-select: none;
-            transition: all 0.3s ease;
-        }
-
-        .angle-label {
-            fill: #e67e22;
-            font-size: 12px;
-            font-weight: bold;
-            font-family: 'Segoe UI', sans-serif;
-            pointer-events: none;
-            user-select: none;
-            transition: all 0.3s ease;
-        }
-
-        .edit-mode .measurement-label,
-        .edit-mode .angle-label {
-            pointer-events: all;
-            cursor: pointer;
-        }
-
-        .edit-mode .measurement-label:hover {
-            fill: #e74c3c;
-            font-size: 14px;
-        }
-
-        .edit-mode .angle-label:hover {
-            fill: #9b59b6;
-            font-size: 14px;
-        }
-
-        .clickable-bg {
-            fill: rgba(255, 255, 255, 0.8);
-            stroke: rgba(52, 152, 219, 0.5);
-            stroke-width: 1;
-            rx: 3;
-            ry: 3;
-            pointer-events: all;
-            cursor: pointer;
-            opacity: 0;
-            transition: opacity 0.3s ease;
-        }
-
-        .edit-mode .clickable-bg {
-            opacity: 1;
-        }
-
-        .edit-mode .clickable-bg:hover {
-            fill: rgba(52, 152, 219, 0.1);
-            stroke: rgba(52, 152, 219, 0.8);
-            stroke-width: 2;
-        }
-
-        .angle-arc {
-            stroke: #f39c12;
-            stroke-width: 1;
-            fill: none;
-            stroke-dasharray: 3,3;
-            opacity: 0.8;
-        }
-
-        .edit-popup {
-            position: absolute;
-            background: white;
-            border: 2px solid #3498db;
-            border-radius: 10px;
-            padding: 20px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-            z-index: 1000;
-            min-width: 250px;
-            display: none;
-        }
-
-        .edit-popup h4 {
-            margin: 0 0 15px 0;
-            color: #2c3e50;
-            font-size: 16px;
-        }
-
-        .edit-popup .input-group {
-            margin-bottom: 15px;
-        }
-
-        .edit-popup .input-group label {
-            display: block;
-            margin-bottom: 5px;
-            color: #2c3e50;
-            font-weight: 600;
-        }
-
-        .edit-popup .input-group input {
-            width: 100%;
-            padding: 10px;
-            border: 2px solid #e9ecef;
-            border-radius: 6px;
-            font-size: 14px;
-        }
-
-        .edit-popup .btn {
-            width: 48%;
-            margin-right: 4%;
-        }
-
-        .edit-popup .btn:last-child {
-            margin-right: 0;
-        }
-
-        .point {
-            fill: #3498db;
-            stroke: white;
-            stroke-width: 2;
-            cursor: pointer;
-        }
-
-        .point:hover {
-            fill: #2980b9;
-            stroke-width: 3;
-        }
-
-        .point.draggable {
-            cursor: grab;
-            stroke-width: 3;
-            r: 8;
-        }
-
-        .point.dragging {
-            cursor: grabbing;
-            fill: #e74c3c;
-            stroke-width: 4;
-        }
-
-        .line {
-            stroke: #b0b4b9;
-            stroke-width: 3;
-            fill: none;
-            stroke-linecap: round;
-            stroke-linejoin: round;
-        }
-
-        .preview-line {
-            stroke: #95a5a6;
-            stroke-width: 2;
-            fill: none;
-            stroke-dasharray: 5,5;
-        }
-
-        .hem-curve {
-            stroke: #ff6b35;
-            stroke-width: 3;
-            fill: none;
-            stroke-linecap: round;
-        }
-
-        .hem-parallel {
-            stroke: #ff6b35;
-            stroke-width: 2;
-            fill: none;
-            stroke-dasharray: 3,3;
-            opacity: 0.8;
-        }
-
-        .coating-hash {
-            stroke: #e74c3c;
-            stroke-width: 1;
-            stroke-linecap: round;
-            opacity: 0.8;
-        }
-
-        .status {
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            background: #2c3e50;
-            color: white;
-            padding: 10px 20px;
-            font-size: 14px;
-            display: flex;
             justify-content: space-between;
+            margin-bottom: 24px;
         }
-
-        .coords {
-            font-family: monospace;
+        .header h1 {
+            font-size: 2em;
+            color: #2d5a5c;
+            margin: 0;
         }
-
-        @media (max-width: 768px) {
-            .top-controls {
-                flex-direction: column;
-                align-items: stretch;
-                flex-wrap: wrap;
-            }
-            
-            .profile-info {
-                flex-direction: column;
-            }
+        .header .desc {
+            color: #57626b;
+            font-size: 1.1em;
         }
-
-        /* Line Cross Popup */
-        #lineCrossPopup {
-            position: fixed;
-            left: 50%;
-            top: 50%;
-            transform: translate(-50%, -50%);
-            background: white;
-            border: 2px solid #e74c3c;
+        .controls {
+            display: flex;
+            gap: 18px;
+            margin-bottom: 18px;
+            flex-wrap: wrap;
+        }
+        .controls input, .controls select {
+            padding: 8px 12px;
+            border-radius: 6px;
+            border: 1.5px solid #e0e4ea;
+            font-size: 1em;
+        }
+        .controls label {
+            font-weight: 600;
+            color: #2d5a5c;
+            margin-right: 8px;
+        }
+        .controls .btn {
+            background: #3498db;
+            color: #fff;
+            border: none;
+            border-radius: 6px;
+            padding: 10px 20px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .controls .btn:hover {
+            background: #217dbb;
+        }
+        .canvas-wrap {
+            background: #f8fafc;
             border-radius: 10px;
-            padding: 24px;
-            z-index: 3000;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-            display: none;
+            box-shadow: 0 2px 12px rgba(52,152,219,0.07);
+            padding: 16px;
+            position: relative;
         }
-
-        #lineCrossPopup h3 {
-            color: #e74c3c;
-            margin-bottom: 12px;
-        }
-
-        #lineCrossPopup .btn {
+        #profile-canvas {
             width: 100%;
-            margin-top: 12px;
+            height: 600px;
+            background: repeating-linear-gradient(90deg, #e8e8e8 0 1px, transparent 1px 20px), repeating-linear-gradient(0deg, #e8e8e8 0 1px, transparent 1px 20px);
+            border-radius: 8px;
+            display: block;
         }
-
-        /* New styles for resizable description box */
-        .input-field input#profileDescription {
-            min-height: 48px;
-            height: 48px;
-            font-size: 15px;
-            padding: 10px 12px;
-            resize: vertical;
+        .status {
+            margin-top: 18px;
+            color: #57626b;
+            font-size: 1em;
+        }
+        @media (max-width: 800px) {
+            .container { padding: 12px 4px; }
+            #profile-canvas { height: 350px; }
         }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <div class="header-text">
-                <h1>2D Profile Designer</h1>
-                <p>Precision Metal Forming Solutions</p>
-            </div>
+            <h1>Sheet Metal Profile Designer</h1>
+            <span class="desc">DXF-Standard 2D Profile Tool for Fabrication</span>
         </div>
-        
-        <div class="top-controls">
-            <div class="profile-info">
-                <div class="input-field">
-                    <label for="profileName">Profile Name</label>
-                    <input type="text" id="profileName" placeholder="Enter profile name">
-                </div>
-                <div class="input-field">
-                    <label for="profileDescription">Description</label>
-                    <input type="text" id="profileDescription" placeholder="Enter description">
-                </div>
-                <div class="input-field">
-                    <label>Total Material Usage</label>
-                    <div style="padding: 8px 12px; background: #e9ecef; border-radius: 6px; font-weight: bold; color: #2d5a5c;">
-                        <span id="totalLength">0.00"</span>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="mode-controls">
-                <div class="side-indicator" style="flex-direction:column; align-items:flex-start;">
-                    <label class="toggle-label" style="margin-bottom:0;">
-                        <span>Colored Side:</span>
-                        <div class="side-toggle">
-                            <input type="checkbox" id="sideToggle" onchange="toggleCoatedSide()">
-                            <div class="toggle-slider">
-                                <span class="side-label left">A</span>
-                                <span class="side-label right">B</span>
-                            </div>
-                        </div>
-                    </label>
-                    <div id="hashSideInfo" style="margin-top:8px; padding:6px 14px; background:#f3f6fa; border-radius:6px; font-size:14px; color:#3498db; font-weight:500; text-align:center; box-shadow:0 2px 6px rgba(52,152,219,0.07); width:max-content;">
-                        Hash side = Color side
-                    </div>
-                </div>
-                <div class="mode-toggle">
-                    <button class="mode-btn active" onclick="setMode('create')" id="createModeBtn">Create</button>
-                    <button class="mode-btn" onclick="setMode('edit')" id="editModeBtn">Edit</button>
-                </div>
-
-                <button class="btn btn-primary" onclick="downloadProfileImage()">Download Image</button>
-                <button class="btn btn-danger" onclick="clearCanvas()">Clear All</button>
-            </div>
+        <div class="controls">
+            <label>Profile Name <input id="profileName" type="text" placeholder="Name"></label>
+            <label>Description <input id="profileDesc" type="text" placeholder="Description"></label>
+            <label>Material <input id="material" type="text" placeholder="Material"></label>
+            <label>Thickness <input id="thickness" type="number" step="0.001" min="0" style="width:80px;"></label>
+            <label>Tooling <input id="tooling" type="text" placeholder="Tooling"></label>
+            <button class="btn" onclick="exportDXF()">Export DXF</button>
+            <button class="btn" onclick="exportMetadata()">Export Metadata</button>
+            <button class="btn" onclick="clearProfile()">Clear</button>
         </div>
-        
-        <div class="main-content">
-            <div class="canvas-container" id="canvasContainer">
-                <svg id="canvas" width="100%" height="100%">
-                    <defs>
-                        <marker id="arrowhead" markerWidth="10" markerHeight="7" 
-                                refX="9" refY="3.5" orient="auto">
-                            <polygon points="0 0, 10 3.5, 0 7" fill="#4a7c7e" />
-                        </marker>
-                    </defs>
-                    <g id="grid"></g>
-                    <g id="lines"></g>
-                    <g id="points"></g>
-                    <g id="labels"></g>
-                </svg>
-                
-                <!-- Edit Popup -->
-                <div id="editPopup" class="edit-popup">
-                    <h4 id="popupTitle">Edit Element</h4>
-                    <div class="input-group">
-                        <label id="popupLabel">Value:</label>
-                        <input type="number" id="popupInput" step="0.125" placeholder="Enter value">
-                    </div>
-                    <div>
-                        <button class="btn btn-primary" onclick="applyPopupEdit()">Apply</button>
-                        <button class="btn btn-danger" onclick="closeEditPopup()">Cancel</button>
-                    </div>
-                </div>
-            </div>
+        <div class="canvas-wrap">
+            <svg id="profile-canvas"></svg>
         </div>
-
-        <div class="status">
-            <span id="mode">Click on the canvas to start drawing your profile</span>
-            <span class="coords" id="coordinates">Mouse: (0, 0)</span>
-        </div>
+        <div class="status" id="status"></div>
     </div>
-
     <script>
-async function downloadProfileImage() {
-    const container = document.querySelector('.canvas-container');
-    
-    if (!container) {
+// --- DXF Entity Model ---
+const scale = 20; // px per inch
+let entities = [];
+let bends = [];
+let hem = null;
+let mode = 'draw';
+let selectedIdx = null;
+let dragging = false;
+let dragStart = null;
+let meta = {
+    name: '',
+    desc: '',
+    material: '',
+    thickness: '',
+    tooling: ''
+};
+const canvas = document.getElementById('profile-canvas');
+canvas.setAttribute('width', canvas.parentElement.offsetWidth);
+canvas.setAttribute('height', 600);
+
+// --- Drawing ---
+function redraw() {
+    while (canvas.firstChild) canvas.removeChild(canvas.firstChild);
+    entities.forEach((e, i) => {
+        if (e.type === 'LINE') drawLine(e, i);
+        if (e.type === 'ARC') drawArc(e, i);
+        if (e.type === 'POLYLINE') drawPolyline(e, i);
+    });
+    drawPoints();
+    drawHemInfo();
+    updateStatus();
+}
+function drawLine(e, idx) {
+    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    line.setAttribute('x1', e.x1);
+    line.setAttribute('y1', e.y1);
+    line.setAttribute('x2', e.x2);
+    line.setAttribute('y2', e.y2);
+    line.setAttribute('stroke', '#2d5a5c');
+    line.setAttribute('stroke-width', 3);
+    line.setAttribute('data-idx', idx);
+    canvas.appendChild(line);
+}
+function drawArc(e, idx) {
+    const startRad = e.startAngle * Math.PI / 180;
+    const endRad = e.endAngle * Math.PI / 180;
+    const startX = e.cx + e.r * Math.cos(startRad);
+    const startY = e.cy + e.r * Math.sin(startRad);
+    const endX = e.cx + e.r * Math.cos(endRad);
+    const endY = e.cy + e.r * Math.sin(endRad);
+    const largeArcFlag = (Math.abs(e.endAngle - e.startAngle) > 180) ? 1 : 0;
+    const sweepFlag = (e.endAngle > e.startAngle) ? 1 : 0;
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('d', `M ${startX} ${startY} A ${e.r} ${e.r} 0 ${largeArcFlag} ${sweepFlag} ${endX} ${endY}`);
+    path.setAttribute('stroke', '#ff6b35');
+    path.setAttribute('stroke-width', 3);
+    path.setAttribute('fill', 'none');
+    canvas.appendChild(path);
+}
+function drawPolyline(e, idx) {
+    if (!e.points || e.points.length < 2) return;
+    let d = `M ${e.points[0].x} ${e.points[0].y}`;
+    for (let i = 1; i < e.points.length; i++) {
+        d += ` L ${e.points[i].x} ${e.points[i].y}`;
+    }
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('d', d);
+    path.setAttribute('stroke', '#2d5a5c');
+    path.setAttribute('stroke-width', 2);
+    path.setAttribute('fill', 'none');
+    canvas.appendChild(path);
+}
+function drawPoints() {
+    entities.forEach((e, i) => {
+        if (e.type === 'LINE') {
+            drawPoint(e.x1, e.y1, i);
+            drawPoint(e.x2, e.y2, i+1000);
+        }
+        if (e.type === 'ARC') {
+            const startRad = e.startAngle * Math.PI / 180;
+            const endRad = e.endAngle * Math.PI / 180;
+            drawPoint(e.cx + e.r * Math.cos(startRad), e.cx + e.r * Math.sin(startRad), i+2000);
+            drawPoint(e.cx + e.r * Math.cos(endRad), e.cx + e.r * Math.sin(endRad), i+3000);
+        }
+        if (e.type === 'POLYLINE') {
+            e.points.forEach((pt, j) => drawPoint(pt.x, pt.y, i*100+j));
+        }
+        if (e.type === 'HEM_VERTEX') {
+            drawHemVertex(e.x, e.y, i, e);
+        }
+    });
+}
+function drawPoint(x, y, idx) {
+    const c = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    c.setAttribute('cx', x);
+    c.setAttribute('cy', y);
+    c.setAttribute('r', 6);
+    c.setAttribute('fill', '#3498db');
+    c.setAttribute('stroke', '#fff');
+    c.setAttribute('stroke-width', 2);
+    c.setAttribute('data-idx', idx);
+    canvas.appendChild(c);
+}
+
+function drawHemVertex(x, y, idx, hemData) {
+    const c = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    c.setAttribute('x', x - 7);
+    c.setAttribute('y', y - 7);
+    c.setAttribute('width', 14);
+    c.setAttribute('height', 14);
+    c.setAttribute('rx', 4);
+    c.setAttribute('fill', '#ff6b35');
+    c.setAttribute('stroke', '#2d5a5c');
+    c.setAttribute('stroke-width', 2);
+    c.setAttribute('data-idx', idx);
+    canvas.appendChild(c);
+    // Optionally, add a small label
+    const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    label.setAttribute('x', x);
+    label.setAttribute('y', y + 22);
+    label.setAttribute('text-anchor', 'middle');
+    label.setAttribute('font-size', 12);
+    label.setAttribute('fill', '#ff6b35');
+    label.textContent = 'HEM';
+    canvas.appendChild(label);
+}
+function drawHemInfo() {
+    if (!hem) return;
+    // Draw info box below hem vertex
+    const box = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    box.setAttribute('x', hem.x - 60);
+    box.setAttribute('y', hem.y + 18);
+    box.setAttribute('width', 120);
+    box.setAttribute('height', 48);
+    box.setAttribute('rx', 8);
+    box.setAttribute('fill', '#fffbe6');
+    box.setAttribute('stroke', '#ff6b35');
+    box.setAttribute('stroke-width', 2);
+    canvas.appendChild(box);
+    const info = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    info.setAttribute('x', hem.x);
+    info.setAttribute('y', hem.y + 42);
+    info.setAttribute('text-anchor', 'middle');
+    info.setAttribute('font-size', 15);
+    info.setAttribute('fill', '#ff6b35');
+    info.textContent = `Hem: ${hem.length} in, ${hem.type}${hem.open ? ', Open: ' + hem.open : ''}`;
+    canvas.appendChild(info);
+}
+function updateStatus() {
+    let total = 0;
+    entities.forEach(e => {
+        if (e.type === 'LINE') {
+            const dx = (e.x2 - e.x1) / scale;
+            const dy = (e.y2 - e.y1) / scale;
+            total += Math.sqrt(dx*dx + dy*dy);
+        }
+        if (e.type === 'ARC') {
+            const arcLen = Math.abs(e.endAngle - e.startAngle) * Math.PI / 180 * (e.r / scale);
+            total += arcLen;
+        }
+        if (e.type === 'POLYLINE') {
+            for (let i = 0; i < e.points.length - 1; i++) {
+                const dx = (e.points[i+1].x - e.points[i].x) / scale;
+                const dy = (e.points[i+1].y - e.points[i].y) / scale;
+                total += Math.sqrt(dx*dx + dy*dy);
+            }
+        }
+    });
+    document.getElementById('status').textContent = `Total Material Usage: ${total.toFixed(3)} in`;
+}
+
+// --- UI & Events ---
+canvas.addEventListener('click', e => {
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    if (mode === 'draw') {
+        if (entities.length > 0) {
+            const last = getLastPoint();
+            addLine(last.x, last.y, x, y);
+            // Hem detection
+            if (entities.length > 1) {
+                const bendAngle = getBendAngleAtVertex(entities.length - 2);
+                // Trigger hem if bend is sharp (close to 0 or 360)
+                if (bendAngle < 30 || bendAngle > 330) showHemModal(entities.length - 2, x, y);
+            }
+        } else {
+            // First point
+            entities.push({ type: 'POLYLINE', points: [{ x, y }] });
+        }
+        redraw();
+    }
+});
+function getLastPoint() {
+    if (entities.length === 0) return null;
+    const last = entities[entities.length - 1];
+    if (last.type === 'LINE') return { x: last.x2, y: last.y2 };
+    if (last.type === 'POLYLINE') return last.points[last.points.length - 1];
+    return null;
+}
+function addLine(x1, y1, x2, y2) {
+    entities.push({ type: 'LINE', x1, y1, x2, y2 });
+}
+function showHemModal(idx, x, y) {
+    // Simple modal for hem details
+    const modal = document.createElement('div');
+    modal.style.position = 'fixed';
+    modal.style.top = '0';
+    modal.style.left = '0';
+    modal.style.width = '100vw';
+    modal.style.height = '100vh';
+    modal.style.background = 'rgba(0,0,0,0.3)';
+    modal.style.display = 'flex';
+    modal.style.alignItems = 'center';
+    modal.style.justifyContent = 'center';
+    modal.style.zIndex = '9999';
+    modal.innerHTML = `
+        <div style="background:#fff;border-radius:10px;padding:32px 28px;min-width:320px;text-align:center;box-shadow:0 4px 24px rgba(0,0,0,0.18);">
+            <div style="font-size:1.3em;font-weight:bold;margin-bottom:12px;">Hem Details</div>
+            <div style="margin-bottom:12px;">
+                <label>Length <input id="hemLengthInput" type="number" min="0" step="0.1" style="width:80px;" /></label>
+            </div>
+            <div style="margin-bottom:12px;">
+                <label>Type <select id="hemTypeSelect"><option value="closed">Closed</option><option value="open">Open</option></select></label>
+            </div>
+            <div id="openAmountRow" style="margin-bottom:12px;display:none;">
+                <label>Open Amount <input id="hemOpenAmountInput" type="number" min="0" step="0.1" style="width:80px;" /></label>
+            </div>
+            <div style="display:flex;gap:18px;justify-content:center;">
+                <button id="hemDetailsOkBtn" style="padding:7px 22px;border-radius:6px;border:none;background:#3498db;color:#fff;cursor:pointer;">OK</button>
+                <button id="hemDetailsCancelBtn" style="padding:7px 22px;border-radius:6px;border:none;background:#e74c3c;color:#fff;cursor:pointer;">Cancel</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+    const hemTypeSelect = modal.querySelector('#hemTypeSelect');
+    const openAmountRow = modal.querySelector('#openAmountRow');
+    hemTypeSelect.onchange = function() {
+        openAmountRow.style.display = hemTypeSelect.value === 'open' ? '' : 'none';
+    };
+    modal.querySelector('#hemDetailsCancelBtn').onclick = function() {
+        document.body.removeChild(modal);
+    };
+    modal.querySelector('#hemDetailsOkBtn').onclick = function() {
+        const length = parseFloat(modal.querySelector('#hemLengthInput').value);
+        const type = hemTypeSelect.value;
+        let open = null;
+        if (type === 'open') open = modal.querySelector('#hemOpenAmountInput').value;
+    hem = { x, y, length, type, open };
+    // Add special hem vertex entity
+    entities.push({ type: 'HEM_VERTEX', x, y, length, hemType: type, open });
+    document.body.removeChild(modal);
+    redraw();
+    };
+}
+function getBendAngleAtVertex(idx) {
+    if (entities.length < 2) return 180;
+    const prev = entities[idx];
+    const curr = entities[idx+1];
+    if (!prev || !curr || prev.type !== 'LINE' || curr.type !== 'LINE') return 180;
+    const v1 = { x: prev.x2 - prev.x1, y: prev.y2 - prev.y1 };
+    const v2 = { x: curr.x2 - curr.x1, y: curr.y2 - curr.y1 };
+    const dot = v1.x * v2.x + v1.y * v2.y;
+    const mag1 = Math.sqrt(v1.x*v1.x + v1.y*v1.y);
+    const mag2 = Math.sqrt(v2.x*v2.x + v2.y*v2.y);
+    if (mag1 === 0 || mag2 === 0) return 180;
+    let angle = Math.acos(dot / (mag1 * mag2)) * 180 / Math.PI;
+    // Convert to internal bend angle: 180 - included angle
+    let bendAngle = 180 - angle;
+    if (bendAngle < 0) bendAngle += 360;
+    return bendAngle;
+}
+function clearProfile() {
+    entities = [];
+    bends = [];
+    hem = null;
+    redraw();
+}
+function exportDXF() {
+    let dxf = '0\nSECTION\n2\nENTITIES\n';
+    entities.forEach(ent => {
+        if (ent.type === 'LINE') {
+            dxf += '0\nLINE\n8\n0\n10\n' + (ent.x1/scale).toFixed(4) + '\n20\n' + (ent.y1/scale).toFixed(4) + '\n11\n' + (ent.x2/scale).toFixed(4) + '\n21\n' + (ent.y2/scale).toFixed(4) + '\n';
+        } else if (ent.type === 'ARC') {
+            dxf += '0\nARC\n8\n0\n10\n' + (ent.cx/scale).toFixed(4) + '\n20\n' + (ent.cy/scale).toFixed(4) + '\n40\n' + (ent.r/scale).toFixed(4) + '\n50\n' + ent.startAngle.toFixed(4) + '\n51\n' + ent.endAngle.toFixed(4) + '\n';
+        } else if (ent.type === 'POLYLINE') {
+            dxf += '0\nLWPOLYLINE\n8\n0\n90\n' + ent.points.length + '\n';
+            ent.points.forEach(pt => {
+                dxf += '10\n' + (pt.x/scale).toFixed(4) + '\n20\n' + (pt.y/scale).toFixed(4) + '\n';
+            });
+        } else if (ent.type === 'HEM_VERTEX') {
+            // DXF POINT entity, layer HEM
+            dxf += '0\nPOINT\n8\nHEM\n10\n' + (ent.x/scale).toFixed(4) + '\n20\n' + (ent.y/scale).toFixed(4) + '\n';
+        }
+    });
+    dxf += '0\nENDSEC\n0\nEOF';
+    downloadTextFile(dxf, 'profile.dxf');
+}
+function exportMetadata() {
+    meta.name = document.getElementById('profileName').value;
+    meta.desc = document.getElementById('profileDesc').value;
+    meta.material = document.getElementById('material').value;
+    meta.thickness = document.getElementById('thickness').value;
+    meta.tooling = document.getElementById('tooling').value;
+    downloadTextFile(JSON.stringify(meta, null, 2), 'profile_metadata.json');
+}
+function downloadTextFile(text, filename) {
+    const blob = new Blob([text], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 100);
+}
+redraw();
+    </script>
+</body>
+</html>
         console.error('Canvas container not found');
         return;
     }
@@ -684,21 +498,167 @@ function loadHtml2Canvas() {
         document.head.appendChild(script);
     });
 }
-        let isDrawing = true; // Auto-start drawing
+        // DXF-style entity storage
+        let isDrawing = true;
         let isEditMode = false;
         let isDragging = false;
-        let dragPointIndex = -1;
+        let dragEntityIndex = -1;
         let currentEditElement = null;
-        let coatedSideRight = false; // false = left/top coated, true = right/bottom coated
-    let points = [];
-    // ...existing code...
-        let scale = 20; // pixels per inch
+        let coatedSideRight = false;
+        let entities = []; // DXF-style: {type: 'LINE'|'ARC'|'POLYLINE', ...}
+        let metadata = {
+            material: '',
+            thickness: '',
+            bendAllowances: [],
+            tooling: '',
+            description: ''
+        };
+        let scale = 20;
         let offset = { x: 50, y: 50 };
 
         const canvas = document.getElementById('canvas');
         const pointsGroup = document.getElementById('points');
         const linesGroup = document.getElementById('lines');
         const labelsGroup = document.getElementById('labels');
+
+        // DXF entity creation helpers
+        function addLine(x1, y1, x2, y2) {
+            entities.push({ type: 'LINE', x1, y1, x2, y2 });
+            redrawProfile();
+        }
+        function addArc(cx, cy, r, startAngle, endAngle) {
+            entities.push({ type: 'ARC', cx, cy, r, startAngle, endAngle });
+            redrawProfile();
+        }
+        function addPolyline(points) {
+            entities.push({ type: 'POLYLINE', points });
+            redrawProfile();
+        }
+
+        // DXF export (geometry only)
+        function exportDXF() {
+            let dxf = '0\nSECTION\n2\nENTITIES\n';
+            entities.forEach(ent => {
+                if (ent.type === 'LINE') {
+                    dxf += '0\nLINE\n8\n0\n10\n' + (ent.x1/scale).toFixed(4) + '\n20\n' + (ent.y1/scale).toFixed(4) + '\n11\n' + (ent.x2/scale).toFixed(4) + '\n21\n' + (ent.y2/scale).toFixed(4) + '\n';
+                } else if (ent.type === 'ARC') {
+                    dxf += '0\nARC\n8\n0\n10\n' + (ent.cx/scale).toFixed(4) + '\n20\n' + (ent.cy/scale).toFixed(4) + '\n40\n' + (ent.r/scale).toFixed(4) + '\n50\n' + ent.startAngle.toFixed(4) + '\n51\n' + ent.endAngle.toFixed(4) + '\n';
+                } else if (ent.type === 'POLYLINE') {
+                    dxf += '0\nLWPOLYLINE\n8\n0\n90\n' + ent.points.length + '\n';
+                    ent.points.forEach(pt => {
+                        dxf += '10\n' + (pt.x/scale).toFixed(4) + '\n20\n' + (pt.y/scale).toFixed(4) + '\n';
+                    });
+                }
+            });
+            dxf += '0\nENDSEC\n0\nEOF';
+            downloadTextFile(dxf, 'profile.dxf');
+        }
+
+        // Metadata export (JSON)
+        function exportMetadataJSON() {
+            metadata.description = document.getElementById('profileDescription').value;
+            metadata.material = document.getElementById('profileName').value;
+            downloadTextFile(JSON.stringify(metadata, null, 2), 'profile_metadata.json');
+        }
+
+        function downloadTextFile(text, filename) {
+            const blob = new Blob([text], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(() => URL.revokeObjectURL(url), 100);
+        }
+
+        // Drawing logic for DXF entities
+        function redrawProfile() {
+            pointsGroup.innerHTML = '';
+            linesGroup.innerHTML = '';
+            labelsGroup.innerHTML = '';
+            entities.forEach((ent, idx) => {
+                if (ent.type === 'LINE') {
+                    drawLineEntity(ent, idx);
+                } else if (ent.type === 'ARC') {
+                    drawArcEntity(ent, idx);
+                } else if (ent.type === 'POLYLINE') {
+                    drawPolylineEntity(ent, idx);
+                }
+            });
+            updateStats();
+        }
+
+        function drawLineEntity(ent, idx) {
+            const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            line.setAttribute('x1', ent.x1);
+            line.setAttribute('y1', ent.y1);
+            line.setAttribute('x2', ent.x2);
+            line.setAttribute('y2', ent.y2);
+            line.setAttribute('class', 'line');
+            line.setAttribute('data-index', idx);
+            linesGroup.appendChild(line);
+            // Draw endpoints as points
+            drawPointEntity(ent.x1, ent.y1, idx);
+            drawPointEntity(ent.x2, ent.y2, idx+1000);
+        }
+
+        function drawArcEntity(ent, idx) {
+            const startRad = ent.startAngle * Math.PI / 180;
+            const endRad = ent.endAngle * Math.PI / 180;
+            const startX = ent.cx + ent.r * Math.cos(startRad);
+            const startY = ent.cy + ent.r * Math.sin(startRad);
+            const endX = ent.cx + ent.r * Math.cos(endRad);
+            const endY = ent.cy + ent.r * Math.sin(endRad);
+            const largeArcFlag = (Math.abs(ent.endAngle - ent.startAngle) > 180) ? 1 : 0;
+            const sweepFlag = (ent.endAngle > ent.startAngle) ? 1 : 0;
+            const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            path.setAttribute('d', `M ${startX} ${startY} A ${ent.r} ${ent.r} 0 ${largeArcFlag} ${sweepFlag} ${endX} ${endY}`);
+            path.setAttribute('stroke', '#ff6b35');
+            path.setAttribute('stroke-width', '3');
+            path.setAttribute('fill', 'none');
+            linesGroup.appendChild(path);
+            drawPointEntity(startX, startY, idx+2000);
+            drawPointEntity(endX, endY, idx+3000);
+        }
+
+        function drawPolylineEntity(ent, idx) {
+            if (!ent.points || ent.points.length < 2) return;
+            for (let i = 0; i < ent.points.length - 1; i++) {
+                drawLineEntity({ type: 'LINE', x1: ent.points[i].x, y1: ent.points[i].y, x2: ent.points[i+1].x, y2: ent.points[i+1].y }, idx*100+i);
+            }
+        }
+
+        function drawPointEntity(x, y, idx) {
+            const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+            circle.setAttribute('cx', x);
+            circle.setAttribute('cy', y);
+            circle.setAttribute('r', isEditMode ? 8 : 6);
+            circle.setAttribute('class', isEditMode ? 'point draggable' : 'point');
+            circle.setAttribute('data-index', idx);
+            pointsGroup.appendChild(circle);
+        }
+
+        function updateStats() {
+            let totalLength = 0;
+            entities.forEach(ent => {
+                if (ent.type === 'LINE') {
+                    const dx = (ent.x2 - ent.x1) / scale;
+                    const dy = (ent.y2 - ent.y1) / scale;
+                    totalLength += Math.sqrt(dx * dx + dy * dy);
+                } else if (ent.type === 'ARC') {
+                    const arcLen = Math.abs(ent.endAngle - ent.startAngle) * Math.PI / 180 * (ent.r / scale);
+                    totalLength += arcLen;
+                } else if (ent.type === 'POLYLINE') {
+                    for (let i = 0; i < ent.points.length - 1; i++) {
+                        const dx = (ent.points[i+1].x - ent.points[i].x) / scale;
+                        const dy = (ent.points[i+1].y - ent.points[i].y) / scale;
+                        totalLength += Math.sqrt(dx * dx + dy * dy);
+                    }
+                }
+            });
+            document.getElementById('totalLength').textContent = `${totalLength.toFixed(3)}"`;
+        }
 
         function closeEditPopup() {
             const popup = document.getElementById('editPopup');
