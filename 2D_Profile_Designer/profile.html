@@ -690,15 +690,39 @@ function loadHtml2Canvas() {
         let dragPointIndex = -1;
         let currentEditElement = null;
         let coatedSideRight = false; // false = left/top coated, true = right/bottom coated
-    let points = [];
-    // ...existing code...
+        let points = [];
+        let entities = []; // DXF entity storage
         let scale = 20; // pixels per inch
         let offset = { x: 50, y: 50 };
+
+        // DXF layers
+        const LAYERS = {
+            PROFILE: 'PROFILE',
+            HEM: 'HEM',
+            CONSTRUCTION: 'CONSTRUCTION'
+        };
 
         const canvas = document.getElementById('canvas');
         const pointsGroup = document.getElementById('points');
         const linesGroup = document.getElementById('lines');
         const labelsGroup = document.getElementById('labels');
+
+        // DXF Coordinate conversion functions
+        function screenToDxf(screenPoint) {
+            // Convert from screen coordinates to DXF coordinates
+            // Screen: origin top-left, Y increases downward
+            // DXF: standard Cartesian, Y increases upward
+            const dxfX = (screenPoint.x - offset.x) / scale;
+            const dxfY = (canvas.clientHeight - screenPoint.y - offset.y) / scale;
+            return { x: dxfX, y: dxfY };
+        }
+
+        function dxfToScreen(dxfPoint) {
+            // Convert from DXF coordinates to screen coordinates
+            const screenX = dxfPoint.x * scale + offset.x;
+            const screenY = canvas.clientHeight - (dxfPoint.y * scale + offset.y);
+            return { x: screenX, y: screenY };
+        }
 
         function closeEditPopup() {
             const popup = document.getElementById('editPopup');
@@ -736,20 +760,18 @@ function loadHtml2Canvas() {
 
         function handleMouseMove(e) {
             const rect = canvas.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const y = e.clientY - rect.top;
+            const screenX = e.clientX - rect.left;
+            const screenY = e.clientY - rect.top;
             
-            // Convert to inches
-            const inchX = ((x - offset.x) / scale).toFixed(2);
-            const inchY = (((canvas.clientHeight - y) - offset.y) / scale).toFixed(2);
-            
-            document.getElementById('coordinates').textContent = `Mouse: (${inchX}", ${inchY}")`;
+            // Convert to DXF coordinates for display
+            const dxfCoords = screenToDxf({ x: screenX, y: screenY });
+            document.getElementById('coordinates').textContent = `Mouse: (${dxfCoords.x.toFixed(2)}", ${dxfCoords.y.toFixed(2)}")`;
             
             // Handle dragging in edit mode
             if (isDragging && dragPointIndex >= 0) {
                 // Save old position
                 const oldPoint = { ...points[dragPointIndex] };
-                points[dragPointIndex] = { ...points[dragPointIndex], x: x, y: y };
+                points[dragPointIndex] = { ...points[dragPointIndex], x: screenX, y: screenY };
 
                 // If dragging the hem's previous vertex, update the hem endpoint to keep length and angle fixed
                 if (typeof window.hemVertexIndex !== 'undefined' && dragPointIndex === window.hemVertexIndex) {
@@ -803,7 +825,7 @@ function loadHtml2Canvas() {
             
             // Show preview line when drawing
             if (isDrawing && points.length > 0 && !isEditMode) {
-                showPreviewLine(x, y);
+                showPreviewLine(screenX, screenY);
             }
         }
 
@@ -814,20 +836,31 @@ function loadHtml2Canvas() {
             const x = e.clientX - rect.left;
             const y = e.clientY - rect.top;
             
-            // Check if clicking on a point
+            // Check if clicking on a point or hem vertex
             for (let i = 0; i < points.length; i++) {
                 const point = points[i];
-                const distance = Math.sqrt((x - point.x) ** 2 + (y - point.y) ** 2);
-                if (distance <= 12) {
-                    isDragging = true;
-                    dragPointIndex = i;
-                    closeEditPopup();
-                    
-                    const pointElement = document.querySelector(`circle[data-index="${i}"]`);
-                    if (pointElement) {
-                        pointElement.classList.add('dragging');
+                if (point.isHem) {
+                    // Check if click is inside hem square
+                    if (x >= point.x - 8 && x <= point.x + 8 && y >= point.y - 8 && y <= point.y + 8) {
+                        isDragging = true;
+                        dragPointIndex = i;
+                        const allPoints = document.querySelectorAll('.point');
+                        allPoints.forEach(pt => {
+                            if (parseInt(pt.getAttribute('data-index')) === i) pt.classList.add('dragging');
+                        });
+                        return;
                     }
-                    break;
+                } else {
+                    const distance = Math.sqrt((x - point.x) ** 2 + (y - point.y) ** 2);
+                    if (distance <= 12) {
+                        isDragging = true;
+                        dragPointIndex = i;
+                        const allPoints = document.querySelectorAll('.point');
+                        allPoints.forEach(pt => {
+                            if (parseInt(pt.getAttribute('data-index')) === i) pt.classList.add('dragging');
+                        });
+                        return;
+                    }
                 }
             }
         }
@@ -858,10 +891,9 @@ function loadHtml2Canvas() {
             addPoint(x, y);
         }
 
-
         function addPoint(x, y) {
             let snapX = x, snapY = y;
-            // Snap to vertical/horizontal if close enough
+            // Snap to vertical/horizontal if close enough (in screen coordinates)
             if (points.length > 0) {
                 const last = points[points.length - 1];
                 const dx = x - last.x;
@@ -893,8 +925,47 @@ function loadHtml2Canvas() {
                     }
                 }
             }
+            
+            // Add point to UI tracking array
             points.push(point);
+
+            // Create DXF POINT entity
+            entities.push({
+                type: 'POINT',
+                x: point.x,
+                y: point.y,
+                layer: LAYERS.PROFILE
+            });
+
             drawPoint(point, points.length - 1);
+
+            // If we have 2+ points, create a DXF LINE entity
+            if (points.length > 1) {
+                const prevPoint = points[points.length - 2];
+                entities.push({
+                    type: 'LINE',
+                    start: { x: prevPoint.x, y: prevPoint.y },
+                    end: { x: point.x, y: point.y },
+                    layer: LAYERS.PROFILE
+                });
+
+                // If the first point was a hem, handle it specially when adding the second point
+                if (points[0].isHem && points[0].hemData && points.length === 2) {
+                    // Save the second point's position temporarily
+                    const secondPoint = { ...points[1] };
+                    // Apply the hem length which will modify point positions
+                    applyLengthEditByIndex(0, points[0].hemData.length);
+                    // Restore the second point's position
+                    points[1] = secondPoint;
+                    // Update window.hemInfo to ensure proper rendering
+                    window.hemVertexIndex = 0;
+                    window.hemInfo = points[0].hemData;
+                    // Draw the hem arc
+                    addHemArcAtVertex(0);
+                    // Force measurement redraw for first hem
+                    drawMeasurements();
+                }
+            }
             if (points.length > 1) {
                 drawLine(points[points.length - 2], point, points.length - 2);
                 clearPreviewLine(); // Remove preview line and label immediately
@@ -905,13 +976,16 @@ function loadHtml2Canvas() {
             }
             updateStats();
             clearPreviewLine();
-            // Hem detection: if a new angle < 30° is created, show the hem popup
-            if (points.length > 2) {
+            
+            // Show hem popup for first point or if angle < 30°
+            if (points.length === 1) {
+                showHemPopup(0, true); // true indicates it's the first point
+            } else if (points.length > 2) {
                 // The new vertex is at points.length - 2 (the previous point)
                 const vertexIndex = points.length - 2;
                 const angle = calculateVertexAngle(vertexIndex);
                 if (angle < 30) {
-                    showHemPopup(vertexIndex);
+                    showHemPopup(vertexIndex, false);
                 }
             }
         }
@@ -925,7 +999,7 @@ function loadHtml2Canvas() {
         }
 
         // Custom modal for Hem prompt
-        function showHemPopup(pointIndex) {
+        function showHemPopup(pointIndex, isFirstPoint = false) {
             let modal = document.getElementById('hemPromptModal');
             if (!modal) {
                 modal = document.createElement('div');
@@ -933,7 +1007,7 @@ function loadHtml2Canvas() {
                 modal.innerHTML = `
                     <div class="hem-modal-content">
                         <div class="hem-modal-title">Create Hem?</div>
-                        <div class="hem-modal-body">Do you want to make a hem at this angle?</div>
+                        <div class="hem-modal-body">Do you want to add a hem?</div>
                         <div class="hem-modal-actions">
                             <button id="hemYesBtn">Yes</button>
                             <button id="hemNoBtn">No</button>
@@ -998,35 +1072,54 @@ function loadHtml2Canvas() {
             // Button handlers
             document.getElementById('hemYesBtn').onclick = function() {
                 modal.style.display = 'none';
-                showSimpleHemDetailsModal(pointIndex);
+                showSimpleHemDetailsModal(pointIndex, isFirstPoint);
             };
             document.getElementById('hemNoBtn').onclick = function() {
                 modal.style.display = 'none';
             };
         }
+
         // Simple modal for hem details
-    function showSimpleHemDetailsModal(pointIndex) {
+        function showSimpleHemDetailsModal(pointIndex, isFirstPoint = false) {
             let modal = document.getElementById('hemDetailsModal');
             if (!modal) {
                 modal = document.createElement('div');
                 modal.id = 'hemDetailsModal';
+                modal.setAttribute('data-editing-index', pointIndex);
+                // Get existing hem data or create default values
+                const existingHem = points[pointIndex] && points[pointIndex].hemData;
+                const defaultHem = {
+                    length: "1.0",
+                    type: "closed",
+                    openAmount: "0.5",
+                    side: "colored"
+                };
+                const hemData = existingHem || defaultHem;
                 modal.innerHTML = `
                     <div class="hem-modal-content">
                         <div class="hem-modal-title">Hem Details</div>
                         <div class="hem-modal-body">
                             <div style="margin-bottom:12px;">
-                                <label>Length of Hem? <input id="hemLengthInput" type="number" min="0" step="0.1" style="width:80px;" /> in</label>
+                                <label>Length of Hem? <input id="hemLengthInput" type="number" min="0" step="0.1" style="width:80px;" value="${hemData.length}"/> in</label>
                             </div>
                             <div style="margin-bottom:12px;">
                                 <label>Open or Closed Hem? 
                                     <select id="hemTypeSelect">
-                                        <option value="closed">Closed</option>
-                                        <option value="open">Open</option>
+                                        <option value="closed" ${hemData.type === 'closed' ? 'selected' : ''}>Closed</option>
+                                        <option value="open" ${hemData.type === 'open' ? 'selected' : ''}>Open</option>
                                     </select>
                                 </label>
                             </div>
-                            <div id="openAmountRow" style="margin-bottom:12px; display:none;">
-                                <label>If open, by how much? <input id="hemOpenAmountInput" type="number" min="0" step="0.1" style="width:80px;" /> in</label>
+                            <div id="openAmountRow" style="margin-bottom:12px; display:${hemData.type === 'open' ? 'block' : 'none'};">
+                                <label>If open, by how much? <input id="hemOpenAmountInput" type="number" min="0" step="0.1" style="width:80px;" value="${hemData.openAmount || '0.5'}"/> in</label>
+                            </div>
+                            <div style="margin-bottom:12px;">
+                                <label>Side: 
+                                    <select id="hemSideSelect">
+                                        <option value="colored" ${hemData.side === 'colored' ? 'selected' : ''}>Colored Side</option>
+                                        <option value="non-colored" ${hemData.side === 'non-colored' ? 'selected' : ''}>Non-Colored Side</option>
+                                    </select>
+                                </label>
                             </div>
                         </div>
                         <div class="hem-modal-actions">
@@ -1072,224 +1165,71 @@ function loadHtml2Canvas() {
                 }
                 modal.style.display = 'none';
 
-                // Change the most recent line's length to the specified hem length
-                // The most recent line is the last one added: index = points.length - 2
-                if (!isNaN(length) && points.length > 1) {
-                    applyLengthEditByIndex(points.length - 2, length);
-                    // Set hem vertex index so label is only shown when hem is created
-                    window.hemVertexIndex = points.length - 2;
-                    // Store hem info for display
-                    window.hemInfo = {
-                        index: points.length - 2,
-                        length: length,
-                        type: type,
-                        openAmount: openAmount
-                    };
-                    redrawProfile();
-                    addHemArcAtVertex(points.length - 2);
-                    // Draw info box below hem vertex
-                    showHemInfoBox(window.hemInfo);
-        // Draw a little info box below the hem vertex with the entered details
-        function showHemInfoBox(hemInfo) {
-            if (!hemInfo) return;
-
-            const vertex = points[hemInfo.index];
-            if (!vertex) return;
-            // Remove any previous info box
-            const oldBox = document.getElementById('hem-info-box');
-            if (oldBox) oldBox.remove();
-            // Info text stacked vertically
-            const lines = [`Length: ${hemInfo.length} in`, `Type: ${hemInfo.type}`];
-            if (hemInfo.type === 'open' && hemInfo.openAmount) {
-                lines.push(`Open: ${hemInfo.openAmount} in`);
-            }
-            const fontSize = 13;
-            const padding = 16;
-            const lineHeight = fontSize + 5;
-            const boxHeight = lines.length * lineHeight + padding;
-            const maxLineLength = Math.max(...lines.map(l => l.length));
-            const boxWidth = maxLineLength * 8 + padding;
-
-            // Try several candidate positions for the info box
-            const candidateOffsets = [
-                { x: 0, y: 60 },    // below
-                { x: 0, y: -60 },   // above
-                { x: 80, y: 0 },    // right
-                { x: -80, y: 0 },   // left
-                { x: 80, y: 60 },   // bottom-right
-                { x: -80, y: 60 },  // bottom-left
-                { x: 80, y: -60 },  // top-right
-                { x: -80, y: -60 }  // top-left
-            ];
-
-            // Get all points and lines bounding boxes
-            const elements = [];
-            // Points
-            points.forEach(pt => {
-                elements.push({
-                    x: pt.x - 10,
-                    y: pt.y - 10,
-                    width: 20,
-                    height: 20
-                });
-            });
-            // Lines
-            for (let i = 0; i < points.length - 1; i++) {
-                const x1 = points[i].x, y1 = points[i].y;
-                const x2 = points[i+1].x, y2 = points[i+1].y;
-                // Bounding box for line
-                const minX = Math.min(x1, x2) - 6;
-                const minY = Math.min(y1, y2) - 6;
-                const maxX = Math.max(x1, x2) + 6;
-                const maxY = Math.max(y1, y2) + 6;
-                elements.push({
-                    x: minX,
-                    y: minY,
-                    width: maxX - minX,
-                    height: maxY - minY
-                });
-            }
-
-            // Find a candidate position that does not overlap any element
-            let boxX = vertex.x;
-            let boxY = vertex.y + 60;
-            let found = false;
-            for (const offset of candidateOffsets) {
-                const testX = vertex.x + offset.x;
-                const testY = vertex.y + offset.y;
-                const testBox = {
-                    x: testX - boxWidth/2,
-                    y: testY - boxHeight/2,
-                    width: boxWidth,
-                    height: boxHeight
-                };
-                // Check for overlap
-                let overlaps = false;
-                for (const el of elements) {
-                    if (
-                        testBox.x < el.x + el.width &&
-                        testBox.x + testBox.width > el.x &&
-                        testBox.y < el.y + el.height &&
-                        testBox.y + testBox.height > el.y
-                    ) {
-                        overlaps = true;
-                        break;
-                    }
-                }
-                if (!overlaps) {
-                    boxX = testX;
-                    boxY = testY;
-                    found = true;
-                    break;
-                }
-            }
-            // If all positions overlap, use below vertex as fallback
-
-            // Create SVG group for the info box
-            const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-            group.setAttribute('id', 'hem-info-box');
-            // Box background
-            const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-            rect.setAttribute('x', boxX - boxWidth/2);
-            rect.setAttribute('y', boxY - boxHeight/2);
-            rect.setAttribute('width', boxWidth);
-            rect.setAttribute('height', boxHeight);
-            rect.setAttribute('rx', 8);
-            rect.setAttribute('fill', '#fffbe6');
-            rect.setAttribute('stroke', '#ff6b35');
-            rect.setAttribute('stroke-width', '2');
-            group.appendChild(rect);
-            // Draw each line of text
-            lines.forEach((line, idx) => {
-                const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-                text.setAttribute('x', boxX);
-                text.setAttribute('y', boxY - boxHeight/2 + padding/2 + lineHeight/2 + idx * lineHeight);
-                text.setAttribute('text-anchor', 'middle');
-                text.setAttribute('font-size', fontSize);
-                text.setAttribute('fill', '#ff6b35');
-                text.textContent = line;
-                group.appendChild(text);
-            });
-            // Add edit button in edit mode
-            if (isEditMode) {
-                const editBtn = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-                // Move the button further right (e.g., +20px more)
-                editBtn.setAttribute('x', boxX + boxWidth/2 + 2);
-                editBtn.setAttribute('y', boxY - boxHeight/2 + 18);
-                editBtn.setAttribute('font-size', '15');
-                editBtn.setAttribute('fill', '#3498db');
-                editBtn.setAttribute('cursor', 'pointer');
-                editBtn.setAttribute('text-anchor', 'start');
-                editBtn.textContent = '\u270E'; // Pencil icon
-                editBtn.setAttribute('id', 'hem-edit-btn');
-                editBtn.addEventListener('click', function(e) {
-                    e.stopPropagation();
-                    // Overlay the modal, but do NOT remove the hem info box
-                    let modal = document.getElementById('hemDetailsModal');
-                    if (!modal) {
-                        showSimpleHemDetailsModal(hemInfo.index);
+                if (!isNaN(length)) {
+                    let currentHemIndex;
+                    let hemData;
+                    
+                    // For first point, create the hem data immediately
+                    if (points.length === 1) {
+                        currentHemIndex = 0;
+                        const side = document.getElementById('hemSideSelect').value;
+                        points[0].isHem = true;
+                        hemData = {
+                            length,
+                            type,
+                            openAmount,
+                            side,
+                            index: 0
+                        };
+                        points[0].hemData = hemData;
                     } else {
-                        modal.style.display = 'flex';
+                        // Handle existing points
+                        const isEditing = points[pointIndex] && points[pointIndex].hemData;
+                        currentHemIndex = isEditing ? pointIndex : points.length - 2;
+                        
+                        // Only apply length edit for new hems that are not the first point
+                        if (!isEditing) {
+                            applyLengthEditByIndex(currentHemIndex, length);
+                        }
+                        
+                        const side = document.getElementById('hemSideSelect').value;
+                        points[currentHemIndex].isHem = true;
+                        hemData = {
+                            length,
+                            type,
+                            openAmount,
+                            side,
+                            index: currentHemIndex
+                        };
+                        points[currentHemIndex].hemData = hemData;
                     }
-                });
-                group.appendChild(editBtn);
-            }
-            // Add to linesGroup so it appears with the lines
-            linesGroup.appendChild(group);
-        }
-
-
-
-        // Draw an orange arc at the specified vertex (between its neighbors)
-        function addHemArcAtVertex(vertexIndex) {
-            // Only draw if vertex has both previous and next points
-            if (vertexIndex <= 0 || vertexIndex >= points.length - 1) return;
-            const prev = points[vertexIndex - 1];
-            const center = points[vertexIndex];
-            const next = points[vertexIndex + 1];
-            if (!prev || !center || !next) return;
-            const r = 24; // arc radius in px
-            // Calculate directions
-            const v1 = { x: prev.x - center.x, y: prev.y - center.y };
-            const v2 = { x: next.x - center.x, y: next.y - center.y };
-            // Normalize
-            const len1 = Math.sqrt(v1.x * v1.x + v1.y * v1.y);
-            const len2 = Math.sqrt(v2.x * v2.x + v2.y * v2.y);
-            if (len1 === 0 || len2 === 0) return;
-            const n1 = { x: v1.x / len1, y: v1.y / len1 };
-            const n2 = { x: v2.x / len2, y: v2.y / len2 };
-            // Start/end points for arc
-            const startX = center.x + n1.x * r;
-            const startY = center.y + n1.y * r;
-            const endX = center.x + n2.x * r;
-            const endY = center.y + n2.y * r;
-            // Calculate angle between vectors
-            let angle1 = Math.atan2(n1.y, n1.x);
-            let angle2 = Math.atan2(n2.y, n2.x);
-            let angleDiff = angle2 - angle1;
-            if (angleDiff <= 0) angleDiff += 2 * Math.PI;
-            // Always use large arc flag
-            const largeArcFlag = 1;
-            // If angleDiff < Math.PI, reverse sweep flag so arc is always >180deg
-            const sweepFlag = (angleDiff < Math.PI) ? 0 : 1;
-            // SVG arc path
-            const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-            const d = `M ${startX} ${startY} A ${r} ${r} 0 ${largeArcFlag} ${sweepFlag} ${endX} ${endY}`;
-            path.setAttribute('d', d);
-            path.setAttribute('stroke', '#ff6b35');
-            path.setAttribute('stroke-width', '4');
-            path.setAttribute('fill', 'none');
-            path.setAttribute('class', 'hem-curve');
-            // Add to linesGroup so it appears with the lines
-            linesGroup.appendChild(path);
-        }
+                    
+                    // Create DXF HEM entity
+                    entities.push({
+                        type: 'POINT',
+                        x: points[currentHemIndex].x,
+                        y: points[currentHemIndex].y,
+                        layer: LAYERS.HEM,
+                        hemData: hemData
+                    });
+                    
+                    // Store hem data in the point itself
+                    points[currentHemIndex].isHem = true;
+                    points[currentHemIndex].hemData = hemData;
+                    
+                    // Update most recent hem for compatibility
+                    window.hemVertexIndex = currentHemIndex;
+                    window.hemInfo = hemData;
+                    
+                    // Only enter edit mode if not the first point or if we have 2+ points
+                    if (currentHemIndex > 0 || points.length > 1) {
+                        addHemArcAtVertex(currentHemIndex);
+                        showHemInfoBox(window.hemInfo);
+                    }
                 }
-
-                }
-
+                
                 // Redraw profile to update the SVG
                 redrawProfile();
-
                 // Turn the most recent line orange
                 // Find the SVG line element for the most recent line
                 const lineIndex = points.length - 2;
@@ -1297,18 +1237,244 @@ function loadHtml2Canvas() {
                 if (lineEl) {
                     lineEl.setAttribute('stroke', '#ff6b35');
                 }
-
                 // Update the measurement label for the most recent line to orange
                 // Find the label by data-type and data-index
                 const labelEl = document.querySelector(`text.measurement-label[data-type="length"][data-index="${lineIndex}"]`);
                 if (labelEl) {
                     labelEl.setAttribute('fill', '#ff6b35');
                 }
-
-                // After hem creation, enter edit mode
-                setMode('edit');
+                // After hem creation, enter edit mode only if not the first point
+                if (!isFirstPoint) {
+                    setMode('edit');
+                }
             };
-        
+        }
+
+        // Draw info box below hem vertex with the entered details
+        function showHemInfoBox(hemInfo) {
+            if (!hemInfo) return;
+
+            const vertex = points[hemInfo.index];
+            if (!vertex) return;
+            // Remove only this hem's info box if it exists
+            const oldBox = document.getElementById(`hem-info-box-${hemInfo.index}`);
+            if (oldBox) oldBox.remove();
+            
+            // Info text stacked vertically
+            const padding = 10; // Minimum distance from canvas edges
+            const lines = ['HEM', `Length: ${hemInfo.length} in`, `Type: ${hemInfo.type}`, `Side: ${hemInfo.side === 'colored' ? 'Colored' : 'Non-Colored'}`];
+            if (hemInfo.type === 'open' && hemInfo.openAmount) {
+                lines.push(`Open: ${hemInfo.openAmount} in`);
+            }
+            const fontSize = 13;
+            const lineHeight = fontSize + 5;
+            const boxHeight = lines.length * lineHeight + padding;
+            const maxLineLength = Math.max(...lines.map(l => l.length));
+            const boxWidth = maxLineLength * 8 + padding;
+            
+            // Helper function to check if box intersects with any line
+            function doesBoxIntersectLines(boxX, boxY) {
+                // Box corners
+                const boxCorners = [
+                    {x: boxX, y: boxY},
+                    {x: boxX + boxWidth, y: boxY},
+                    {x: boxX + boxWidth, y: boxY + boxHeight},
+                    {x: boxX, y: boxY + boxHeight}
+                ];
+                
+                // Box edges
+                const boxEdges = [
+                    {start: boxCorners[0], end: boxCorners[1]},
+                    {start: boxCorners[1], end: boxCorners[2]},
+                    {start: boxCorners[2], end: boxCorners[3]},
+                    {start: boxCorners[3], end: boxCorners[0]}
+                ];
+                
+                // Check intersection with each line segment in the profile
+                for (let i = 0; i < points.length - 1; i++) {
+                    const line = {
+                        start: points[i],
+                        end: points[i + 1]
+                    };
+                    
+                    // Check if any box edge intersects with the line
+                    for (const boxEdge of boxEdges) {
+                        if (doLinesIntersect(boxEdge.start, boxEdge.end, line.start, line.end)) {
+                            return true;
+                        }
+                    }
+                }
+                return false;
+            }
+
+            // Get canvas bounds
+            const canvasBounds = canvas.getBoundingClientRect();
+
+            // Calculate valid ranges for box position
+            const minX = padding;
+            const maxX = canvasBounds.width - boxWidth - padding;
+            const minY = padding;
+            const maxY = canvasBounds.height - boxHeight - padding;
+
+            // Try positions in different directions around the vertex
+            const directions = [
+                { angle: 0, dist: 60 },    // right
+                { angle: 90, dist: 60 },   // below
+                { angle: 180, dist: 60 },  // left
+                { angle: 270, dist: 60 },  // above
+                { angle: 45, dist: 85 },   // bottom-right
+                { angle: 135, dist: 85 },  // bottom-left
+                { angle: 225, dist: 85 },  // top-left
+                { angle: 315, dist: 85 }   // top-right
+            ];
+
+            // Function to get box position from angle and distance
+            function getBoxPosition(vertex, angle, distance) {
+                const radians = angle * Math.PI / 180;
+                return {
+                    x: vertex.x + Math.cos(radians) * distance,
+                    y: vertex.y + Math.sin(radians) * distance
+                };
+            }
+
+            // Find first non-intersecting position
+            let bestPos = null;
+            let minIntersections = Infinity;
+            
+            // Try each direction with varying distances
+            const distanceMultipliers = [1, 1.5, 2, 0.75];
+            
+            for (const dir of directions) {
+                for (const mult of distanceMultipliers) {
+                    const pos = getBoxPosition(vertex, dir.angle, dir.dist * mult);
+                    
+                    // Ensure box stays within canvas bounds
+                    if (pos.x < minX || pos.x + boxWidth > maxX || 
+                        pos.y < minY || pos.y + boxHeight > maxY) {
+                        continue;
+                    }
+                    
+                    // Check for line intersections
+                    if (!doesBoxIntersectLines(pos.x, pos.y)) {
+                        bestPos = pos;
+                        break;
+                    }
+                }
+                if (bestPos) break;
+            }
+            
+            // If no clear position found, use default position
+            if (!bestPos) {
+                bestPos = {
+                    x: Math.min(Math.max(vertex.x + 60, minX), maxX),
+                    y: Math.min(Math.max(vertex.y + 60, minY), maxY)
+                };
+            }
+            // Create the info box group
+            const boxGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+            boxGroup.setAttribute('id', `hem-info-box-${hemInfo.index}`);
+            boxGroup.setAttribute('data-hem-index', hemInfo.index);
+            
+            // Background box
+            const box = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+            box.setAttribute('x', bestPos.x);
+            box.setAttribute('y', bestPos.y);
+            box.setAttribute('width', boxWidth);
+            box.setAttribute('height', boxHeight);
+            box.setAttribute('fill', '#fffbe6');
+            box.setAttribute('stroke', '#ff6b35');
+            box.setAttribute('stroke-width', '2');
+            box.setAttribute('rx', '5');
+            boxGroup.appendChild(box);
+
+            // Add text lines
+            lines.forEach((line, index) => {
+                const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                text.setAttribute('x', bestPos.x + padding/2);
+                text.setAttribute('y', bestPos.y + (index + 1) * lineHeight);
+                text.setAttribute('fill', index === 0 ? '#ff6b35' : '#2c3e50');
+                text.setAttribute('font-size', fontSize);
+                text.setAttribute('font-weight', index === 0 ? 'bold' : 'normal');
+                text.textContent = line;
+                boxGroup.appendChild(text);
+            });
+            
+            // Add edit button if not the first vertex or if we have 2+ points
+            if ((hemInfo.index > 0 || points.length > 1) && isEditMode) {
+                const editBtn = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                editBtn.setAttribute('x', bestPos.x + boxWidth + 5);
+                editBtn.setAttribute('y', bestPos.y + 15);
+                editBtn.setAttribute('font-size', '15');
+                editBtn.setAttribute('fill', '#3498db');
+                editBtn.setAttribute('cursor', 'pointer');
+                editBtn.setAttribute('text-anchor', 'start');
+                editBtn.textContent = '\u270E'; // Pencil icon
+                editBtn.setAttribute('id', `hem-edit-btn-${hemInfo.index}`);
+                editBtn.setAttribute('data-hem-index', hemInfo.index);
+                
+                editBtn.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    const hemIndex = parseInt(this.getAttribute('data-hem-index'), 10);
+                    
+                    // Always remove existing modal to ensure we start fresh
+                    const existingModal = document.getElementById('hemDetailsModal');
+                    if (existingModal) {
+                        existingModal.remove();
+                    }
+                    
+                    // Show new modal with correct hem index
+                    const isFirstPoint = hemIndex === 0 && points.length === 1;
+                    showSimpleHemDetailsModal(hemIndex, isFirstPoint);
+                });
+                boxGroup.appendChild(editBtn);
+            }
+
+            // Add the info box group to the SVG
+            linesGroup.appendChild(boxGroup);
+        }
+
+        // Make the hem vertex the end point of the profile
+        function addHemArcAtVertex(vertexIndex) {
+            // Check if this is a first point hem
+            const isFirstPoint = vertexIndex === 0 && points.length <= 2;
+            // Only proceed if it's the first point or if we have a previous point
+            if (!isFirstPoint && vertexIndex <= 0) return;
+            
+            const hem = points[vertexIndex];
+            const prev = vertexIndex > 0 ? points[vertexIndex - 1] : null;
+            
+            // For points after first hem, remove subsequent points
+            if (!isFirstPoint) {
+                while (points.length > vertexIndex + 1) {
+                    const pointToRemove = points.length - 1;
+                    const pointElement = document.querySelector(`[data-point-index="${pointToRemove}"]`);
+                    if (pointElement) {
+                        pointElement.remove();
+                    }
+                    
+                    // Remove the line connecting to this point
+                    const lineElement = document.querySelector(`[data-index="${pointToRemove - 1}"]`);
+                    if (lineElement) {
+                        lineElement.remove();
+                    }
+                    
+                    points.pop();
+                }
+            }
+            
+            // Draw square hem marker
+            const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+            rect.setAttribute('x', hem.x - 8);
+            rect.setAttribute('y', hem.y - 8);
+            rect.setAttribute('width', 16);
+            rect.setAttribute('height', 16);
+            rect.setAttribute('fill', '#ff6b35');
+            rect.setAttribute('stroke', '#fffbe6');
+            rect.setAttribute('stroke-width', '3');
+            rect.setAttribute('class', 'hem-point');
+            rect.setAttribute('data-index', vertexIndex);
+            pointsGroup.appendChild(rect);
+        }
 
         function closeHemPopup() {
             const hemPopup = document.getElementById('hemPopup');
@@ -1320,14 +1486,26 @@ function loadHtml2Canvas() {
             redrawProfile();
         }
 
-        // Update drawHem to use new parameters
-        function drawHem(pointIndex, hemType, hemLength, openAmount) {
-            // No Hem drawing logic
-        }
-
         function drawPoint(point, index) {
-            // If a Hem was just created, skip drawing the last vertex (dot)
-            if (typeof window.hemVertexIndex !== 'undefined' && index === points.length - 1 && window.hemVertexIndex === points.length - 2) {
+            // Check if the previous point has a hem
+            if (index > 0 && points[index - 1].hemData) {
+                // Don't draw this vertex (the one after a hem)
+                return;
+            }
+
+            if (point.isHem) {
+                const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+                rect.setAttribute('x', point.x - 8);
+                rect.setAttribute('y', point.y - 8);
+                rect.setAttribute('width', 16);
+                rect.setAttribute('height', 16);
+                rect.setAttribute('class', isEditMode ? 'draggable' : ''); // Remove point class for hems
+                rect.setAttribute('fill', '#ff6b35'); // Always orange for hems
+                rect.setAttribute('stroke', '#fffbe6');
+                rect.setAttribute('stroke-width', '3');
+                rect.setAttribute('data-index', index);
+                rect.setAttribute('data-type', 'hem');
+                pointsGroup.appendChild(rect);
                 return;
             }
             const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
@@ -1411,13 +1589,16 @@ function loadHtml2Canvas() {
             previewLine.setAttribute('x2', mouseX);
             previewLine.setAttribute('y2', mouseY);
 
-            // Calculate preview length
-            const deltaX = (mouseX - lastPoint.x) / scale;
-            const deltaY = (lastPoint.y - mouseY) / scale;
+            // Calculate preview length using DXF coordinates
+            const lastDxf = screenToDxf(lastPoint);
+            const mouseDxf = screenToDxf({ x: mouseX, y: mouseY });
+            const deltaX = mouseDxf.x - lastDxf.x;
+            const deltaY = mouseDxf.y - lastDxf.y;
             const length = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+            
             // Move label off the line, above it in white space
-            const midX = (lastPoint.x + mouseX) / 2; // 12px left of center
-            const midY = (lastPoint.y + mouseY) / 2 - 24; // 24px above the line
+            const midX = (lastPoint.x + mouseX) / 2;
+            const midY = (lastPoint.y + mouseY) / 2 - 24;
 
             // Add or update preview length label
             let lengthLabel = document.getElementById('preview-length-label');
@@ -1427,7 +1608,6 @@ function loadHtml2Canvas() {
                 lengthLabel.setAttribute('class', 'measurement-label');
                 lengthLabel.setAttribute('text-anchor', 'middle');
                 lengthLabel.setAttribute('dominant-baseline', 'central');
-
                 linesGroup.appendChild(lengthLabel);
             }
             lengthLabel.setAttribute('x', midX);
@@ -1459,7 +1639,7 @@ function loadHtml2Canvas() {
                     linesGroup.appendChild(angleLabel);
                 }
                 angleLabel.setAttribute('x', last.x);
-                angleLabel.setAttribute('y', last.y - 44); // 44px above vertex
+                angleLabel.setAttribute('y', last.y - 44);
                 angleLabel.textContent = `${angle.toFixed(1)}°`;
             } else {
                 // Remove angle label if not needed
@@ -1479,15 +1659,29 @@ function loadHtml2Canvas() {
             labelsGroup.innerHTML = '';
             const lineCount = points.length - 1;
             for (let i = 0; i < lineCount; i++) {
-                // Hide the blue line length label for the last line if it is a Hem
-                if (typeof window.hemVertexIndex !== 'undefined' && i === points.length - 2 && window.hemVertexIndex === points.length - 2) {
-                    continue;
-                }
+                // Get current and next points
                 const current = points[i];
                 const next = points[i + 1];
-                const deltaX = (next.x - current.x) / scale;
-                const deltaY = (current.y - next.y) / scale;
+                
+                // Special handling for hems
+                const isRegularHem = typeof window.hemVertexIndex !== 'undefined' && 
+                                   i === points.length - 2 && 
+                                   window.hemVertexIndex === points.length - 2;
+                                   
+                const isFirstPointHem = points[0].isHem && i === 0;
+                
+                // Skip measurement for regular hems but not for first point hems with exactly 2 points
+                if (isRegularHem && !isFirstPointHem) {
+                    continue;
+                }
+                
+                // Calculate length using DXF coordinates
+                const currentDxf = screenToDxf(current);
+                const nextDxf = screenToDxf(next);
+                const deltaX = nextDxf.x - currentDxf.x;
+                const deltaY = nextDxf.y - currentDxf.y;
                 const length = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+                
                 // Move permanent label off the line, above it in white space
                 const midX = (current.x + next.x) / 2;
                 const midY = (current.y + next.y) / 2 - 24;
@@ -1503,7 +1697,6 @@ function loadHtml2Canvas() {
                 // Only show 'HEM' if hemVertexIndex is set and matches this vertex
                 if (typeof window.hemVertexIndex !== 'undefined' && i === window.hemVertexIndex) {
                     labelText = 'HEM';
-                    console.log('HEM label set at vertex', i, 'with points.length', points.length, 'hemVertexIndex', window.hemVertexIndex);
                 } else {
                     const angle = calculateVertexAngle(i);
                     labelText = `${angle.toFixed(1)}°`;
@@ -1763,16 +1956,21 @@ function loadHtml2Canvas() {
                 drawLine(points[i], points[i + 1], i);
             }
             
+            // Draw hem arcs and info boxes for all hems
+            points.forEach((point, index) => {
+                if (point.isHem && point.hemData) {
+                    addHemArcAtVertex(index);
+                    showHemInfoBox(point.hemData);
+                }
+            });
+            
             drawMeasurements();
             updateStats(); // Ensure material usage updates after any change
         }
 
-        function drawHem(pointIndex, hemType) {
-            // Remove all Hem logic from drawHem
-        }
-
         function clearCanvas() {
             points = [];
+            dxfEntities = []; // Clear DXF entities as well
             pointsGroup.innerHTML = '';
             linesGroup.innerHTML = '';
             labelsGroup.innerHTML = '';
@@ -1798,8 +1996,12 @@ function loadHtml2Canvas() {
             for (let i = 0; i < points.length - 1; i++) {
                 const current = points[i];
                 const next = points[i + 1];
-                const deltaX = (next.x - current.x) / scale;
-                const deltaY = (current.y - next.y) / scale;
+                
+                // Calculate length using DXF coordinates
+                const currentDxf = screenToDxf(current);
+                const nextDxf = screenToDxf(next);
+                const deltaX = nextDxf.x - currentDxf.x;
+                const deltaY = nextDxf.y - currentDxf.y;
                 totalLength += Math.sqrt(deltaX * deltaX + deltaY * deltaY);
             }
             
@@ -1810,21 +2012,29 @@ function loadHtml2Canvas() {
             const startPoint = points[lineIndex];
             const endPoint = points[lineIndex + 1];
             
-            const deltaX = endPoint.x - startPoint.x;
-            const deltaY = endPoint.y - startPoint.y;
-            const currentLength = Math.sqrt(deltaX * deltaX + deltaY * deltaY) / scale;
+            // Convert to DXF coordinates for calculation
+            const startDxf = screenToDxf(startPoint);
+            const endDxf = screenToDxf(endPoint);
+            
+            const deltaX = endDxf.x - startDxf.x;
+            const deltaY = endDxf.y - startDxf.y;
+            const currentLength = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
             
             if (currentLength === 0) return;
             
-            const ratio = (newLength * scale) / (currentLength * scale);
-            const newEndPoint = {
-                x: startPoint.x + deltaX * ratio,
-                y: startPoint.y + deltaY * ratio
+            const ratio = newLength / currentLength;
+            const newEndDxf = {
+                x: startDxf.x + deltaX * ratio,
+                y: startDxf.y + deltaY * ratio
             };
+            
+            // Convert back to screen coordinates
+            const newEndPoint = dxfToScreen(newEndDxf);
             
             // Temporarily update the point and check for line crossing
             const oldEndPoint = { ...points[lineIndex + 1] };
             points[lineIndex + 1] = { ...endPoint, x: newEndPoint.x, y: newEndPoint.y };
+            
             // Check for line crossing
             for (let i = 0; i < points.length - 2; i++) {
                 if (i === lineIndex - 1 || i === lineIndex || i === lineIndex + 1) continue; // skip adjacent lines
@@ -1858,9 +2068,11 @@ function loadHtml2Canvas() {
             // Calculate new coordinates for the next point
             const newX = currentPoint.x + Math.cos(newAngleRad) * lineLength;
             const newY = currentPoint.y + Math.sin(newAngleRad) * lineLength;
+            
             // Temporarily update the point and check for line crossing
             const oldNextPoint = { ...points[actualVertexIndex + 1] };
             points[actualVertexIndex + 1] = { ...points[actualVertexIndex + 1], x: newX, y: newY };
+            
             // Check for line crossing
             for (let i = 0; i < points.length - 2; i++) {
                 if (i === actualVertexIndex - 1 || i === actualVertexIndex || i === actualVertexIndex + 1) continue; // skip adjacent lines
