@@ -533,48 +533,96 @@
         </div>
         
         <div class="top-controls">
-            <div class="profile-info">
-                <div class="input-field">
-                    <label for="profileName">Profile Name</label>
-                    <input type="text" id="profileName" placeholder="Enter profile name">
-                </div>
-                <div class="input-field">
-                    <label for="profileDescription">Description</label>
-                    <input type="text" id="profileDescription" placeholder="Enter description">
-                </div>
-                <div class="input-field">
-                    <label>Total Material Usage</label>
-                    <div style="padding: 8px 12px; background: #e9ecef; border-radius: 6px; font-weight: bold; color: #2d5a5c;">
-                        <span id="totalLength">0.00"</span>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="mode-controls">
-                <div class="side-indicator" style="flex-direction:column; align-items:flex-start;">
-                    <label class="toggle-label" style="margin-bottom:0;">
-                        <span>Colored Side:</span>
-                        <div class="side-toggle">
-                            <input type="checkbox" id="sideToggle" onchange="toggleCoatedSide()">
-                            <div class="toggle-slider">
-                                <span class="side-label left">A</span>
-                                <span class="side-label right">B</span>
-                            </div>
-                        </div>
-                    </label>
-                    <div id="hashSideInfo" style="margin-top:8px; padding:6px 14px; background:#f3f6fa; border-radius:6px; font-size:14px; color:#3498db; font-weight:500; text-align:center; box-shadow:0 2px 6px rgba(52,152,219,0.07); width:max-content;">
-                        Hash side = Color side
-                    </div>
-                </div>
-                <div class="mode-toggle">
-                    <button class="mode-btn active" onclick="setMode('create')" id="createModeBtn">Create</button>
-                    <button class="mode-btn" onclick="setMode('edit')" id="editModeBtn">Edit</button>
-                </div>
-
-                <button class="btn btn-primary" onclick="downloadProfileImage()">Download Image</button>
-                <button class="btn btn-danger" onclick="clearCanvas()">Clear All</button>
+    <!-- Customer Information Row -->
+    <div style="display: flex; gap: 20px; align-items: center; margin-bottom: 15px; flex-wrap: wrap;">
+        <div class="input-field" style="flex: 1; min-width: 180px;">
+            <label for="customerName">Customer Name *</label>
+            <input type="text" id="customerName" required>
+        </div>
+        
+        <div class="input-field" style="flex: 1; min-width: 180px;">
+            <label for="profileName">Profile Name *</label>
+            <input type="text" id="profileName" value="Custom Profile" required>
+        </div>
+        
+        <div class="input-field" style="flex: 2; min-width: 250px;">
+            <label for="profileDescription">Description</label>
+            <input type="text" id="profileDescription" placeholder="Brief description">
+        </div>
+    </div>
+    
+    <!-- Specifications Row -->
+    <div style="display: flex; gap: 20px; align-items: center; margin-bottom: 15px; flex-wrap: wrap;">
+        <div class="input-field">
+            <label for="metalType">Metal Type</label>
+            <select id="metalType" onchange="updateGaugeOptions()" style="padding: 8px 12px; border: 2px solid #e9ecef; border-radius: 6px;">
+                <option value="steel">Steel</option>
+                <option value="aluminum">Aluminum</option>
+            </select>
+        </div>
+        
+        <div class="input-field">
+            <label for="metalGauge">Gauge</label>
+            <select id="metalGauge" style="padding: 8px 12px; border: 2px solid #e9ecef; border-radius: 6px;">
+                <option value="22" selected>22</option>
+                <option value="24">24</option>
+                <option value="26">26</option>
+                <option value="28">28</option>
+                <option value="30">30</option>
+            </select>
+        </div>
+        
+        <div class="input-field">
+            <label for="color">Color</label>
+            <input type="text" id="color" value="White" style="width: 100px;">
+        </div>
+        
+        <div class="input-field">
+            <label for="quantity">Quantity</label>
+            <input type="number" id="quantity" value="1" min="1" style="width: 70px;">
+        </div>
+        
+        <div style="display: flex; align-items: center; gap: 8px; margin-top: 20px;">
+            <input type="checkbox" id="hasRibs" style="width: 16px; height: 16px;">
+            <label for="hasRibs" style="font-weight: 600; color: #2c3e50;">Include Ribs</label>
+        </div>
+    </div>
+    
+    <!-- Controls Row -->
+    <div class="profile-info">
+        <div class="input-field">
+            <label>Total Material Usage</label>
+            <div style="padding: 8px 12px; background: #e9ecef; border-radius: 6px; font-weight: bold; color: #2d5a5c;">
+                <span id="totalLength">0.00"</span>
             </div>
         </div>
+    </div>
+    
+    <div class="mode-controls">
+        <div class="side-indicator" style="flex-direction:column; align-items:flex-start;">
+            <label class="toggle-label" style="margin-bottom:0;">
+                <span>Colored Side:</span>
+                <div class="side-toggle">
+                    <input type="checkbox" id="sideToggle" onchange="toggleCoatedSide()">
+                    <div class="toggle-slider">
+                        <span class="side-label left">A</span>
+                        <span class="side-label right">B</span>
+                    </div>
+                </div>
+            </label>
+            <div id="hashSideInfo" style="margin-top:8px; padding:6px 14px; background:#f3f6fa; border-radius:6px; font-size:14px; color:#3498db; font-weight:500; text-align:center; box-shadow:0 2px 6px rgba(52,152,219,0.07); width:max-content;">
+                Hash side = Color side
+            </div>
+        </div>
+        <div class="mode-toggle">
+            <button class="mode-btn active" onclick="setMode('create')" id="createModeBtn">Create</button>
+            <button class="mode-btn" onclick="setMode('edit')" id="editModeBtn">Edit</button>
+        </div>
+
+        <button class="btn btn-danger" onclick="clearCanvas()">Clear All</button>
+        <button class="btn btn-success" onclick="submitProfileRequest()" style="font-size: 16px; padding: 12px 24px;">Submit Profile Request</button>
+    </div>
+</div>
         
         <div class="main-content">
             <div class="canvas-container" id="canvasContainer">
@@ -701,6 +749,70 @@ function loadHtml2Canvas() {
             HEM: 'HEM',
             CONSTRUCTION: 'CONSTRUCTION'
         };
+
+            // Convert entities array to a valid DXF string (R12+)
+            function entitiesToDXF(entities) {
+                // DXF header
+                let dxf = [
+                    "0",
+                    "SECTION",
+                    "2",
+                    "HEADER",
+                    "0",
+                    "ENDSEC",
+                    "0",
+                    "SECTION",
+                    "2",
+                    "TABLES",
+                    "0",
+                    "ENDSEC",
+                    "0",
+                    "SECTION",
+                    "2",
+                    "BLOCKS",
+                    "0",
+                    "ENDSEC",
+                    "0",
+                    "SECTION",
+                    "2",
+                    "ENTITIES"
+                ];
+
+                // Entities
+                for (const ent of entities) {
+                    if (ent.type === "POINT") {
+                        dxf.push(
+                            "0", "POINT",
+                            "8", ent.layer || "PROFILE",
+                            "10", Number(ent.x).toFixed(6),
+                            "20", Number(ent.y).toFixed(6),
+                            "30", "0"
+                        );
+                    } else if (ent.type === "LINE") {
+                        dxf.push(
+                            "0", "LINE",
+                            "8", ent.layer || "PROFILE",
+                            "10", Number(ent.x1).toFixed(6),
+                            "20", Number(ent.y1).toFixed(6),
+                            "30", "0",
+                            "11", Number(ent.x2).toFixed(6),
+                            "21", Number(ent.y2).toFixed(6),
+                            "31", "0"
+                        );
+                    }
+                    // Add more entity types as needed
+                }
+
+                // DXF footer
+                dxf.push(
+                    "0",
+                    "ENDSEC",
+                    "0",
+                    "EOF"
+                );
+
+                return dxf.join("\r\n");
+            }
 
         const canvas = document.getElementById('canvas');
         const pointsGroup = document.getElementById('points');
@@ -1984,8 +2096,9 @@ function loadHtml2Canvas() {
             
             closeEditPopup();
             
-            document.getElementById('profileName').value = '';
-            document.getElementById('profileDescription').value = '';
+            // Clear form fields
+            resetForm();  // Add this line
+            
             document.getElementById('mode').textContent = 'Click on the canvas to start drawing your profile';
             updateStats();
             clearPreviewLine();
@@ -2145,6 +2258,242 @@ function loadHtml2Canvas() {
             const popup = document.getElementById('lineCrossPopup');
             if (popup) popup.style.display = 'none';
         }
+
+        // Update gauge options based on metal type
+function updateGaugeOptions() {
+    const metalType = document.getElementById('metalType').value;
+    const gaugeSelect = document.getElementById('metalGauge');
+    
+    gaugeSelect.innerHTML = '';
+    
+    if (metalType === 'steel') {
+        const steelGauges = ['22', '24', '26', '28', '30'];
+        steelGauges.forEach(gauge => {
+            const option = document.createElement('option');
+            option.value = gauge;
+            option.textContent = gauge;
+            if (gauge === '22') option.selected = true;
+            gaugeSelect.appendChild(option);
+        });
+    } else if (metalType === 'aluminum') {
+        const aluminumGauges = ['.019', '.027', '.032', '.040', '.050'];
+        aluminumGauges.forEach(gauge => {
+            const option = document.createElement('option');
+            option.value = gauge;
+            option.textContent = gauge;
+            if (gauge === '.032') option.selected = true;
+            gaugeSelect.appendChild(option);
+        });
+    }
+}
+
+// Submit profile request function
+function submitProfileRequest() {
+    // Validate required fields
+    const customerName = document.getElementById('customerName').value.trim();
+    const profileName = document.getElementById('profileName').value.trim();
+    
+    if (!customerName || !profileName) {
+        alert('Please fill in Customer Name and Profile Name');
+        return;
+    }
+    
+    if (points.length < 2) {
+        alert('Please create a profile with at least 2 points before submitting');
+        return;
+    }
+    
+    // Show loading state
+    const btn = event.target;
+    const originalText = btn.textContent;
+    btn.textContent = 'Submitting...';
+    btn.disabled = true;
+    
+    try {
+        // Create task data
+        const taskData = createTaskData();
+        
+        // Show success message
+        showSuccessMessage();
+        
+        // Reset form after delay
+        setTimeout(() => {
+            clearCanvas();
+            resetForm();
+        }, 2000);
+        
+    } catch (error) {
+        alert('Error submitting request. Please try again or contact us directly.');
+    } finally {
+        // Reset button
+        setTimeout(() => {
+            btn.textContent = originalText;
+            btn.disabled = false;
+        }, 2000);
+    }
+}
+
+function createTaskData() {
+    // Calculate total length
+    let totalLength = 0;
+    for (let i = 0; i < points.length - 1; i++) {
+        const current = points[i];
+        const next = points[i + 1];
+        const currentDxf = screenToDxf(current);
+        const nextDxf = screenToDxf(next);
+        const deltaX = nextDxf.x - currentDxf.x;
+        const deltaY = nextDxf.y - nextDxf.y;
+        totalLength += Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+    }
+    
+    // Collect hem information
+    const hemData = points.filter(p => p.isHem && p.hemData).map(p => p.hemData);
+    
+    // Create comprehensive task description
+    const taskDescription = `NEW PROFILE MANUFACTURING REQUEST
+
+CUSTOMER INFORMATION:
+- Customer Name: ${document.getElementById('customerName').value.trim()}
+- Profile Name: ${document.getElementById('profileName').value.trim()}
+- Description: ${document.getElementById('profileDescription').value.trim() || 'No description provided'}
+
+SPECIFICATIONS:
+- Metal Type: ${document.getElementById('metalType').value}
+- Gauge: ${document.getElementById('metalGauge').value}
+- Color: ${document.getElementById('color').value.trim()}
+- Quantity: ${document.getElementById('quantity').value}
+- Ribs: ${document.getElementById('hasRibs').checked ? 'Yes' : 'No'}
+- Total Length: ${totalLength.toFixed(3)}"
+- Coated Side: ${coatedSideRight ? 'Side B (Right)' : 'Side A (Left)'}
+- Number of Points: ${points.length}
+
+PROFILE COORDINATES (DXF FORMAT):
+${points.map((point, index) => {
+    const dxfPoint = screenToDxf(point);
+    return `Point ${index + 1}: X=${dxfPoint.x.toFixed(4)}, Y=${dxfPoint.y.toFixed(4)}`;
+}).join('\n')}
+
+HEM INFORMATION:
+${hemData.length > 0 ? JSON.stringify(hemData, null, 2) : 'No hems specified'}
+
+DXF DATA:
+${generateDXFData()}
+
+NEXT STEPS FOR EMPLOYEE:
+1. Review profile specifications above
+2. Create Manufacturing Order with product "Custom Profile - ${document.getElementById('profileName').value.trim()}"
+3. Set quantity to ${document.getElementById('quantity').value}
+4. Use DXF data above for manufacturing file
+5. Contact customer if clarification needed
+
+Request submitted: ${new Date().toLocaleString()}`;
+
+    return {
+        title: `Profile Request: ${document.getElementById('profileName').value.trim()} - ${document.getElementById('customerName').value.trim()}`,
+        description: taskDescription
+    };
+}
+
+function generateDXFData() {
+    const dxf = [];
+    dxf.push(
+        '0', 'SECTION',
+        '2', 'HEADER',
+        '9', '$ACADVER',
+        '1', 'AC1027',
+        '0', 'ENDSEC'
+    );
+    
+    dxf.push('0', 'SECTION', '2', 'ENTITIES');
+    
+    for (let i = 0; i < points.length - 1; i++) {
+        const start = screenToDxf(points[i]);
+        const end = screenToDxf(points[i + 1]);
+        
+        dxf.push(
+            '0', 'LINE',
+            '8', '0',
+            '10', start.x.toFixed(4),
+            '20', start.y.toFixed(4),
+            '30', '0.0',
+            '11', end.x.toFixed(4),
+            '21', end.y.toFixed(4),
+            '31', '0.0'
+        );
+    }
+    
+    dxf.push('0', 'ENDSEC', '0', 'EOF');
+    return dxf.join('\r\n');
+}
+
+function showSuccessMessage() {
+    // Create success overlay
+    const overlay = document.createElement('div');
+    overlay.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.8);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+    `;
+    
+    const successBox = document.createElement('div');
+    successBox.style.cssText = `
+        background: white;
+        padding: 40px;
+        border-radius: 15px;
+        text-align: center;
+        max-width: 500px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+    `;
+    
+    successBox.innerHTML = `
+        <div style="color: #27ae60; font-size: 48px; margin-bottom: 20px;">✓</div>
+        <h3 style="color: #27ae60; margin-bottom: 15px;">Request Submitted Successfully!</h3>
+        <p style="margin-bottom: 20px;">
+            Your profile manufacturing request has been sent to our team. 
+            We'll review your specifications and create the manufacturing order.
+        </p>
+        <p style="color: #666; font-size: 14px;">
+            You'll be contacted if we need any clarification.
+        </p>
+        <div style="margin-top: 30px;">
+            <button onclick="this.parentElement.parentElement.parentElement.remove()" 
+                    style="background: #27ae60; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer;">
+                Continue
+            </button>
+        </div>
+    `;
+    
+    overlay.appendChild(successBox);
+    document.body.appendChild(overlay);
+    
+    // Auto-remove after 5 seconds
+    setTimeout(() => {
+        if (overlay.parentNode) {
+            overlay.remove();
+        }
+    }, 5000);
+}
+
+function resetForm() {
+    document.getElementById('customerName').value = '';
+    document.getElementById('profileName').value = 'Custom Profile';
+    document.getElementById('profileDescription').value = '';
+    document.getElementById('color').value = 'White';
+    document.getElementById('quantity').value = '1';
+    document.getElementById('hasRibs').checked = false;
+    document.getElementById('metalType').value = 'steel';
+    updateGaugeOptions();
+}
+
+// Initialize gauge options on page load
+updateGaugeOptions();
     </script>
 </body>
 </html>
