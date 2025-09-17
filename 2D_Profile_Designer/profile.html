@@ -1547,45 +1547,44 @@ function loadHtml2Canvas() {
 
         // Make the hem vertex the end point of the profile
         function addHemArcAtVertex(vertexIndex) {
-            // Check if this is a first point hem
-            const isFirstPoint = vertexIndex === 0 && points.length <= 2;
-            // Only proceed if it's the first point or if we have a previous point
-            if (!isFirstPoint && vertexIndex <= 0) return;
-            
+            // Only proceed if we have a previous point
+            if (vertexIndex <= 0) return;
             const hem = points[vertexIndex];
-            const prev = vertexIndex > 0 ? points[vertexIndex - 1] : null;
-            
-            // For points after first hem, remove subsequent points
-            if (!isFirstPoint) {
-                while (points.length > vertexIndex + 1) {
-                    const pointToRemove = points.length - 1;
-                    const pointElement = document.querySelector(`[data-point-index="${pointToRemove}"]`);
-                    if (pointElement) {
-                        pointElement.remove();
-                    }
-                    
-                    // Remove the line connecting to this point
-                    const lineElement = document.querySelector(`[data-index="${pointToRemove - 1}"]`);
-                    if (lineElement) {
-                        lineElement.remove();
-                    }
-                    
-                    points.pop();
-                }
-            }
-            
-            // Draw square hem marker
-            const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-            rect.setAttribute('x', hem.x - 8);
-            rect.setAttribute('y', hem.y - 8);
-            rect.setAttribute('width', 16);
-            rect.setAttribute('height', 16);
-            rect.setAttribute('fill', '#ff6b35');
-            rect.setAttribute('stroke', '#fffbe6');
-            rect.setAttribute('stroke-width', '3');
-            rect.setAttribute('class', 'hem-point');
-            rect.setAttribute('data-index', vertexIndex);
-            pointsGroup.appendChild(rect);
+            const prev = points[vertexIndex - 1];
+            if (!hem.hemData || !prev) return;
+
+            // Calculate direction vector (normalized)
+            const dx = hem.x - prev.x;
+            const dy = hem.y - prev.y;
+            const len = Math.sqrt(dx * dx + dy * dy);
+            if (len === 0) return;
+            const dirX = dx / len;
+            const dirY = dy / len;
+
+            // Hem extension length (in screen px)
+            const hemLengthIn = hem.hemData.length || 0.5; // fallback
+            // Convert hem length from DXF units (inches) to screen px
+            const hemLengthPx = hemLengthIn * scale;
+
+            // Use a much larger SVG path for the hem arc
+            // New Path: M 0 0 L 300 0 Q 400 0 400 60 L 400 100 Q 400 160 300 160 L 200 160
+            // This makes the "U" much deeper and wider
+            const basePath = "M 0 0 L 300 0 Q 400 0 400 60 L 400 100 Q 400 160 300 160 L 200 160";
+            const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            path.setAttribute('d', basePath);
+            path.setAttribute('stroke', '#222');
+            path.setAttribute('stroke-width', '16');
+            path.setAttribute('fill', 'none');
+            path.setAttribute('stroke-linecap', 'round');
+            // Compute angle in degrees
+            const angle = Math.atan2(dirY, dirX) * 180 / Math.PI;
+            // Scale the path to match the hem length (profile units to SVG units)
+            // The straight part of the SVG is 300 units, so scale by hemLengthPx/300, but the arc is much bigger
+            const scaleVal = hemLengthPx / 300 * 1.2; // 1.2x to make it even bigger visually
+            // Move the arc down by 30px
+            path.setAttribute('transform', `translate(${hem.x},${hem.y}) rotate(${angle}) scale(${scaleVal},${-scaleVal})`);
+            path.setAttribute('class', 'hem-u-shape');
+            linesGroup.appendChild(path);
         }
 
         function closeHemPopup() {
@@ -2064,18 +2063,23 @@ function loadHtml2Canvas() {
                 drawPoint(point, index);
             });
             
+            // Only draw lines and points. HEM visuals will be handled separately.
             for (let i = 0; i < points.length - 1; i++) {
                 drawLine(points[i], points[i + 1], i);
             }
-            
-            // Draw hem arcs and info boxes for all hems
+
+            // Draw only the HEM info box, orange vertex, and curve at the correct vertex
             points.forEach((point, index) => {
                 if (point.isHem && point.hemData) {
+                    // Draw orange vertex
+                    drawPoint(point, index);
+                    // Draw curve at the correct vertex
                     addHemArcAtVertex(index);
+                    // Draw editable info box
                     showHemInfoBox(point.hemData);
                 }
             });
-            
+
             drawMeasurements();
             updateStats(); // Ensure material usage updates after any change
         }
