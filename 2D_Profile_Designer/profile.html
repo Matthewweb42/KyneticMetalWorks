@@ -437,12 +437,7 @@
             stroke-dasharray: 5,5;
         }
 
-        .hem-curve {
-            stroke: #ff6b35;
-            stroke-width: 3;
-            fill: none;
-            stroke-linecap: round;
-        }
+
 
         .hem-parallel {
             stroke: #ff6b35;
@@ -672,11 +667,9 @@ async function downloadProfileImage() {
     try {
         // Load html2canvas if not available
         if (typeof html2canvas === 'undefined') {
-            console.log('Loading html2canvas...');
             await loadHtml2Canvas();
         }
         
-        console.log('Taking screenshot...');
         const canvas = await html2canvas(container, {
             backgroundColor: 'white',
             scale: 2, // Higher resolution for crisp image
@@ -723,7 +716,6 @@ function loadHtml2Canvas() {
         const script = document.createElement('script');
         script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
         script.onload = () => {
-            console.log('html2canvas loaded successfully');
             resolve();
         };
         script.onerror = () => {
@@ -1063,12 +1055,6 @@ function loadHtml2Canvas() {
 
                 // If the first point was a hem, handle it specially when adding the second point
                 if (points[0].isHem && points[0].hemData && points.length === 2) {
-                    // Save the second point's position temporarily
-                    const secondPoint = { ...points[1] };
-                    // Apply the hem length which will modify point positions
-                    applyLengthEditByIndex(0, points[0].hemData.length);
-                    // Restore the second point's position
-                    points[1] = secondPoint;
                     // Update window.hemInfo to ensure proper rendering
                     window.hemVertexIndex = 0;
                     window.hemInfo = points[0].hemData;
@@ -1089,15 +1075,21 @@ function loadHtml2Canvas() {
             updateStats();
             clearPreviewLine();
             
-            // Show hem popup for first point or if angle < 30°
-            if (points.length === 1) {
-                showHemPopup(0, true); // true indicates it's the first point
-            } else if (points.length > 2) {
-                // The new vertex is at points.length - 2 (the previous point)
-                const vertexIndex = points.length - 2;
-                const angle = calculateVertexAngle(vertexIndex);
-                if (angle < 30) {
-                    showHemPopup(vertexIndex, false);
+            // Hem logic: For every new vertex after the second, check if the previous angle is sharp
+            if (points.length >= 3) {
+                // For the third vertex, check V2 (index 1) for start hem
+                if (points.length === 3) {
+                    const angle = calculateVertexAngle(1);
+                    if (angle < 30) {
+                        showHemPopup(1, true); // Start hem special logic
+                    }
+                } else {
+                    // For all later vertices, check the previous vertex's angle
+                    const prevIdx = points.length - 2;
+                    const angle = calculateVertexAngle(prevIdx);
+                    if (angle < 30) {
+                        showHemPopup(prevIdx, false); // End hem or mid hem
+                    }
                 }
             }
         }
@@ -1184,7 +1176,42 @@ function loadHtml2Canvas() {
             // Button handlers
             document.getElementById('hemYesBtn').onclick = function() {
                 modal.style.display = 'none';
-                showSimpleHemDetailsModal(pointIndex, isFirstPoint);
+                // If this is the start hem (third vertex, angle < 30), remove V1 and L1, then show hem details for new V1
+                if (isFirstPoint && points.length === 3) {
+                    points.splice(0, 1); // Remove V1
+                    let firstLineIdx = entities.findIndex(e => e.type === 'LINE');
+                    if (firstLineIdx !== -1) {
+                        entities.splice(firstLineIdx, 1);
+                    }
+                    // Place hem on new V1 (was V2, now index 0)
+                    // Show hem details modal for new V1
+                    showSimpleHemDetailsModal(0, true);
+                    redrawProfile();
+                    // Draw the hem arc for the start hem at index 0 if possible
+                    if (points.length > 1 && points[0].isHem) {
+                        addHemArcAtVertex(0);
+                    }
+                } else if (pointIndex === points.length - 2) {
+                    // This is the end hem (last possible hem): show modal for second-to-last vertex, then after modal, delete last vertex and last line
+                    showSimpleHemDetailsModal(pointIndex, isFirstPoint, function afterHem() {
+                        points.splice(points.length - 1, 1); // Remove last vertex
+                        // Remove last LINE entity (last line in entities)
+                        let lastLineIdx = -1;
+                        for (let i = entities.length - 1; i >= 0; i--) {
+                            if (entities[i].type === 'LINE') {
+                                lastLineIdx = i;
+                                break;
+                            }
+                        }
+                        if (lastLineIdx !== -1) {
+                            entities.splice(lastLineIdx, 1);
+                        }
+                        redrawProfile();
+                    });
+                } else {
+                    // For mid-profile hems, just show hem details modal
+                    showSimpleHemDetailsModal(pointIndex, isFirstPoint);
+                }
             };
             document.getElementById('hemNoBtn').onclick = function() {
                 modal.style.display = 'none';
@@ -1192,7 +1219,7 @@ function loadHtml2Canvas() {
         }
 
         // Simple modal for hem details
-        function showSimpleHemDetailsModal(pointIndex, isFirstPoint = false) {
+    function showSimpleHemDetailsModal(pointIndex, isFirstPoint = false, afterHemCallback) {
             let modal = document.getElementById('hemDetailsModal');
             if (!modal) {
                 modal = document.createElement('div');
@@ -1280,7 +1307,6 @@ function loadHtml2Canvas() {
                 if (!isNaN(length)) {
                     let currentHemIndex;
                     let hemData;
-                    
                     // For first point, create the hem data immediately
                     if (points.length === 1) {
                         currentHemIndex = 0;
@@ -1298,12 +1324,7 @@ function loadHtml2Canvas() {
                         // Handle existing points
                         const isEditing = points[pointIndex] && points[pointIndex].hemData;
                         currentHemIndex = isEditing ? pointIndex : points.length - 2;
-                        
-                        // Only apply length edit for new hems that are not the first point
-                        if (!isEditing) {
-                            applyLengthEditByIndex(currentHemIndex, length);
-                        }
-                        
+                        // No line shortening for hems!
                         const side = document.getElementById('hemSideSelect').value;
                         points[currentHemIndex].isHem = true;
                         hemData = {
@@ -1315,7 +1336,6 @@ function loadHtml2Canvas() {
                         };
                         points[currentHemIndex].hemData = hemData;
                     }
-                    
                     // Create DXF HEM entity
                     entities.push({
                         type: 'POINT',
@@ -1324,24 +1344,27 @@ function loadHtml2Canvas() {
                         layer: LAYERS.HEM,
                         hemData: hemData
                     });
-                    
                     // Store hem data in the point itself
                     points[currentHemIndex].isHem = true;
                     points[currentHemIndex].hemData = hemData;
-                    
                     // Update most recent hem for compatibility
                     window.hemVertexIndex = currentHemIndex;
                     window.hemInfo = hemData;
-                    
                     // Only enter edit mode if not the first point or if we have 2+ points
                     if (currentHemIndex > 0 || points.length > 1) {
-                        addHemArcAtVertex(currentHemIndex);
+                        if (currentHemIndex > 0) {
+                            addHemArcAtVertex(currentHemIndex);
+                        }
                         showHemInfoBox(window.hemInfo);
                     }
+                } else {
                 }
-                
                 // Redraw profile to update the SVG
                 redrawProfile();
+                // If a callback is provided (for end hem), call it after hem creation
+                if (typeof afterHemCallback === 'function') {
+                    afterHemCallback();
+                }
                 // Turn the most recent line orange
                 // Find the SVG line element for the most recent line
                 const lineIndex = points.length - 2;
@@ -1547,13 +1570,45 @@ function loadHtml2Canvas() {
 
         // Make the hem vertex the end point of the profile
         function addHemArcAtVertex(vertexIndex) {
-            // Only proceed if we have a previous point
-            if (vertexIndex <= 0) return;
-            const hem = points[vertexIndex];
-            const prev = points[vertexIndex - 1];
-            if (!hem.hemData || !prev) return;
+            // Allow drawing for vertexIndex 0 if it is a hem and there is a next point
+            if (vertexIndex < 0 || vertexIndex >= points.length) {
+                return;
+            }
+            let hem = points[vertexIndex];
+            let prev = null, next = null;
+            if (vertexIndex === 0) {
+                // For start hem, use next and next-next if available
+                if (points.length > 2) {
+                    prev = points[1];
+                    next = points[2];
+                } else if (points.length > 1) {
+                    prev = points[1];
+                    next = points[0];
+                } else {
+                    return;
+                }
+            } else if (vertexIndex === points.length - 1) {
+                // For end hem, use previous and previous-previous if available
+                prev = points[vertexIndex - 1];
+                next = points[vertexIndex - 2] ? points[vertexIndex - 2] : prev;
+            } else {
+                prev = points[vertexIndex - 1];
+                next = points[vertexIndex + 1];
+            }
+            if (!hem.hemData || !prev || !next) {
+                return;
+            }
 
-            // Calculate direction vector (normalized)
+            // Vectors from hem to prev and next
+            const v1x = prev.x - hem.x;
+            const v1y = prev.y - hem.y;
+            const v2x = next.x - hem.x;
+            const v2y = next.y - hem.y;
+
+            // Calculate the cross product to determine which side is the sharp angle
+            const cross = v1x * v2y - v1y * v2x;
+
+            // Calculate direction vector (normalized) for arc base orientation
             const dx = hem.x - prev.x;
             const dy = hem.y - prev.y;
             const len = Math.sqrt(dx * dx + dy * dy);
@@ -1567,23 +1622,36 @@ function loadHtml2Canvas() {
             const hemLengthPx = hemLengthIn * scale;
 
             // Use a much larger SVG path for the hem arc
-            // New Path: M 0 0 L 300 0 Q 400 0 400 60 L 400 100 Q 400 160 300 160 L 200 160
-            // This makes the "U" much deeper and wider
-            const basePath = "M 0 0 L 300 0 Q 400 0 400 60 L 400 100 Q 400 160 300 160 L 200 160";
+            const basePath = "M -50 0 L 300 0 Q 400 0 400 60 L 400 100 Q 400 160 300 160 L 150 160";
             const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
             path.setAttribute('d', basePath);
-            path.setAttribute('stroke', '#222');
-            path.setAttribute('stroke-width', '16');
             path.setAttribute('fill', 'none');
+            path.setAttribute('stroke', '#222'); // Much darker color
+            path.setAttribute('stroke-width', '4'); // Thicker stroke width
             path.setAttribute('stroke-linecap', 'round');
+
             // Compute angle in degrees
-            const angle = Math.atan2(dirY, dirX) * 180 / Math.PI;
+            let angle;
+            if (vertexIndex === 1 && points[vertexIndex + 1]) {
+                // For the second HEM, point the arc in the direction of the next segment
+                const dx2 = points[vertexIndex + 1].x - hem.x;
+                const dy2 = points[vertexIndex + 1].y - hem.y;
+                angle = Math.atan2(dy2, dx2) * 180 / Math.PI;
+                console.log(`[HEM ANGLE] Second HEM at ${vertexIndex}: angle=${angle}`);
+            } else {
+                angle = Math.atan2(dirY, dirX) * 180 / Math.PI;
+            }
             // Scale the path to match the hem length (profile units to SVG units)
-            // The straight part of the SVG is 300 units, so scale by hemLengthPx/300, but the arc is much bigger
             const scaleVal = hemLengthPx / 300 * 1.2; // 1.2x to make it even bigger visually
-            // Move the arc down by 30px
-            path.setAttribute('transform', `translate(${hem.x},${hem.y}) rotate(${angle}) scale(${scaleVal},${-scaleVal})`);
-            path.setAttribute('class', 'hem-u-shape');
+
+            // Flip vertically if the sharp angle is on the opposite side
+            // If cross > 0, arc faces one way; if cross < 0, flip
+            let scaleY = -scaleVal;
+            if (cross < 0) {
+                scaleY = scaleVal;
+            }
+            path.setAttribute('transform', `translate(${hem.x},${hem.y}) rotate(${angle}) scale(${scaleVal},${scaleY})`);
+
             linesGroup.appendChild(path);
         }
 
@@ -1598,11 +1666,7 @@ function loadHtml2Canvas() {
         }
 
         function drawPoint(point, index) {
-            // Check if the previous point has a hem
-            if (index > 0 && points[index - 1].hemData) {
-                // Don't draw this vertex (the one after a hem)
-                return;
-            }
+            // Always draw the vertex unless it is a hem itself
 
             if (point.isHem) {
                 const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
@@ -2048,6 +2112,38 @@ function loadHtml2Canvas() {
             
             isDrawing = false;
             document.getElementById('mode').textContent = 'Profile finished. Use Edit mode to make changes.';
+
+            // End hem logic: Only if at least 3 points
+            if (points.length >= 3) {
+                if (confirm('Do you want to create an end hem at the end of the profile?')) {
+                    // Remove last line entity (last LINE in entities)
+                    let lastLineIdx = -1;
+                    for (let i = entities.length - 1; i >= 0; i--) {
+                        if (entities[i].type === 'LINE') {
+                            lastLineIdx = i;
+                            break;
+                        }
+                    }
+                    if (lastLineIdx !== -1) {
+                        entities.splice(lastLineIdx, 1);
+                    }
+                    const idx = points.length - 2; // The vertex before the last point
+                    let hemData = {
+                        length: 1.0, // Default, user can edit
+                        type: 'closed',
+                        openAmount: null,
+                        side: 'colored',
+                        index: idx
+                    };
+                    points[idx].isHem = true;
+                    points[idx].hemData = hemData;
+                    points[idx].hemType = 'end';
+                    window.hemVertexIndex = idx;
+                    window.hemInfo = hemData;
+                    redrawProfile();
+                }
+            }
+
             // Clear hem vertex index when finishing profile
             window.hemVertexIndex = undefined;
             drawMeasurements();
@@ -2203,6 +2299,32 @@ function loadHtml2Canvas() {
             }
         }
 
+        // Returns 'right', 'up', 'left', or 'down' for the direction the angle at curr opens toward
+function getHemDirection(prev, curr, next) {
+    // Vector of previous segment
+    const vPrev = { x: curr.x - prev.x, y: curr.y - prev.y };
+    // Vector of next segment
+    const vNext = { x: next.x - curr.x, y: next.y - curr.y };
+    // Angle from previous to next (in degrees, 0 = right, 90 = up, 180 = left, 270 = down)
+    let angle = Math.atan2(vNext.y, vNext.x) - Math.atan2(vPrev.y, vPrev.x);
+    angle = angle * 180 / Math.PI;
+    if (angle < 0) angle += 360;
+    
+    let direction = '';
+    if ((angle >= 315 && angle < 360) || (angle >= 0 && angle < 45)) {
+        direction = 'right';
+    } else if (angle >= 45 && angle < 135) {
+        direction = 'up';
+    } else if (angle >= 135 && angle < 225) {
+        direction = 'left';
+    } else if (angle >= 225 && angle < 315) {
+        direction = 'down';
+    }
+    
+    console.log(`Hem direction: ${direction} (angle: ${angle.toFixed(2)}°)`);
+    return direction;
+}
+
         // Initialize canvas size
         function resizeCanvas() {
             const container = document.querySelector('.canvas-container');
@@ -2346,7 +2468,7 @@ function createTaskData() {
         const currentDxf = screenToDxf(current);
         const nextDxf = screenToDxf(next);
         const deltaX = nextDxf.x - currentDxf.x;
-        const deltaY = nextDxf.y - nextDxf.y;
+        const deltaY = nextDxf.y - currentDxf.y;
         totalLength += Math.sqrt(deltaX * deltaX + deltaY * deltaY);
     }
     
