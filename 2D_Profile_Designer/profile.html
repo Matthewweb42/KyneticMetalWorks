@@ -1,14 +1,17 @@
     <script>
     // --- PRINT SHEET DATA BINDING ---
     function populatePrintSheetFromDesigner() {
+        console.log('populatePrintSheetFromDesigner called');
+        
+        try {
         // Gather data from designer fields
         const data = {};
-        data.customer_name = document.getElementById('customerName').value;
-        data.job_number = document.getElementById('jobName').value;
-        data.profile_name = document.getElementById('profileName').value;
-        data.color = document.getElementById('color').value;
-        data.color_manufacturer = document.getElementById('colorManufacturer').value;
-        data.quantity = document.getElementById('quantity').value;
+        data.customer_name = document.getElementById('customerName')?.value || '';
+        data.job_number = document.getElementById('jobName')?.value || '';
+        data.profile_name = document.getElementById('profileName')?.value || '';
+        data.color = document.getElementById('color')?.value || '';
+        data.color_manufacturer = document.getElementById('colorManufacturer')?.value || '';
+        data.quantity = document.getElementById('quantity')?.value || '';
         data.length = document.getElementById('totalLength') ? document.getElementById('totalLength').textContent.replace('"','') : '';
         data.material_usage = data.length;
         data.date_ordered = new Date().toLocaleDateString();
@@ -17,6 +20,8 @@
         data.shipping_weight = '';
         data.dimensions = '';
         data.signature = '';
+
+        console.log('Gathered data:', data);
 
         // Metal type and gauge
         const metalType = document.getElementById('metalType').value;
@@ -43,24 +48,36 @@
         data.process_invoiced = false;
 
         // Fill all print sheet fields
+        console.log('Starting field population...');
+        let fieldsPopulated = 0;
         for (const key in data) {
             const el = document.querySelector('#printSheetSection [data-field="' + key + '"]');
             if (el) {
+                fieldsPopulated++;
                 if (el.classList.contains('checkbox') || el.classList.contains('process-checkbox')) {
                     if (data[key]) {
                         el.classList.add('checked');
                     } else {
                         el.classList.remove('checked');
                     }
+                    console.log(`Checkbox field ${key}: ${data[key]} -> ${el.classList.contains('checked')}`);
                 } else {
                     el.textContent = data[key] || '';
+                    console.log(`Text field ${key}: "${data[key]}" -> "${el.textContent}"`);
                 }
+            } else {
+                console.log(`Field element not found for: ${key}`);
             }
         }
+        console.log(`Total fields populated: ${fieldsPopulated}`);
 
         // Copy the profile SVG to the drawing area
+        console.log('Starting SVG cloning...');
         const originalSvg = document.getElementById('canvas');
         const drawingArea = document.querySelector('#printSheetSection .drawing-area');
+        console.log('Original SVG found:', !!originalSvg);
+        console.log('Drawing area found:', !!drawingArea);
+        
         if (originalSvg && drawingArea) {
             // Clear existing content except overlay
             const overlay = drawingArea.querySelector('.drawing-overlay');
@@ -69,6 +86,7 @@
             
             // Clone and add the SVG
             const svgClone = originalSvg.cloneNode(true);
+            console.log('SVG cloned successfully');
             
             // Center the SVG within the drawing area
             svgClone.style.width = '95%';
@@ -81,13 +99,25 @@
             
             // Scale the viewBox to fit content properly
             const bbox = originalSvg.getBBox ? originalSvg.getBBox() : null;
+            console.log('SVG bounding box:', bbox);
             if (bbox && bbox.width > 0 && bbox.height > 0) {
                 const padding = 50;
                 svgClone.setAttribute('viewBox', `${bbox.x - padding} ${bbox.y - padding} ${bbox.width + padding * 2} ${bbox.height + padding * 2}`);
                 svgClone.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+                console.log('SVG viewBox set to:', svgClone.getAttribute('viewBox'));
             }
             
             drawingArea.appendChild(svgClone);
+            console.log('SVG appended to drawing area');
+        } else {
+            console.error('Failed to find required elements for SVG cloning');
+        }
+        
+        console.log('populatePrintSheetFromDesigner completed');
+        
+        } catch (error) {
+            console.error('Error in populatePrintSheetFromDesigner:', error);
+            alert('Error populating print sheet: ' + error.message);
         }
     }
     </script>
@@ -1068,27 +1098,189 @@
             
             <button class="btn btn-success" onclick="submitProfileRequest()" style="font-size: 14px; padding: 10px 16px;">Submit Profile Request</button>
             <button class="btn btn-primary" onclick="showPrintSheet()" style="font-size: 14px; padding: 10px 16px;">Print/Export Sheet</button>
+            <button class="btn btn-secondary" onclick="forcePrint()" style="font-size: 14px; padding: 10px 16px; background: #2c5f5f; color: white; border: none;">Force Print (Odoo)</button>
         </div>
     </div>
     <script>
     // --- PRINT SHEET SHOW/HIDE AND PRINT LOGIC ---
     function showPrintSheet() {
-        populatePrintSheetFromDesigner();
+        console.log('showPrintSheet called');
+        
+        try {
+            // First, populate the print sheet with data
+            populatePrintSheetFromDesigner();
+            
+            // Clear the preview line so it doesn't appear in print
+            clearPreviewLine();
+            
+            // Verify the print sheet exists
+            const printSheet = document.getElementById('printSheetSection');
+            const container = document.querySelector('.container');
+            
+            if (!printSheet) {
+                console.error('Print sheet section not found!');
+                alert('Error: Print sheet not found. Please refresh the page and try again.');
+                return;
+            }
+            
+            if (!container) {
+                console.error('Main container not found!');
+                alert('Error: Main container not found. Please refresh the page and try again.');
+                return;
+            }
+            
+            console.log('Print sheet found, showing...');
+            
+            // Hide main UI, show print sheet (with additional null checks)
+            if (container && container.style) {
+                container.style.display = 'none';
+            }
+            if (printSheet && printSheet.style) {
+                printSheet.style.display = 'block';
+            }
+            
+            // Force a repaint to ensure the print sheet is visible
+            if (printSheet) {
+                printSheet.offsetHeight;
+            }
+        
         // Hide main UI, show print sheet
-        document.querySelector('.container').style.display = 'none';
-        document.getElementById('printSheetSection').style.display = 'block';
-        // Print, then restore UI
+        container.style.display = 'none';
+        printSheet.style.display = 'block';
+        
+        // Force a repaint to ensure the print sheet is visible
+        printSheet.offsetHeight;
+        
+        // Additional debugging: check print sheet content
+        const printSheetContent = printSheet.innerHTML;
+        console.log('Print sheet content length:', printSheetContent.length);
+        console.log('Print sheet has content:', printSheetContent.trim().length > 0);
+        
+        // Check for populated fields
+        const populatedFields = printSheet.querySelectorAll('[data-field]');
+        let nonEmptyFields = 0;
+        populatedFields.forEach(field => {
+            const hasTextContent = field.textContent.trim().length > 0;
+            const isCheckedCheckbox = field.classList.contains('checked');
+            const isCheckboxField = field.classList.contains('checkbox') || field.classList.contains('process-checkbox');
+            
+            // Count as populated if: has text content OR is a checkbox (checked or unchecked is still "populated")
+            if (hasTextContent || isCheckboxField) {
+                nonEmptyFields++;
+            }
+        });
+        console.log(`Populated fields found: ${nonEmptyFields} out of ${populatedFields.length}`);
+        
+        // Check for SVG content
+        const svgInPrint = printSheet.querySelector('svg');
+        console.log('SVG in print sheet:', !!svgInPrint);
+        if (svgInPrint) {
+            const svgChildren = svgInPrint.children.length;
+            console.log('SVG children count:', svgChildren);
+        }
+        
+        // Add a longer delay for Odoo environments and verify content before printing
         setTimeout(() => {
+            // Final verification before printing
+            const finalCheck = document.getElementById('printSheetSection');
+            if (!finalCheck || finalCheck.style.display === 'none') {
+                console.error('Print sheet not visible at print time!');
+                alert('Print sheet preparation failed. Please try again.');
+                return;
+            }
+            
+            console.log('Triggering print...');
             window.print();
-            setTimeout(hidePrintSheet, 500);
-        }, 100);
+            // Restore UI after printing
+            setTimeout(hidePrintSheet, 1000);
+        }, 750); // Increased delay for Odoo
+        
+        } catch (error) {
+            console.error('Error in showPrintSheet:', error);
+            alert('Error showing print sheet: ' + error.message);
+        }
     }
+    
     function hidePrintSheet() {
-        document.getElementById('printSheetSection').style.display = 'none';
-        document.querySelector('.container').style.display = '';
+        console.log('hidePrintSheet called');
+        const printSheet = document.getElementById('printSheetSection');
+        const container = document.querySelector('.container');
+        
+        if (printSheet) {
+            printSheet.style.display = 'none';
+        }
+        if (container) {
+            container.style.display = '';
+        }
     }
+    
+    // FORCE PRINT FUNCTION FOR ODOO COMPATIBILITY
+    function forcePrint() {
+        console.log('forcePrint called - creating new window for Odoo compatibility');
+        
+        // First, populate the print sheet with data
+        populatePrintSheetFromDesigner();
+        
+        // Clear the preview line so it doesn't appear in print
+        clearPreviewLine();
+        
+        // Get the print sheet content
+        const printSheet = document.getElementById('printSheetSection');
+        if (!printSheet) {
+            alert('Print sheet not found!');
+            return;
+        }
+        
+        // Get all styles from the current document
+        let allStyles = '';
+        const styleElements = document.querySelectorAll('style');
+        styleElements.forEach(style => {
+            allStyles += style.innerHTML + '\n';
+        });
+        
+        // Create a new window with just the print sheet content
+        const printWindow = window.open('', '_blank', 'width=800,height=600');
+        
+        if (!printWindow) {
+            alert('Popup blocked! Please allow popups for this site and try again.');
+            return;
+        }
+        
+        const htmlContent = '<!DOCTYPE html>' +
+            '<html>' +
+            '<head>' +
+            '<title>Profile Order Sheet</title>' +
+            '<style>' +
+            allStyles +
+            'body { margin: 0; padding: 0; }' +
+            '.container { display: none !important; }' +
+            '#printSheetSection { display: block !important; }' +
+            '</style>' +
+            '</head>' +
+            '<body>' +
+            printSheet.outerHTML +
+            '</body>' +
+            '</html>';
+        
+        printWindow.document.write(htmlContent);
+        printWindow.document.close();
+        
+        // Auto-print after a short delay
+        setTimeout(function() {
+            printWindow.print();
+            setTimeout(function() {
+                printWindow.close();
+            }, 1000);
+        }, 500);
+        
+        console.log('Print window created successfully');
+    }
+    
     // Optional: Hide print sheet on page load
-    document.getElementById('printSheetSection').style.display = 'none';
+    const initialPrintSheet = document.getElementById('printSheetSection');
+    if (initialPrintSheet) {
+        initialPrintSheet.style.display = 'none';
+    }
     </script>
     </div>
 </div>
@@ -1135,6 +1327,7 @@ async function downloadProfileImage() {
     
     if (!container) {
         console.error('Canvas container not found');
+        alert('Canvas container not found');
         return;
     }
     
@@ -1193,7 +1386,9 @@ function loadHtml2Canvas() {
             resolve();
         };
         script.onerror = () => {
-            reject(new Error('Failed to load html2canvas library'));
+            // Note: This external library is only needed for the "Download Profile Image" feature
+            // All other functionality (including print/export) works without external dependencies
+            reject(new Error('Failed to load html2canvas library - Download Image feature unavailable'));
         };
         document.head.appendChild(script);
     });
