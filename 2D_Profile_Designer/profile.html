@@ -1,4 +1,4 @@
-    <script>
+<script>
     // --- PRINT SHEET DATA BINDING ---
     function populatePrintSheetFromDesigner() {
         console.log('populatePrintSheetFromDesigner called');
@@ -121,9 +121,9 @@
         }
     }
     </script>
-<!DOCTYPE html>
-<html lang="en">
-<head>
+
+
+
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Kynetic Metalworks - 2D Profile Designer</title>
@@ -984,8 +984,8 @@
             font-style: italic;
         }
     </style>
-</head>
-<body>
+
+
     <div class="container">
         <div class="header">
             <div class="header-text">
@@ -995,11 +995,11 @@
         </div>
         
         <div class="top-controls">
-    <!-- Customer Information Row -->
+    
     <div style="display: flex; gap: 15px; align-items: center; margin-bottom: 15px; flex-wrap: wrap;">
         <div class="input-field" style="flex: 1; min-width: 200px;">
             <label for="customerName">Customer Name *</label>
-            <input type="text" id="customerName" required>
+            <input type="text" id="customerName" required="">
         </div>
         
         <div class="input-field" style="flex: 1; min-width: 150px;">
@@ -1009,7 +1009,7 @@
         
         <div class="input-field" style="flex: 1.5; min-width: 200px;">
             <label for="profileName">Profile Name *</label>
-            <input type="text" id="profileName" value="Custom Profile" required>
+            <input type="text" id="profileName" value="Custom Profile" required="">
         </div>
         
         <div class="input-field" style="flex: 2; min-width: 250px;">
@@ -1018,7 +1018,7 @@
         </div>
     </div>
     
-    <!-- Material Specifications Row -->
+    
     <div style="display: flex; gap: 15px; align-items: center; margin-bottom: 15px; flex-wrap: wrap;">
         <div class="input-field" style="min-width: 120px;">
             <label for="metalType">Metal Type</label>
@@ -1031,7 +1031,7 @@
         <div class="input-field" style="min-width: 100px;">
             <label for="metalGauge">Gauge</label>
             <select id="metalGauge" style="padding: 8px 12px; border: 2px solid #e9ecef; border-radius: 6px; width: 100%;">
-                <option value="22" selected>22</option>
+                <option value="22" selected="">22</option>
                 <option value="24">24</option>
                 <option value="26">26</option>
                 <option value="28">28</option>
@@ -1060,7 +1060,7 @@
         </div>
     </div>
     
-    <!-- Controls and Info Row -->
+    
     <div style="display: flex; gap: 20px; align-items: center; justify-content: space-between; flex-wrap: wrap;">
         <div class="profile-info">
             <div class="input-field">
@@ -1107,7 +1107,7 @@
         console.log('showPrintSheet called');
         
         try {
-            // First, populate the print sheet with data
+            // First, populate the print sheet with dataPerfec
             populatePrintSheetFromDesigner();
             
             // Clear the preview line so it doesn't appear in print
@@ -1289,9 +1289,8 @@
             <div class="canvas-container" id="canvasContainer">
                 <svg id="canvas" width="100%" height="100%">
                     <defs>
-                        <marker id="arrowhead" markerWidth="10" markerHeight="7" 
-                                refX="9" refY="3.5" orient="auto">
-                            <polygon points="0 0, 10 3.5, 0 7" fill="#4a7c7e" />
+                        <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+                            <polygon points="0 0, 10 3.5, 0 7" fill="#4a7c7e"></polygon>
                         </marker>
                     </defs>
                     <g id="grid"></g>
@@ -1300,7 +1299,7 @@
                     <g id="labels"></g>
                 </svg>
                 
-                <!-- Edit Popup -->
+                
                 <div id="editPopup" class="edit-popup">
                     <h4 id="popupTitle">Edit Element</h4>
                     <div class="input-group">
@@ -1319,7 +1318,7 @@
             <span id="mode">Click on the canvas to start drawing your profile</span>
             <span class="coords" id="coordinates">Mouse: (0, 0)</span>
         </div>
-    </div>
+    
 
     <script>
 async function downloadProfileImage() {
@@ -2245,83 +2244,230 @@ function loadHtml2Canvas() {
             }
             let hem = points[vertexIndex];
             let prev = null, next = null;
+            
+            // Determine proper prev and next points for consistent direction calculation
             if (vertexIndex === 0) {
-                // For start hem, use next and next-next if available
-                if (points.length > 2) {
-                    prev = points[1];
-                    next = points[2];
-                } else if (points.length > 1) {
-                    prev = points[1];
-                    next = points[0];
+                // For first point hem: incoming direction is FROM point 1 TO point 0
+                // outgoing direction is FROM point 0 TO point 1 (reversed for proper fold direction)
+                if (points.length > 1) {
+                    prev = points[1]; // The point we're coming FROM
+                    next = points[1]; // Use same point for outgoing to create proper fold direction
                 } else {
                     return;
                 }
             } else if (vertexIndex === points.length - 1) {
-                // For end hem, use previous and previous-previous if available
-                prev = points[vertexIndex - 1];
-                next = points[vertexIndex - 2] ? points[vertexIndex - 2] : prev;
+                // For last point hem: incoming direction is FROM previous point TO this point
+                // outgoing direction should be continuation of that line
+                if (vertexIndex > 0) {
+                    prev = points[vertexIndex - 1];
+                    next = points[vertexIndex - 1]; // Use same point to create proper fold direction
+                } else {
+                    return;
+                }
             } else {
+                // For middle point hem: use normal adjacent points
                 prev = points[vertexIndex - 1];
                 next = points[vertexIndex + 1];
             }
-            if (!hem.hemData || !prev || !next) {
+            
+            if (!hem.hemData || !prev) {
                 return;
             }
 
-            // Vectors from hem to prev and next
-            const v1x = prev.x - hem.x;
-            const v1y = prev.y - hem.y;
-            const v2x = next.x - hem.x;
-            const v2y = next.y - hem.y;
-
-            // Calculate the cross product to determine which side is the sharp angle
-            const cross = v1x * v2y - v1y * v2x;
-
-            // Calculate direction vector (normalized) for arc base orientation
-            const dx = hem.x - prev.x;
-            const dy = hem.y - prev.y;
-            const len = Math.sqrt(dx * dx + dy * dy);
-            if (len === 0) return;
-            const dirX = dx / len;
-            const dirY = dy / len;
-
-            // Hem extension length (in screen px)
-            const hemLengthIn = hem.hemData.length || 0.5; // fallback
-            // Convert hem length from DXF units (inches) to screen px
-            const hemLengthPx = hemLengthIn * scale;
-
-            // Use a much larger SVG path for the hem arc
-            const basePath = "M -50 0 L 300 0 Q 400 0 400 60 L 400 100 Q 400 160 300 160 L 150 160";
-            const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-            path.setAttribute('d', basePath);
-            path.setAttribute('fill', 'none');
-            path.setAttribute('stroke', '#222'); // Much darker color
-            path.setAttribute('stroke-width', '4'); // Thicker stroke width
-            path.setAttribute('stroke-linecap', 'round');
-
-            // Compute angle in degrees
-            let angle;
-            if (vertexIndex === 1 && points[vertexIndex + 1]) {
-                // For the second HEM, point the arc in the direction of the next segment
-                const dx2 = points[vertexIndex + 1].x - hem.x;
-                const dy2 = points[vertexIndex + 1].y - hem.y;
-                angle = Math.atan2(dy2, dx2) * 180 / Math.PI;
-                console.log(`[HEM ANGLE] Second HEM at ${vertexIndex}: angle=${angle}`);
+            // Calculate the direction vectors for determining fold direction
+            let incomingVector, outgoingVector;
+            
+            if (vertexIndex === 0) {
+                // First point hem: the line TO the next point exists, 
+                // but there was originally a line BEFORE this point that got deleted
+                // The hem should curve toward where that deleted line would have been
+                if (points.length > 1) {
+                    // The existing line direction (what we can see)
+                    const existingLine = {
+                        x: points[1].x - hem.x,
+                        y: points[1].y - hem.y
+                    };
+                    
+                    // The hem should curve opposite to the existing line direction
+                    // (toward where the deleted line would have been)
+                    incomingVector = {
+                        x: -existingLine.x,  // Point backward from the existing line
+                        y: -existingLine.y
+                    };
+                    outgoingVector = existingLine;  // The line we can see
+                }
+            } else if (vertexIndex === points.length - 1) {
+                // Last point hem: the line FROM the previous point exists,
+                // but there was originally a line AFTER this point that got deleted
+                // The hem should curve toward where that deleted line would have been
+                if (vertexIndex > 0) {
+                    // The existing line direction (what we can see)
+                    const existingLine = {
+                        x: hem.x - prev.x,
+                        y: hem.y - prev.y
+                    };
+                    
+                    // The hem should curve in the direction the deleted line would have gone
+                    incomingVector = existingLine;  // The line we can see
+                    outgoingVector = {
+                        x: existingLine.x,  // Continue in the same direction
+                        y: existingLine.y   // (where the deleted line would have been)
+                    };
+                }
             } else {
-                angle = Math.atan2(dirY, dirX) * 180 / Math.PI;
+                // Middle point hem: we have both adjacent points
+                // Calculate the normal incoming and outgoing vectors
+                incomingVector = {
+                    x: hem.x - prev.x,
+                    y: hem.y - prev.y
+                };
+                outgoingVector = {
+                    x: next.x - hem.x,
+                    y: next.y - hem.y
+                };
             }
-            // Scale the path to match the hem length (profile units to SVG units)
-            const scaleVal = hemLengthPx / 300 * 1.2; // 1.2x to make it even bigger visually
-
-            // Flip vertically if the sharp angle is on the opposite side
-            // If cross > 0, arc faces one way; if cross < 0, flip
-            let scaleY = -scaleVal;
-            if (cross < 0) {
-                scaleY = scaleVal;
+            
+            // Normalize the incoming vector
+            const incomingLength = Math.sqrt(incomingVector.x * incomingVector.x + incomingVector.y * incomingVector.y);
+            if (incomingLength === 0) return;
+            
+            const incomingNorm = {
+                x: incomingVector.x / incomingLength,
+                y: incomingVector.y / incomingLength
+            };
+            
+            // Determine fold direction based on the V-geometry and position
+            // Pattern analysis shows different behavior needed for left vs right sides
+            let foldDirection;
+            
+            // Calculate cross product to determine which side of the incoming line the outgoing line is on
+            const crossProduct = incomingVector.x * outgoingVector.y - incomingVector.y * outgoingVector.x;
+            
+            // Handle edge cases where cross product is near zero (90° or 180° angles)
+            const CROSS_PRODUCT_TOLERANCE = 1e-10;
+            const isNearZero = Math.abs(crossProduct) < CROSS_PRODUCT_TOLERANCE;
+            
+            // Determine if this is a "left side" or "right side" hem based on the incoming vector direction
+            // For a vertical line: positive x-component = pointing right, negative = pointing left
+            const isRightSide = incomingVector.x > 0;
+            
+            // For near-zero cross products, use fallback logic based on vector directions
+            if (isNearZero) {
+                // Calculate dot product to determine if vectors are parallel (180°) or perpendicular (90°)
+                const dotProduct = incomingVector.x * outgoingVector.x + incomingVector.y * outgoingVector.y;
+                
+                if (Math.abs(dotProduct) > 0.9) {
+                    // Nearly parallel lines (180°) - fold based on position and side
+                    if (vertexIndex === 0) {
+                        foldDirection = isRightSide ? 1 : -1;
+                    } else {
+                        foldDirection = isRightSide ? -1 : 1;
+                    }
+                } else {
+                    // Nearly perpendicular lines (90°) - fold based on quadrant
+                    if (incomingVector.y > 0) {  // Incoming vector points up
+                        foldDirection = outgoingVector.x > 0 ? 1 : -1;
+                    } else {  // Incoming vector points down
+                        foldDirection = outgoingVector.x > 0 ? -1 : 1;
+                    }
+                }
+            } else {
+                // Normal case with reliable cross product
+                if (vertexIndex === 0) {
+                    // First hem logic based on patterns:
+                    // - Right side first hems: work with current logic
+                    // - Left side first hems: need inverted logic
+                    if (isRightSide) {
+                        foldDirection = crossProduct > 0 ? -1 : 1;  // Original logic works
+                    } else {
+                        foldDirection = crossProduct > 0 ? 1 : -1;  // Inverted for left side
+                    }
+                } else if (vertexIndex === points.length - 1) {
+                    // Last/Second hem logic based on patterns:
+                    // - Left side second hems: work with current logic  
+                    // - Right side second hems: need inverted logic
+                    if (isRightSide) {
+                        foldDirection = crossProduct > 0 ? -1 : 1;  // Inverted for right side
+                    } else {
+                        foldDirection = crossProduct > 0 ? 1 : -1;  // Original logic works
+                    }
+                } else {
+                    // Middle hem: use standard geometric logic
+                    foldDirection = crossProduct > 0 ? -1 : 1;
+                }
             }
-            path.setAttribute('transform', `translate(${hem.x},${hem.y}) rotate(${angle}) scale(${scaleVal},${scaleY})`);
-
-            linesGroup.appendChild(path);
+            
+            // Calculate perpendicular direction for fold orientation
+            const perpendicular = {
+                x: -incomingNorm.y * foldDirection,
+                y: incomingNorm.x * foldDirection
+            };
+            
+            // Hem extension length (in screen px) - make it narrower
+            const hemLengthIn = hem.hemData.length || 0.5; // fallback
+            const radius = hemLengthIn * scale * 0.4; // Reduced from full scale to 40% for tighter curve
+            
+            // Calculate the center of the hemming curve - closer to the line
+            const centerX = hem.x + perpendicular.x * radius;
+            const centerY = hem.y + perpendicular.y * radius;
+            
+            // Calculate start and end points for the 180-degree arc
+            const startX = hem.x;
+            const startY = hem.y;
+            
+            // End point is 180 degrees around (folded edge) - much closer to original line
+            const endX = hem.x + perpendicular.x * radius * 2;
+            const endY = hem.y + perpendicular.y * radius * 2;
+            
+            // Draw the hem curve (180-degree semicircle)
+            const hemCurve = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            const pathData = `M ${startX} ${startY} A ${radius} ${radius} 0 0 ${foldDirection > 0 ? 1 : 0} ${endX} ${endY}`;
+            
+            hemCurve.setAttribute('d', pathData);
+            hemCurve.setAttribute('stroke', '#e67e22');
+            hemCurve.setAttribute('stroke-width', '3');
+            hemCurve.setAttribute('fill', 'none');
+            hemCurve.setAttribute('stroke-linecap', 'round');
+            
+            linesGroup.appendChild(hemCurve);
+            
+            // Draw the folded material edge (dashed line to show where material ends up)
+            const foldedEdge = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            
+            // Calculate the direction of the folded edge - should run parallel to the ORIGINAL line, not perpendicular
+            const extensionLength = scale * 1.5; // Fixed length for visibility
+            
+            // The folded edge should extend along the direction that the material came from (backward along incoming line)
+            // Start from the fold end point and extend backward along the incoming line direction
+            const foldedEdgeStart = {
+                x: endX - incomingNorm.x * extensionLength, // Extend backward along the original line direction
+                y: endY - incomingNorm.y * extensionLength
+            };
+            const foldedEdgeEnd = {
+                x: endX, // End at the fold point
+                y: endY
+            };
+            
+            foldedEdge.setAttribute('x1', foldedEdgeStart.x);
+            foldedEdge.setAttribute('y1', foldedEdgeStart.y);
+            foldedEdge.setAttribute('x2', foldedEdgeEnd.x);
+            foldedEdge.setAttribute('y2', foldedEdgeEnd.y);
+            foldedEdge.setAttribute('stroke', '#d35400');
+            foldedEdge.setAttribute('stroke-width', '2');
+            foldedEdge.setAttribute('stroke-dasharray', '4,4');
+            foldedEdge.setAttribute('opacity', '0.8');
+            
+            linesGroup.appendChild(foldedEdge);
+            
+            // Draw center point indicator (for reference)
+            const centerDot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+            centerDot.setAttribute('cx', centerX);
+            centerDot.setAttribute('cy', centerY);
+            centerDot.setAttribute('r', '2');
+            centerDot.setAttribute('fill', '#e67e22');
+            centerDot.setAttribute('opacity', '0.6');
+            
+            linesGroup.appendChild(centerDot);
         }
 
         function closeHemPopup() {
@@ -3292,9 +3438,9 @@ function resetForm() {
 // Initialize gauge options on page load
 updateGaugeOptions();
     </script>
-    <!-- PRINT SHEET SECTION (hidden by default, shown for printing) -->
+    
     <div id="printSheetSection" style="display:none;">
-        <!-- Header -->
+        
         <div class="header">
             <div class="logo-section">
                 <div class="logo-box">
@@ -3331,7 +3477,7 @@ updateGaugeOptions();
             </div>
         </div>
         
-        <!-- Customer and Job Information -->
+        
         <div class="section bordered">
             <div class="row">
                 <div class="col">
@@ -3349,7 +3495,7 @@ updateGaugeOptions();
             </div>
         </div>
         
-        <!-- Materials and Specifications -->
+        
         <div class="section bordered">
             <div class="row">
                 <div class="col wide">
@@ -3433,7 +3579,7 @@ updateGaugeOptions();
             </div>
         </div>
         
-        <!-- Profile Section -->
+        
         <div class="profile-section">
             <div class="field-group">
                 <span class="field-label">Profile Name:</span>
@@ -3445,7 +3591,7 @@ updateGaugeOptions();
             </div>
         </div>
         
-        <!-- Process Status -->
+        
         <div class="process-section">
             <div class="process-grid">
                 <div class="process-item">
@@ -3475,7 +3621,7 @@ updateGaugeOptions();
             </div>
         </div>
         
-        <!-- Bottom Information -->
+        
         <div class="bottom-grid">
             <div class="bottom-field">
                 <span class="bottom-label">Shipping Weight:</span>
@@ -3491,5 +3637,3 @@ updateGaugeOptions();
             </div>
         </div>
     </div>
-</body>
-</html>
