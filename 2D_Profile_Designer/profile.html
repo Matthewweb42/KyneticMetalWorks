@@ -142,49 +142,72 @@
         }
 
         .container {
-            max-width: 1400px;
+            max-width: 8.5in;
+            width: 8.5in;
+            min-height: 11in;
             margin: 0 auto;
             background: white;
-            border-radius: 15px;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
-            overflow: hidden;
+            border: 1px solid #ddd;
+            font-family: Arial, sans-serif;
+            font-size: 12px;
+            color: black;
+            padding: 0;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
         }
 
-        .header {
-            background: #57626b;
+        /* Order Sheet Input Styles */
+        .order-input {
+            border: none;
+            border-bottom: 1px solid #000;
+            background: transparent;
+            padding: 2px 4px;
+            font-size: 12px;
+            font-family: Arial, sans-serif;
+            outline: none;
+        }
+
+        .order-input:focus {
+            border-bottom: 2px solid #007cba;
+            background: #f8f9fa;
+        }
+
+        .order-select {
+            border: 1px solid #000;
+            background: white;
+            padding: 2px 4px;
+            font-size: 12px;
+            font-family: Arial, sans-serif;
+            outline: none;
+        }
+
+        .order-select:focus {
+            border-color: #007cba;
+            background: #f8f9fa;
+        }
+
+        /* Gauge Selection Styling */
+        .gauge-option {
+            display: inline-block;
+            padding: 4px 8px;
+            border: 1px solid #000;
+            cursor: pointer;
+            background: white;
+            margin-right: 2px;
+        }
+
+        .gauge-option.selected {
+            background: #007cba;
             color: white;
-            padding: 10px 20px;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            min-height: 48px;
         }
 
-        .header-text {
-            flex: 1;
-            text-align: center;
-        }
-
-        .header h1 {
-            font-size: 1.5em;
-            margin-bottom: 2px;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
-        }
-
-        .header p {
-            font-size: 1em;
-            opacity: 0.8;
+        .gauge-option:hover {
+            background: #e6f3ff;
         }
 
         .top-controls {
-            background: #f8f9fa;
-            padding: 20px 30px;
-            border-bottom: 2px solid #e9ecef;
-            display: flex;
-            gap: 30px;
-            align-items: center;
-            flex-wrap: nowrap;
-            min-width: 0;
+            padding: 0;
+            background: white;
+            border: none;
         }
 
         .profile-info {
@@ -226,9 +249,11 @@
             display: flex;
             align-items: center;
             margin-right: 20px;
+            min-width: fit-content; /* Ensure it doesn't get compressed */
+            flex-shrink: 0; /* Prevent shrinking */
         }
 
-        .toggle-label {
+        .side-toggle-label {
             display: flex;
             align-items: center;
             gap: 10px;
@@ -245,13 +270,15 @@
             border-radius: 16px;
             overflow: hidden;
             border: 2px solid #ddd;
+            flex-shrink: 0; /* Prevent the toggle from shrinking */
+            cursor: pointer;
         }
 
         .side-toggle input[type="checkbox"] {
             display: none;
         }
 
-        .toggle-slider {
+        .side-toggle-slider {
             position: relative;
             width: 100%;
             height: 100%;
@@ -260,7 +287,7 @@
             transition: all 0.3s ease;
         }
 
-        .toggle-slider::before {
+        .side-toggle-slider::before {
             content: '';
             position: absolute;
             width: 50%;
@@ -272,7 +299,7 @@
             z-index: 1;
         }
 
-        .side-toggle input:checked + .toggle-slider::before {
+        .side-toggle input:checked + .side-toggle-slider::before {
             transform: translateX(100%);
             background: linear-gradient(135deg, #3498db, #2980b9);
         }
@@ -296,19 +323,19 @@
             right: 0;
         }
 
-        .side-toggle input:not(:checked) + .toggle-slider .side-label.left {
+        .side-toggle input:not(:checked) + .side-toggle-slider .side-label.left {
             color: white;
         }
 
-        .side-toggle input:not(:checked) + .toggle-slider .side-label.right {
+        .side-toggle input:not(:checked) + .side-toggle-slider .side-label.right {
             color: #666;
         }
 
-        .side-toggle input:checked + .toggle-slider .side-label.left {
+        .side-toggle input:checked + .side-toggle-slider .side-label.left {
             color: #666;
         }
 
-        .side-toggle input:checked + .toggle-slider .side-label.right {
+        .side-toggle input:checked + .side-toggle-slider .side-label.right {
             color: white;
         }
 
@@ -607,6 +634,314 @@
             }
         }
 
+        /* Canvas and Drawing Area Styles */
+        .drawing-area {
+            height: 580px;
+            border: 1px solid #000;
+            margin-top: 8px;
+            position: relative;
+            background: white;
+        }
+
+        .canvas-container {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .drawing-canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        .mode-display {
+            position: absolute;
+            top: 8px;
+            left: 8px;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 4px 8px;
+            font-size: 11px;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+        }
+
+        /* Control Sections */
+        .controls-section {
+            padding: 15px;
+            border-top: 1px solid #ddd;
+            background: #f8f9fa;
+        }
+
+        .control-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 20px;
+            margin-bottom: 10px;
+            flex-wrap: wrap;
+            min-height: 40px; /* Ensure enough height for the toggle */
+        }
+
+        .side-indicator {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+        }
+
+        .hash-info {
+            margin-top: 5px;
+            padding: 4px 8px;
+            background: #e3f2fd;
+            border-radius: 4px;
+            font-size: 11px;
+            color: #1976d2;
+            font-weight: 500;
+        }
+
+        .mode-controls {
+            display: flex;
+            gap: 5px;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 8px;
+        }
+
+        .btn {
+            padding: 6px 12px;
+            border: 1px solid #000;
+            background: white;
+            cursor: pointer;
+            font-size: 12px;
+            border-radius: 3px;
+            transition: all 0.2s;
+        }
+
+        .btn:hover {
+            background: #f0f0f0;
+        }
+
+        .btn-primary {
+            background: #007cba;
+            color: white;
+            border-color: #007cba;
+        }
+
+        .btn-primary:hover {
+            background: #005a8a;
+        }
+
+        .btn-warning {
+            background: #ffc107;
+            border-color: #ffc107;
+        }
+
+        .btn-warning:hover {
+            background: #e0a800;
+        }
+
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+            border-color: #dc3545;
+        }
+
+        .btn-danger:hover {
+            background: #c82333;
+        }
+
+        .zoom-control {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 11px;
+        }
+
+        .zoom-control input[type="range"] {
+            width: 150px;
+        }
+
+        /* Material Type Toggle */
+        .material-type-toggle {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .material-toggle-label {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 600;
+            color: #2c3e50;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .material-toggle {
+            position: relative;
+            width: 120px; /* Wider to accommodate "Aluminum" */
+            height: 32px;
+            background: #e9ecef;
+            border-radius: 16px;
+            overflow: hidden;
+            border: 2px solid #ddd;
+            flex-shrink: 0;
+            cursor: pointer;
+        }
+
+        .material-toggle-slider {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            transition: all 0.3s ease;
+        }
+
+        .material-toggle-slider::before {
+            content: '';
+            position: absolute;
+            width: 50%;
+            height: 100%;
+            background: linear-gradient(135deg, #6c757d, #495057);
+            border-radius: 14px;
+            transition: all 0.3s ease;
+            transform: translateX(0);
+            z-index: 1;
+        }
+
+        .material-toggle-slider.aluminum::before {
+            transform: translateX(100%);
+            background: linear-gradient(135deg, #007cba, #0056b3);
+        }
+
+        .material-label {
+            position: absolute;
+            width: 50%;
+            text-align: center;
+            font-size: 11px;
+            font-weight: bold;
+            color: white;
+            z-index: 2;
+            transition: all 0.3s ease;
+        }
+
+        .material-label.left {
+            left: 0;
+        }
+
+        .material-label.right {
+            right: 0;
+        }
+
+        .material-toggle-slider:not(.aluminum) .material-label.left {
+            color: white;
+        }
+
+        .material-toggle-slider:not(.aluminum) .material-label.right {
+            color: #666;
+        }
+
+        .material-toggle-slider.aluminum .material-label.left {
+            color: #666;
+        }
+
+        .material-toggle-slider.aluminum .material-label.right {
+            color: white;
+        }
+
+        /* Hem Toggle Styles */
+        .hem-toggle-label {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 600;
+            color: #2c3e50;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .hem-toggle {
+            position: relative;
+            width: 80px;
+            height: 32px;
+            background: #e9ecef;
+            border-radius: 16px;
+            overflow: hidden;
+            border: 2px solid #ddd;
+            flex-shrink: 0;
+            cursor: pointer;
+        }
+
+        .hem-toggle input[type="checkbox"] {
+            display: none;
+        }
+
+        .hem-toggle-slider {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            transition: all 0.3s ease;
+        }
+
+        .hem-toggle-slider::before {
+            content: '';
+            position: absolute;
+            width: 50%;
+            height: 100%;
+            background: linear-gradient(135deg, #95a5a6, #7f8c8d);
+            border-radius: 14px;
+            transition: all 0.3s ease;
+            transform: translateX(0);
+            z-index: 1;
+        }
+
+        .hem-toggle input:checked + .hem-toggle-slider::before {
+            transform: translateX(100%);
+            background: linear-gradient(135deg, #3498db, #2980b9);
+        }
+
+        .hem-label {
+            position: absolute;
+            width: 50%;
+            text-align: center;
+            font-size: 12px;
+            font-weight: bold;
+            color: white;
+            z-index: 2;
+            transition: all 0.3s ease;
+        }
+
+        .hem-label.left {
+            left: 0;
+        }
+
+        .hem-label.right {
+            right: 0;
+        }
+
+        .hem-toggle input:not(:checked) + .hem-toggle-slider .hem-label.left {
+            color: white;
+        }
+
+        .hem-toggle input:not(:checked) + .hem-toggle-slider .hem-label.right {
+            color: #666;
+        }
+
+        .hem-toggle input:checked + .hem-toggle-slider .hem-label.left {
+            color: #666;
+        }
+
+        .hem-toggle input:checked + .hem-toggle-slider .hem-label.right {
+            color: white;
+        }
+
         /* Line Cross Popup */
         #lineCrossPopup {
             position: fixed;
@@ -687,13 +1022,13 @@
         }
 
         /* Print Sheet Header Section */
-        #printSheetSection .header {
+        .header {
             display: flex;
             justify-content: space-between;
             align-items: flex-start;
             margin-bottom: 10px;
             border-bottom: 2px solid black;
-            padding-bottom: 8px;
+            padding: 8px 15px;
         }
 
         .logo-section {
@@ -768,7 +1103,7 @@
         /* Main Content Sections */
         .section {
             margin: 8px 0;
-            padding: 5px 0;
+            padding: 5px 15px;
         }
 
         .section.bordered {
@@ -860,6 +1195,7 @@
         /* Profile Drawing Area */
         .profile-section {
             margin: 8px 0 4px 0;
+            padding: 0 15px;
         }
 
         .drawing-area {
@@ -999,127 +1335,244 @@
 
 
     <div class="container">
+        <!-- Order Sheet Style Header -->
         <div class="header">
-            <div class="header-text">
-                <h1>2D Profile Designer</h1>
-                <p>Precision Metal Forming Solutions</p>
+            <div class="logo-section">
+                <div class="logo-box">
+                    <div class="logo-text">KYNETIC</div>
+                    <div class="dots">
+                        <div class="dot"></div>
+                        <div class="dot"></div>
+                        <div class="dot"></div>
+                        <div class="dot"></div>
+                        <div class="dot"></div>
+                        <div class="dot"></div>
+                    </div>
+                    <div class="metalworks">metalworks</div>
+                </div>
             </div>
-        </div>
-        
-        <div class="top-controls">
-    
-    <div style="display: flex; gap: 15px; align-items: center; margin-bottom: 15px; flex-wrap: wrap;">
-        <div class="input-field" style="flex: 1; min-width: 200px;">
-            <label for="customerName">Customer Name *</label>
-            <input type="text" id="customerName" required="">
-        </div>
-        
-        <div class="input-field" style="flex: 1; min-width: 150px;">
-            <label for="jobName">Job Name</label>
-            <input type="text" id="jobName" placeholder="Job identifier">
-        </div>
-        
-        <div class="input-field" style="flex: 1.5; min-width: 200px;">
-            <label for="profileName">Profile Name *</label>
-            <input type="text" id="profileName" value="Custom Profile" required="">
-        </div>
-        
-        <div class="input-field" style="flex: 2; min-width: 250px;">
-            <label for="profileDescription">Description</label>
-            <input type="text" id="profileDescription" placeholder="Brief description">
-        </div>
-    </div>
-    
-    
-    <div style="display: flex; gap: 15px; align-items: center; margin-bottom: 15px; flex-wrap: wrap;">
-        <div class="input-field" style="min-width: 120px;">
-            <label for="metalType">Metal Type</label>
-            <select id="metalType" onchange="updateGaugeOptions()" style="padding: 8px 12px; border: 2px solid #e9ecef; border-radius: 6px; width: 100%;">
-                <option value="steel">Steel</option>
-                <option value="aluminum">Aluminum</option>
-            </select>
-        </div>
-        
-        <div class="input-field" style="min-width: 100px;">
-            <label for="metalGauge">Gauge</label>
-            <select id="metalGauge" style="padding: 8px 12px; border: 2px solid #e9ecef; border-radius: 6px; width: 100%;">
-                <option value="22" selected="">22</option>
-                <option value="24">24</option>
-                <option value="26">26</option>
-                <option value="28">28</option>
-                <option value="30">30</option>
-            </select>
-        </div>
-        
-        <div class="input-field" style="min-width: 120px;">
-            <label for="color">Color</label>
-            <input type="text" id="color" value="White" style="width: 100%;">
-        </div>
-        
-        <div class="input-field" style="min-width: 150px;">
-            <label for="colorManufacturer">Color Manufacturer</label>
-            <input type="text" id="colorManufacturer" placeholder="e.g. Sherwin Williams" style="width: 100%;">
-        </div>
-        
-        <div class="input-field" style="min-width: 80px;">
-            <label for="quantity">Quantity</label>
-            <input type="number" id="quantity" value="1" min="1" style="width: 100%;">
-        </div>
-        
-        <div style="display: flex; align-items: center; gap: 8px; margin-top: 20px; min-width: 120px;">
-            <input type="checkbox" id="hasRibs" style="width: 16px; height: 16px;">
-            <label for="hasRibs" style="font-weight: 600; color: #2c3e50; white-space: nowrap;">Include Ribs</label>
-        </div>
-    </div>
-    
-    
-    <div style="display: flex; gap: 20px; align-items: center; justify-content: space-between; flex-wrap: wrap;">
-        <div class="profile-info">
-            <div class="input-field">
-                <label>Total Material Usage</label>
-                <div style="padding: 8px 12px; background: #e9ecef; border-radius: 6px; font-weight: bold; color: #2d5a5c; min-width: 120px;">
-                    <span id="totalLength">0.00"</span>
+            
+            <div class="title-section">
+                <div class="order-sheet-title">2D PROFILE DESIGNER</div>
+            </div>
+            
+            <div class="dates-section">
+                <div class="date-row">
+                    <span class="date-label">Date Created:</span>
+                    <span class="data-field" id="dateCreated"></span>
+                </div>
+                <div class="date-row">
+                    <span class="date-label">Designer:</span>
+                    <span class="data-field" placeholder="Your Name"></span>
+                </div>
+                <div class="date-row">
+                    <span class="date-label">Version:</span>
+                    <span class="data-field">1.0</span>
                 </div>
             </div>
         </div>
-
-        <div class="side-indicator" style="flex-direction:column; align-items:flex-start;">
-            <label class="toggle-label" style="margin-bottom:0;">
-                <span>Colored Side:</span>
-                <div class="side-toggle">
-                    <input type="checkbox" id="sideToggle" onchange="toggleCoatedSide()">
-                    <div class="toggle-slider">
-                        <span class="side-label left">A</span>
-                        <span class="side-label right">B</span>
+        
+        <!-- Customer and Job Information Section -->
+        <div class="section bordered">
+            <div class="row">
+                <div class="col">
+                    <div class="field-group">
+                        <span class="field-label inline">Customer:</span>
+                        <input type="text" id="customerName" class="order-input" placeholder="Customer Name" required>
                     </div>
                 </div>
-            </label>
-            <div id="hashSideInfo" style="margin-top:8px; padding:6px 14px; background:#f3f6fa; border-radius:6px; font-size:14px; color:#3498db; font-weight:500; text-align:center; box-shadow:0 2px 6px rgba(52,152,219,0.07); width:max-content;">
-                Hash side = Color side
-            </div>
-        </div>
-
-        <div class="mode-controls" style="display: flex; flex-direction: column; gap: 8px; align-items: stretch; min-width: 200px;">
-            <div style="display: flex; gap: 5px;">
-                <div class="mode-toggle">
-                    <button class="mode-btn active" onclick="setMode('create')" id="createModeBtn">Create</button>
-                    <button class="mode-btn" onclick="setMode('edit')" id="editModeBtn">Edit</button>
+                <div class="col">
+                    <div class="field-group">
+                        <span class="field-label inline">Job:</span>
+                        <input type="text" id="jobName" class="order-input" placeholder="Job Number">
+                    </div>
                 </div>
-                <button class="btn btn-warning" onclick="undoLastAction()" style="font-size: 14px; padding: 8px 12px;" id="undoBtn">Undo</button>
-                <button class="btn btn-danger" onclick="clearCanvas()" style="font-size: 14px; padding: 8px 12px;">Clear Profile</button>
             </div>
-            
-            <div style="display: flex; gap: 8px; align-items: center;">
-                <label for="zoomSlider" style="font-size: 12px; font-weight: 600;">Zoom:</label>
-                <input type="range" id="zoomSlider" min="0.25" max="3" step="0.25" value="1" style="flex: 1;" oninput="handleZoomSlider(this.value)">
-                <span id="zoomValue" style="font-size: 12px; font-weight: 600; min-width: 45px;">100%</span>
-            </div>
-            
-            <!-- <button class="btn btn-success" onclick="submitProfileRequest()" style="font-size: 14px; padding: 10px 16px;">Submit Profile Request</button> -->
-            <!-- <button class="btn btn-primary" onclick="showPrintSheet()" style="font-size: 14px; padding: 10px 16px;">Print/Export Sheet</button> -->
-            <button class="btn btn-secondary" onclick="forcePrint()" style="font-size: 14px; padding: 10px 16px; background: #2c5f5f; color: white; border: none;">Print</button>
         </div>
-    </div>
+        
+        <!-- Material and Color Section -->
+        <div class="section bordered">
+            <div class="row">
+                <div class="col wide">
+                    <!-- Hidden selects for compatibility -->
+                    <select id="metalType" style="display: none;" onchange="updateGaugeOptions()">
+                        <option value="steel" selected>Steel</option>
+                        <option value="aluminum">Aluminum</option>
+                    </select>
+                    <select id="metalGauge" style="display: none;">
+                        <option value="22" selected>22</option>
+                        <option value="24">24</option>
+                        <option value="26">26</option>
+                        <option value="28">28</option>
+                        <option value="30">30</option>
+                    </select>
+                    
+                    <!-- Material Type Toggle -->
+                    <div class="material-type-toggle" style="margin-bottom: 10px;">
+                        <div class="material-toggle-label">
+                            <span>Material Type:</span>
+                            <div class="material-toggle" onclick="toggleMaterialType()">
+                                <div class="material-toggle-slider" id="materialToggleSlider">
+                                    <span class="material-label left">Steel</span>
+                                    <span class="material-label right">Aluminum</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="material-group">
+                        <span class="material-label">Steel</span>
+                        <div class="option-group" id="steelOptions">
+                            <div class="option">
+                                <span class="gauge-option" data-gauge="22">22</span>
+                            </div>
+                            <div class="option">
+                                <span class="gauge-option" data-gauge="24">24</span>
+                            </div>
+                            <div class="option">
+                                <span class="gauge-option" data-gauge="26">26</span>
+                            </div>
+                            <div class="option">
+                                <span class="gauge-option" data-gauge="28">28</span>
+                            </div>
+                            <div class="option">
+                                <span class="gauge-option" data-gauge="30">30</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="material-group">
+                        <span class="material-label">Al</span>
+                        <div class="option-group" id="aluminumOptions" style="display: none;">
+                            <div class="option">
+                                <span class="gauge-option" data-gauge=".019">.019</span>
+                            </div>
+                            <div class="option">
+                                <span class="gauge-option" data-gauge=".027">.027</span>
+                            </div>
+                            <div class="option">
+                                <span class="gauge-option" data-gauge=".032">.032</span>
+                            </div>
+                            <div class="option">
+                                <span class="gauge-option" data-gauge=".040">.040</span>
+                            </div>
+                            <div class="option">
+                                <span class="gauge-option" data-gauge=".050">.050</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="field-group">
+                        <span class="field-label inline">Color:</span>
+                        <select id="color" class="order-select" style="width: 200px;">
+                            <option value="White" selected>White</option>
+                            <option value="Black">Black</option>
+                            <option value="Gray">Gray</option>
+                            <option value="Red">Red</option>
+                            <option value="Blue">Blue</option>
+                            <option value="Green">Green</option>
+                            <option value="Brown">Brown</option>
+                            <option value="Tan">Tan</option>
+                            <option value="Charcoal">Charcoal</option>
+                            <option value="Burgundy">Burgundy</option>
+                            <option value="Forest Green">Forest Green</option>
+                            <option value="Navy Blue">Navy Blue</option>
+                            <option value="Copper">Copper</option>
+                            <option value="Bronze">Bronze</option>
+                            <option value="Ivory">Ivory</option>
+                            <option value="Cream">Cream</option>
+                            <option value="Slate">Slate</option>
+                            <option value="Stone">Stone</option>
+                            <option value="Clay">Clay</option>
+                            <option value="Custom Color">Custom Color...</option>
+                        </select>
+                    </div>
+                    
+                    <div class="field-group" style="margin-top: 15px;">
+                        <span class="field-label inline">Color Manufacturer:</span>
+                        <input type="text" id="colorManufacturer" class="order-input" placeholder="e.g. Sherwin Williams" style="width: 200px;">
+                    </div>
+                </div>
+                
+                <div class="col narrow">
+                    <div class="field-group">
+                        <span class="field-label">Quantity:</span>
+                        <input type="number" id="quantity" class="order-input" value="1" min="1" style="width: 80px;">
+                    </div>
+                    <div class="field-group">
+                        <span class="field-label">Length (inches):</span>
+                        <span class="data-field" id="totalLength">0.00</span>
+                    </div>
+                    <div class="field-group">
+                        <span class="field-label">Total Material Usage (inches):</span>
+                        <span class="data-field" id="materialUsage">0.00</span>
+                    </div>
+                    <div class="field-group">
+                        <input type="checkbox" id="hasRibs" style="margin-right: 8px;">
+                        <span class="field-label inline">Include Ribs</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Profile Drawing Section -->
+        <div class="profile-section">
+            <div class="field-group">
+                <span class="field-label">Profile Name:</span>
+                <input type="text" id="profileName" class="order-input full" value="Custom Profile" placeholder="Profile Description" required>
+            </div>
+            
+            <div class="drawing-area">
+                <div class="canvas-container" id="canvasContainer">
+                    <svg id="canvas" class="drawing-canvas" 
+                         style="cursor: crosshair; background: radial-gradient(circle, #e8e8e8 1px, transparent 1px); background-size: 20px 20px;">
+                        <g id="grid"></g>
+                        <g id="lines"></g>
+                        <g id="points"></g>
+                        <g id="labels"></g>
+                    </svg>
+                    <div id="mode" class="mode-display">Click on the canvas to start drawing your profile</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Control Buttons and Settings -->
+        <div class="controls-section">
+            <div class="control-row">
+                <div class="side-indicator">
+                    <label class="side-toggle-label" for="sideToggle">
+                        <span>Colored Side:</span>
+                        <div class="side-toggle">
+                            <input type="checkbox" id="sideToggle" onchange="toggleCoatedSide()">
+                            <div class="side-toggle-slider">
+                                <span class="side-label left">A</span>
+                                <span class="side-label right">B</span>
+                            </div>
+                        </div>
+                    </label>
+                    <div id="hashSideInfo" class="hash-info">Hash side = Color side</div>
+                </div>
+                
+                <div class="mode-controls">
+                    <div class="mode-toggle">
+                        <button class="mode-btn active" onclick="setMode('create')" id="createModeBtn">Create</button>
+                        <button class="mode-btn" onclick="setMode('edit')" id="editModeBtn">Edit</button>
+                    </div>
+                </div>
+                
+                <div class="action-buttons">
+                    <button class="btn btn-warning" onclick="undoLastAction()" id="undoBtn">Undo</button>
+                    <button class="btn btn-danger" onclick="clearCanvas()">Clear Profile</button>
+                    <button class="btn btn-primary" onclick="forcePrint()">Print</button>
+                </div>
+            </div>
+            
+            <div class="zoom-control">
+                <label for="zoomSlider">Zoom:</label>
+                <input type="range" id="zoomSlider" min="0.75" max="3" step="0.25" value="1" oninput="handleZoomSlider(this.value)">
+                <span id="zoomValue">100%</span>
+            </div>
+        </div>
     <script>
     // --- PRINT SHEET SHOW/HIDE AND PRINT LOGIC ---
     function showPrintSheet() {
@@ -1578,6 +2031,22 @@ function loadHtml2Canvas() {
         // Zoom system functions
         function handleZoomSlider(value) {
             zoomLevel = parseFloat(value);
+            
+            // Apply boundary constraints when zoom changes
+            const viewportWidth = canvas.clientWidth;
+            const viewportHeight = canvas.clientHeight;
+            const workingAreaWidth = (12 * baseScale) * zoomLevel; // 12 inches * scale * zoom
+            const workingAreaHeight = (16 * baseScale) * zoomLevel; // 16 inches * scale * zoom
+            const margin = 50 * zoomLevel; // Scale margin with zoom
+            
+            const minPanX = Math.min(0, viewportWidth - workingAreaWidth - margin);
+            const maxPanX = margin;
+            const minPanY = Math.min(0, viewportHeight - workingAreaHeight - margin);
+            const maxPanY = margin;
+            
+            panOffset.x = Math.max(minPanX, Math.min(maxPanX, panOffset.x));
+            panOffset.y = Math.max(minPanY, Math.min(maxPanY, panOffset.y));
+            
             applyZoom();
             updateZoomDisplay();
         }
@@ -1592,13 +2061,28 @@ function loadHtml2Canvas() {
             
             // Calculate zoom change
             const zoomChange = event.deltaY > 0 ? 0.9 : 1.1;
-            const newZoom = Math.max(0.25, Math.min(3, zoomLevel * zoomChange));
+            const newZoom = Math.max(0.75, Math.min(3, zoomLevel * zoomChange));
             
             if (newZoom !== zoomLevel) {
                 // Calculate pan adjustment to zoom towards mouse cursor
                 const zoomRatio = newZoom / zoomLevel;
-                panOffset.x = mouseX - (mouseX - panOffset.x) * zoomRatio;
-                panOffset.y = mouseY - (mouseY - panOffset.y) * zoomRatio;
+                const newPanX = mouseX - (mouseX - panOffset.x) * zoomRatio;
+                const newPanY = mouseY - (mouseY - panOffset.y) * zoomRatio;
+                
+                // Apply boundary constraints
+                const viewportWidth = canvas.clientWidth;
+                const viewportHeight = canvas.clientHeight;
+                const workingAreaWidth = (12 * baseScale) * newZoom; // 12 inches * scale * zoom
+                const workingAreaHeight = (16 * baseScale) * newZoom; // 16 inches * scale * zoom
+                const margin = 50 * newZoom; // Scale margin with zoom
+                
+                const minPanX = Math.min(0, viewportWidth - workingAreaWidth - margin);
+                const maxPanX = margin;
+                const minPanY = Math.min(0, viewportHeight - workingAreaHeight - margin);
+                const maxPanY = margin;
+                
+                panOffset.x = Math.max(minPanX, Math.min(maxPanX, newPanX));
+                panOffset.y = Math.max(minPanY, Math.min(maxPanY, newPanY));
                 
                 zoomLevel = newZoom;
                 applyZoom();
@@ -1726,8 +2210,27 @@ function loadHtml2Canvas() {
                 const deltaX = event.clientX - lastPanPoint.x;
                 const deltaY = event.clientY - lastPanPoint.y;
                 
-                panOffset.x += deltaX;
-                panOffset.y += deltaY;
+                // Calculate new pan offset
+                const newPanX = panOffset.x + deltaX;
+                const newPanY = panOffset.y + deltaY;
+                
+                // Get current viewport dimensions
+                const viewportWidth = canvas.clientWidth;
+                const viewportHeight = canvas.clientHeight;
+                
+                // Calculate the working area dimensions at current zoom
+                const workingAreaWidth = (12 * baseScale) * zoomLevel; // 12 inches * scale * zoom
+                const workingAreaHeight = (16 * baseScale) * zoomLevel; // 16 inches * scale * zoom
+                const margin = 50 * zoomLevel; // Scale margin with zoom
+                
+                // Apply boundaries - prevent panning beyond working area edges
+                const minPanX = Math.min(0, viewportWidth - workingAreaWidth - margin);
+                const maxPanX = margin;
+                const minPanY = Math.min(0, viewportHeight - workingAreaHeight - margin);
+                const maxPanY = margin;
+                
+                panOffset.x = Math.max(minPanX, Math.min(maxPanX, newPanX));
+                panOffset.y = Math.max(minPanY, Math.min(maxPanY, newPanY));
                 
                 lastPanPoint = { x: event.clientX, y: event.clientY };
                 applyZoom();
@@ -2124,58 +2627,7 @@ function loadHtml2Canvas() {
                         .hem-modal-actions button:hover {
                             background: #2d3338;
                         }
-                        .toggle-switch {
-                            display: inline-block;
-                            margin-left: 10px;
-                        }
-                        .toggle-switch input[type="checkbox"] {
-                            display: none;
-                        }
-                        .toggle-label {
-                            display: flex;
-                            align-items: center;
-                            background: #e0e0e0;
-                            border-radius: 20px;
-                            padding: 2px;
-                            cursor: pointer;
-                            position: relative;
-                            width: 80px;
-                            height: 32px;
-                        }
-                        .toggle-option {
-                            flex: 1;
-                            text-align: center;
-                            font-weight: bold;
-                            font-size: 14px;
-                            z-index: 2;
-                            transition: color 0.3s;
-                        }
-                        .toggle-a {
-                            color: #fff;
-                        }
-                        .toggle-b {
-                            color: #666;
-                        }
-                        .toggle-slider {
-                            position: absolute;
-                            top: 2px;
-                            left: 2px;
-                            width: 36px;
-                            height: 28px;
-                            background: #3498db;
-                            border-radius: 16px;
-                            transition: transform 0.3s;
-                            z-index: 1;
-                        }
-                        .toggle-switch input:checked + .toggle-label .toggle-slider {
-                            transform: translateX(40px);
-                        }
-                        .toggle-switch input:checked + .toggle-label .toggle-a {
-                            color: #666;
-                        }
-                        .toggle-switch input:checked + .toggle-label .toggle-b {
-                            color: #fff;
-                        }
+
                     `;
                     document.head.appendChild(style);
                 }
@@ -2258,14 +2710,14 @@ function loadHtml2Canvas() {
                                 </label>
                             </div>
                             <div style="margin-bottom:12px;">
-                                <label>Side: 
-                                    <div class="toggle-switch">
+                                <label class="hem-toggle-label" for="hemSideToggle">
+                                    <span>Side:</span>
+                                    <div class="hem-toggle">
                                         <input type="checkbox" id="hemSideToggle" ${hemData.side === 'flipped' ? 'checked' : ''}>
-                                        <label for="hemSideToggle" class="toggle-label">
-                                            <span class="toggle-option toggle-a">A</span>
-                                            <span class="toggle-slider"></span>
-                                            <span class="toggle-option toggle-b">B</span>
-                                        </label>
+                                        <div class="hem-toggle-slider">
+                                            <span class="hem-label left">A</span>
+                                            <span class="hem-label right">B</span>
+                                        </div>
                                     </div>
                                 </label>
                             </div>
@@ -3308,7 +3760,9 @@ function loadHtml2Canvas() {
         }
 
         function toggleCoatedSide() {
-            coatedSideRight = document.getElementById('sideToggle').checked;
+            const toggle = document.getElementById('sideToggle');
+            coatedSideRight = toggle.checked;
+            console.log('Colored side toggled:', coatedSideRight ? 'Side B' : 'Side A');
             redrawProfile();
             
             const sideText = coatedSideRight ? 'Side B Colored' : 'Side A Colored';
@@ -3580,22 +4034,25 @@ function getHemDirection(prev, curr, next) {
         // Initialize canvas size and calculate scale for 10-inch vertical span
         function resizeCanvas() {
             const container = document.querySelector('.canvas-container');
-            const canvasWidth = container.clientWidth;
-            const canvasHeight = container.clientHeight;
+            const viewportWidth = container.clientWidth;
+            const viewportHeight = container.clientHeight;
             
-            canvas.setAttribute('width', canvasWidth);
-            canvas.setAttribute('height', canvasHeight);
-            
-            // Calculate scale so 10 inches fits top to bottom with padding
+            // Calculate scale so 8 inches fits at 100% zoom with padding
             const padding = 100; // Total padding (50px top + 50px bottom)
-            const availableHeight = canvasHeight - padding;
-            const targetInches = 10;
+            const availableHeight = viewportHeight - padding;
+            const targetInches = 7;
             
-            // Calculate new base scale (pixels per inch)
+            // Calculate base scale (pixels per inch at 100% zoom)
             const newBaseScale = Math.max(availableHeight / targetInches, 10); // Minimum scale of 10
-            
-            // Update base scale and current scale
             baseScale = newBaseScale;
+            
+            // Working area is fixed at 12x16 inches - no need for maxCanvasWidth/Height variables
+            
+            // Set SVG to the current viewport size (what's visible)
+            canvas.setAttribute('width', viewportWidth);
+            canvas.setAttribute('height', viewportHeight);
+            
+            // Update current scale
             scale = baseScale * zoomLevel;
             
             // Update grid size to maintain 1/8 inch spacing
@@ -3604,13 +4061,17 @@ function getHemDirection(prev, curr, next) {
             // Update the canvas background grid
             canvas.style.backgroundSize = `${gridSpacing}px ${gridSpacing}px`;
             
-            console.log(`Canvas resized: ${canvasWidth}x${canvasHeight}, Scale: ${scale.toFixed(1)} px/inch, Grid: ${gridSpacing.toFixed(1)}px`);
+            // Working area boundaries are enforced through pan limits - no visual boundary needed
+            
+            console.log(`Canvas resized: ${viewportWidth}x${viewportHeight}, Working area: ${maxCanvasWidth}x${maxCanvasHeight}, Scale: ${scale.toFixed(1)} px/inch, Grid: ${gridSpacing.toFixed(1)}px`);
             
             // Redraw profile if there are points to reflect the new scale
             if (points.length > 0) {
                 redrawProfile();
             }
         }
+
+
 
         // Close popup when clicking outside
         document.addEventListener('click', function(e) {
@@ -3704,7 +4165,122 @@ function updateGaugeOptions() {
             gaugeSelect.appendChild(option);
         });
     }
+    
+    // Handle the new order sheet gauge selection
+    updateOrderSheetGaugeDisplay();
 }
+
+// Toggle material type with clickable toggle
+function toggleMaterialType() {
+    const slider = document.getElementById('materialToggleSlider');
+    const currentType = slider.classList.contains('aluminum') ? 'aluminum' : 'steel';
+    const newType = currentType === 'steel' ? 'aluminum' : 'steel';
+    console.log('Material type toggled from', currentType, 'to', newType);
+    switchMaterialType(newType);
+}
+
+// Switch material type
+function switchMaterialType(type) {
+    // Update hidden select
+    const metalTypeSelect = document.getElementById('metalType');
+    if (metalTypeSelect) {
+        metalTypeSelect.value = type;
+    }
+    
+    // Update toggle visual state
+    const slider = document.getElementById('materialToggleSlider');
+    if (slider) {
+        if (type === 'aluminum') {
+            slider.classList.add('aluminum');
+        } else {
+            slider.classList.remove('aluminum');
+        }
+    }
+    
+    // Clear current gauge selection
+    document.querySelectorAll('.gauge-option').forEach(option => {
+        option.classList.remove('selected');
+    });
+    
+    // Update gauge options
+    updateGaugeOptions();
+    updateOrderSheetGaugeDisplay();
+    
+    // Set default gauge for the material type
+    if (type === 'steel') {
+        const defaultGauge = document.querySelector('.gauge-option[data-gauge="22"]');
+        if (defaultGauge) {
+            defaultGauge.classList.add('selected');
+            document.getElementById('metalGauge').value = '22';
+        }
+    } else {
+        const defaultGauge = document.querySelector('.gauge-option[data-gauge=".032"]');
+        if (defaultGauge) {
+            defaultGauge.classList.add('selected');
+            document.getElementById('metalGauge').value = '.032';
+        }
+    }
+}
+
+// New gauge selection for order sheet interface
+function updateOrderSheetGaugeDisplay() {
+    const metalType = document.getElementById('metalType')?.value || 'steel';
+    const steelOptions = document.getElementById('steelOptions');
+    const aluminumOptions = document.getElementById('aluminumOptions');
+    
+    if (metalType === 'steel') {
+        if (steelOptions) steelOptions.style.display = 'flex';
+        if (aluminumOptions) aluminumOptions.style.display = 'none';
+    } else {
+        if (steelOptions) steelOptions.style.display = 'none';
+        if (aluminumOptions) aluminumOptions.style.display = 'flex';
+    }
+}
+
+// Handle gauge option clicks
+function selectGauge(gauge) {
+    // Clear all selected gauges
+    document.querySelectorAll('.gauge-option').forEach(option => {
+        option.classList.remove('selected');
+    });
+    
+    // Select the clicked gauge
+    event.target.classList.add('selected');
+    
+    // Update the hidden select element
+    const gaugeSelect = document.getElementById('metalGauge');
+    if (gaugeSelect) {
+        gaugeSelect.value = gauge;
+    }
+}
+
+// Initialize gauge selection on page load
+document.addEventListener('DOMContentLoaded', function() {
+    // Add click handlers to gauge options
+    document.querySelectorAll('.gauge-option').forEach(option => {
+        option.addEventListener('click', function() {
+            selectGauge(this.dataset.gauge);
+        });
+    });
+    
+    // Set initial gauge selection
+    const defaultGauge = document.querySelector('.gauge-option[data-gauge="22"]');
+    if (defaultGauge) {
+        defaultGauge.classList.add('selected');
+    }
+    
+    // Set current date
+    const dateCreatedField = document.getElementById('dateCreated');
+    if (dateCreatedField) {
+        const today = new Date();
+        const dateStr = (today.getMonth() + 1).toString().padStart(2, '0') + '/' + 
+                       today.getDate().toString().padStart(2, '0') + '/' + 
+                       today.getFullYear();
+        dateCreatedField.textContent = dateStr;
+    }
+    
+    updateOrderSheetGaugeDisplay();
+});
 
 // Submit profile request function
 function submitProfileRequest() {
