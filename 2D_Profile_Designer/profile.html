@@ -1093,7 +1093,14 @@
                     <button class="mode-btn active" onclick="setMode('create')" id="createModeBtn">Create</button>
                     <button class="mode-btn" onclick="setMode('edit')" id="editModeBtn">Edit</button>
                 </div>
+                <button class="btn btn-warning" onclick="undoLastAction()" style="font-size: 14px; padding: 8px 12px;" id="undoBtn">Undo</button>
                 <button class="btn btn-danger" onclick="clearCanvas()" style="font-size: 14px; padding: 8px 12px;">Clear All</button>
+            </div>
+            
+            <div style="display: flex; gap: 8px; align-items: center;">
+                <label for="zoomSlider" style="font-size: 12px; font-weight: 600;">Zoom:</label>
+                <input type="range" id="zoomSlider" min="0.25" max="3" step="0.25" value="1" style="flex: 1;" oninput="handleZoomSlider(this.value)">
+                <span id="zoomValue" style="font-size: 12px; font-weight: 600; min-width: 45px;">100%</span>
             </div>
             
             <button class="btn btn-success" onclick="submitProfileRequest()" style="font-size: 14px; padding: 10px 16px;">Submit Profile Request</button>
@@ -1304,7 +1311,7 @@
                     <h4 id="popupTitle">Edit Element</h4>
                     <div class="input-group">
                         <label id="popupLabel">Value:</label>
-                        <input type="number" id="popupInput" step="0.125" placeholder="Enter value">
+                        <input type="number" id="popupInput" step="0.0625" placeholder="Enter value">
                     </div>
                     <div>
                         <button class="btn btn-primary" onclick="applyPopupEdit()">Apply</button>
@@ -1403,6 +1410,18 @@ function loadHtml2Canvas() {
         let scale = 20; // pixels per inch
         let offset = { x: 50, y: 50 };
 
+        // Undo system
+        let undoHistory = [];
+        const MAX_UNDO_HISTORY = 50;
+
+        // Zoom system
+        let zoomLevel = 1.0;
+        let baseScale = 20; // Base pixels per inch (will be set by resizeCanvas)
+        let panOffset = { x: 0, y: 0 };
+        let isPanning = false;
+        let lastPanPoint = { x: 0, y: 0 };
+        let isSpacePressed = false;
+
         // DXF layers
         const LAYERS = {
             PROFILE: 'PROFILE',
@@ -1496,6 +1515,247 @@ function loadHtml2Canvas() {
             return { x: screenX, y: screenY };
         }
 
+        // Undo system functions
+        function saveState(actionType, actionData = {}) {
+            const state = {
+                points: JSON.parse(JSON.stringify(points)), // Deep copy
+                actionType: actionType,
+                actionData: actionData,
+                timestamp: Date.now()
+            };
+            
+            undoHistory.push(state);
+            
+            // Limit history size
+            if (undoHistory.length > MAX_UNDO_HISTORY) {
+                undoHistory.shift();
+            }
+            
+            // Update undo button state
+            updateUndoButton();
+        }
+
+        function undoLastAction() {
+            if (undoHistory.length === 0) {
+                return;
+            }
+            
+            // Get the last state
+            const lastState = undoHistory.pop();
+            
+            // Restore the points array
+            points = JSON.parse(JSON.stringify(lastState.points));
+            
+            // Redraw the profile
+            redrawProfile();
+            
+            // Update undo button state
+            updateUndoButton();
+            
+            console.log(`Undid action: ${lastState.actionType}`);
+        }
+
+        function updateUndoButton() {
+            const undoButton = document.querySelector('button[onclick="undoLastAction()"]');
+            if (undoButton) {
+                undoButton.disabled = undoHistory.length === 0;
+                undoButton.style.opacity = undoHistory.length === 0 ? '0.5' : '1';
+            }
+        }
+
+        // Zoom system functions
+        function handleZoomSlider(value) {
+            zoomLevel = parseFloat(value);
+            applyZoom();
+            updateZoomDisplay();
+        }
+
+        function handleWheelZoom(event) {
+            event.preventDefault();
+            
+            // Get mouse position relative to canvas
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = event.clientX - rect.left;
+            const mouseY = event.clientY - rect.top;
+            
+            // Calculate zoom change
+            const zoomChange = event.deltaY > 0 ? 0.9 : 1.1;
+            const newZoom = Math.max(0.25, Math.min(3, zoomLevel * zoomChange));
+            
+            if (newZoom !== zoomLevel) {
+                // Calculate pan adjustment to zoom towards mouse cursor
+                const zoomRatio = newZoom / zoomLevel;
+                panOffset.x = mouseX - (mouseX - panOffset.x) * zoomRatio;
+                panOffset.y = mouseY - (mouseY - panOffset.y) * zoomRatio;
+                
+                zoomLevel = newZoom;
+                applyZoom();
+                updateZoomDisplay();
+                updateZoomSlider();
+            }
+        }
+
+        function applyZoom() {
+            // Update the scale based on base scale and zoom level
+            scale = baseScale * zoomLevel;
+            
+            // Apply transform to the main canvas groups, preserving top bar
+            const groups = ['grid', 'lines', 'points', 'labels'];
+            groups.forEach(groupId => {
+                const group = document.getElementById(groupId);
+                if (group) {
+                    group.setAttribute('transform', `translate(${panOffset.x}, ${panOffset.y}) scale(${zoomLevel})`);
+                }
+            });
+            
+            // Update grid size
+            const gridSpacing = scale * 0.125;
+            canvas.style.backgroundSize = `${gridSpacing}px ${gridSpacing}px`;
+            
+            // Update any hem info boxes that might be showing
+            updateHemInfoBoxPositions();
+        }
+
+        function updateZoomDisplay() {
+            const zoomValueSpan = document.getElementById('zoomValue');
+            if (zoomValueSpan) {
+                zoomValueSpan.textContent = Math.round(zoomLevel * 100) + '%';
+            }
+        }
+
+        function updateZoomSlider() {
+            const zoomSlider = document.getElementById('zoomSlider');
+            if (zoomSlider) {
+                zoomSlider.value = zoomLevel;
+            }
+        }
+
+        function updateHemInfoBoxPositions() {
+            // Update positions of any visible hem info boxes to account for zoom/pan
+            const hemInfoBoxes = document.querySelectorAll('.hem-info-box');
+            hemInfoBoxes.forEach(box => {
+                const pointIndex = parseInt(box.getAttribute('data-point-index'));
+                if (pointIndex >= 0 && points[pointIndex]) {
+                    const screenPos = dxfToScreen(points[pointIndex]);
+                    box.style.left = screenPos.x + 'px';
+                    box.style.top = screenPos.y + 'px';
+                }
+            });
+        }
+
+        function screenToTransformedCoordinates(screenX, screenY) {
+            // Convert screen coordinates to coordinates in the transformed space
+            // Account for zoom and pan
+            const transformedX = (screenX - panOffset.x) / zoomLevel;
+            const transformedY = (screenY - panOffset.y) / zoomLevel;
+            return { x: transformedX, y: transformedY };
+        }
+
+        // Length measurement utilities
+        function snapToSixteenth(value) {
+            // Snap to nearest 1/16th of an inch
+            return Math.round(value * 16) / 16;
+        }
+
+        function decimalToFraction(decimal) {
+            // Convert decimal inches to fraction string
+            const snapped = snapToSixteenth(decimal);
+            const wholeInches = Math.floor(snapped);
+            const remainder = snapped - wholeInches;
+            
+            if (remainder === 0) {
+                return wholeInches === 0 ? '0' : wholeInches.toString();
+            }
+            
+            // Convert remainder to sixteenths
+            const sixteenths = Math.round(remainder * 16);
+            
+            // Reduce fraction to lowest terms
+            const gcd = (a, b) => b === 0 ? a : gcd(b, a % b);
+            const divisor = gcd(sixteenths, 16);
+            const numerator = sixteenths / divisor;
+            const denominator = 16 / divisor;
+            
+            const fractionStr = denominator === 1 ? numerator.toString() : `${numerator}/${denominator}`;
+            
+            if (wholeInches === 0) {
+                return fractionStr;
+            } else {
+                return `${wholeInches} ${fractionStr}`;
+            }
+        }
+
+        function formatLength(lengthInInches) {
+            // Format length with snapping and fraction display
+            const snapped = snapToSixteenth(lengthInInches);
+            return decimalToFraction(snapped) + '"';
+        }
+
+        // Test cases for fraction conversion:
+        // 0.5 -> "1/2"
+        // 1.25 -> "1 1/4" 
+        // 0.375 -> "3/8"
+        // 2.0625 -> "2 1/16"
+        // 0.125 -> "1/8"
+
+        function handlePanStart(event) {
+            // Allow panning with right-click OR left-click while space is pressed
+            if (event.button === 2 || (event.button === 0 && isSpacePressed)) {
+                event.preventDefault();
+                isPanning = true;
+                lastPanPoint = { x: event.clientX, y: event.clientY };
+                canvas.style.cursor = 'grabbing';
+            }
+        }
+
+        function handlePanMove(event) {
+            if (isPanning) {
+                event.preventDefault();
+                const deltaX = event.clientX - lastPanPoint.x;
+                const deltaY = event.clientY - lastPanPoint.y;
+                
+                panOffset.x += deltaX;
+                panOffset.y += deltaY;
+                
+                lastPanPoint = { x: event.clientX, y: event.clientY };
+                applyZoom();
+            }
+        }
+
+        function handlePanEnd(event) {
+            if (isPanning) {
+                isPanning = false;
+                // Set cursor based on current state
+                canvas.style.cursor = isSpacePressed ? 'grab' : 'crosshair';
+            }
+        }
+
+        function handleKeyDown(event) {
+            if (event.code === 'Space' && !isSpacePressed) {
+                // Only prevent default if not typing in an input field
+                if (!['INPUT', 'TEXTAREA'].includes(event.target.tagName)) {
+                    event.preventDefault();
+                    isSpacePressed = true;
+                    if (!isPanning) {
+                        canvas.style.cursor = 'grab';
+                    }
+                }
+            }
+        }
+
+        function handleKeyUp(event) {
+            if (event.code === 'Space') {
+                // Only prevent default if not typing in an input field
+                if (!['INPUT', 'TEXTAREA'].includes(event.target.tagName)) {
+                    event.preventDefault();
+                    isSpacePressed = false;
+                    if (!isPanning) {
+                        canvas.style.cursor = 'crosshair';
+                    }
+                }
+            }
+        }
+
         function closeEditPopup() {
             const popup = document.getElementById('editPopup');
             popup.style.display = 'none';
@@ -1514,7 +1774,9 @@ function loadHtml2Canvas() {
             }
             
             if (currentEditElement.type === 'length') {
-                applyLengthEditByIndex(currentEditElement.index, newValue);
+                // Snap length to nearest 1/16th inch
+                const snappedLength = snapToSixteenth(newValue);
+                applyLengthEditByIndex(currentEditElement.index, snappedLength);
             } else if (currentEditElement.type === 'angle') {
                 applyAngleEditByIndex(currentEditElement.index, newValue);
             }
@@ -1535,15 +1797,18 @@ function loadHtml2Canvas() {
             const screenX = e.clientX - rect.left;
             const screenY = e.clientY - rect.top;
             
+            // Transform screen coordinates to account for zoom and pan
+            const transformed = screenToTransformedCoordinates(screenX, screenY);
+            
             // Convert to DXF coordinates for display
-            const dxfCoords = screenToDxf({ x: screenX, y: screenY });
-            document.getElementById('coordinates').textContent = `Mouse: (${dxfCoords.x.toFixed(2)}", ${dxfCoords.y.toFixed(2)}")`;
+            const dxfCoords = screenToDxf({ x: transformed.x, y: transformed.y });
+            document.getElementById('coordinates').textContent = `Mouse: (${formatLength(dxfCoords.x).replace('"', '')}, ${formatLength(dxfCoords.y).replace('"', '')})`;
             
             // Handle dragging in edit mode
             if (isDragging && dragPointIndex >= 0) {
                 // Save old position
                 const oldPoint = { ...points[dragPointIndex] };
-                points[dragPointIndex] = { ...points[dragPointIndex], x: screenX, y: screenY };
+                points[dragPointIndex] = { ...points[dragPointIndex], x: transformed.x, y: transformed.y };
 
                 // If dragging the hem's previous vertex, update the hem endpoint to keep length and angle fixed
                 if (typeof window.hemVertexIndex !== 'undefined' && dragPointIndex === window.hemVertexIndex) {
@@ -1597,7 +1862,7 @@ function loadHtml2Canvas() {
             
             // Show preview line when drawing
             if (isDrawing && points.length > 0 && !isEditMode) {
-                showPreviewLine(screenX, screenY);
+                showPreviewLine(transformed.x, transformed.y);
             }
         }
 
@@ -1605,8 +1870,13 @@ function loadHtml2Canvas() {
             if (!isEditMode) return;
             
             const rect = canvas.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const y = e.clientY - rect.top;
+            const screenX = e.clientX - rect.left;
+            const screenY = e.clientY - rect.top;
+            
+            // Transform screen coordinates to account for zoom and pan
+            const transformed = screenToTransformedCoordinates(screenX, screenY);
+            const x = transformed.x;
+            const y = transformed.y;
             
             // Check if clicking on a point or hem vertex
             for (let i = 0; i < points.length; i++) {
@@ -1653,14 +1923,18 @@ function loadHtml2Canvas() {
             if (isDragging) return;
             if (isEditMode) return;
             if (!isDrawing) return;
+            if (isSpacePressed) return; // Don't place points when space key is pressed
             // Only block clicks on interactive elements (points, labels, popups)
             const ignoreTags = ['circle', 'rect', 'text', 'foreignObject'];
             if (ignoreTags.includes(e.target.tagName)) return;
             // Accept clicks anywhere inside the SVG
             const rect = canvas.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const y = e.clientY - rect.top;
-            addPoint(x, y);
+            const screenX = e.clientX - rect.left;
+            const screenY = e.clientY - rect.top;
+            
+            // Transform screen coordinates to account for zoom and pan
+            const transformed = screenToTransformedCoordinates(screenX, screenY);
+            addPoint(transformed.x, transformed.y);
         }
 
         function addPoint(x, y) {
@@ -1697,6 +1971,9 @@ function loadHtml2Canvas() {
                     }
                 }
             }
+            
+            // Save state before adding point
+            saveState('Add Point', { x: point.x, y: point.y });
             
             // Add point to UI tracking array
             points.push(point);
@@ -1899,7 +2176,7 @@ function loadHtml2Canvas() {
                     length: "1.0",
                     type: "closed",
                     openAmount: "0.5",
-                    side: "colored"
+                    side: "default"
                 };
                 const hemData = existingHem || defaultHem;
                 modal.innerHTML = `
@@ -1907,7 +2184,7 @@ function loadHtml2Canvas() {
                         <div class="hem-modal-title">Hem Details</div>
                         <div class="hem-modal-body">
                             <div style="margin-bottom:12px;">
-                                <label>Length of Hem? <input id="hemLengthInput" type="number" min="0" step="0.1" style="width:80px;" value="${hemData.length}"/> in</label>
+                                <label>Length of Hem? <input id="hemLengthInput" type="number" min="0" step="0.0625" style="width:80px;" value="${hemData.length}"/> in</label>
                             </div>
                             <div style="margin-bottom:12px;">
                                 <label>Open or Closed Hem? 
@@ -1923,8 +2200,8 @@ function loadHtml2Canvas() {
                             <div style="margin-bottom:12px;">
                                 <label>Side: 
                                     <select id="hemSideSelect">
-                                        <option value="colored" ${hemData.side === 'colored' ? 'selected' : ''}>Colored Side</option>
-                                        <option value="non-colored" ${hemData.side === 'non-colored' ? 'selected' : ''}>Non-Colored Side</option>
+                                        <option value="default" ${hemData.side === 'default' ? 'selected' : ''}>Default</option>
+                                        <option value="flipped" ${hemData.side === 'flipped' ? 'selected' : ''}>Flipped</option>
                                     </select>
                                 </label>
                             </div>
@@ -1960,11 +2237,27 @@ function loadHtml2Canvas() {
                     openAmountRow.style.display = 'none';
                 }
             };
+            
+            // Add real-time flip functionality
+            const hemSideSelect = document.getElementById('hemSideSelect');
+            hemSideSelect.onchange = function() {
+                // Get the point index from the modal
+                const pointIndex = parseInt(modal.getAttribute('data-editing-index'));
+                if (points[pointIndex] && points[pointIndex].hemData) {
+                    // Save state before changing hem side
+                    saveState('Change Hem Side', { pointIndex, newSide: hemSideSelect.value });
+                    // Update the hem data
+                    points[pointIndex].hemData.side = hemSideSelect.value;
+                    // Immediately redraw to show the flip
+                    redrawProfile();
+                }
+            };
             document.getElementById('hemDetailsCancelBtn').onclick = function() {
                 modal.style.display = 'none';
             };
             document.getElementById('hemDetailsOkBtn').onclick = function() {
-                const length = parseFloat(document.getElementById('hemLengthInput').value);
+                const inputLength = parseFloat(document.getElementById('hemLengthInput').value);
+                const length = snapToSixteenth(inputLength); // Snap to nearest 1/16th
                 const type = document.getElementById('hemTypeSelect').value;
                 let openAmount = null;
                 if (type === 'open') {
@@ -1973,6 +2266,9 @@ function loadHtml2Canvas() {
                 modal.style.display = 'none';
 
                 if (!isNaN(length)) {
+                    // Save state before creating/editing hem
+                    saveState('Create/Edit Hem', { pointIndex, length, type, openAmount });
+                    
                     let currentHemIndex;
                     let hemData;
                     // For first point, create the hem data immediately
@@ -2065,7 +2361,7 @@ function loadHtml2Canvas() {
             
             // Info text stacked vertically
             const padding = 10; // Minimum distance from canvas edges
-            const lines = ['HEM', `Length: ${hemInfo.length} in`, `Type: ${hemInfo.type}`, `Side: ${hemInfo.side === 'colored' ? 'Colored' : 'Non-Colored'}`];
+            const lines = ['HEM', `Length: ${formatLength(hemInfo.length).replace('"', ' in')}`, `Type: ${hemInfo.type}`, `Side: ${hemInfo.side === 'default' ? 'Default' : 'Flipped'}`];
             if (hemInfo.type === 'open' && hemInfo.openAmount) {
                 lines.push(`Open: ${hemInfo.openAmount} in`);
             }
@@ -2202,8 +2498,8 @@ function loadHtml2Canvas() {
                 boxGroup.appendChild(text);
             });
             
-            // Add edit button if not the first vertex or if we have 2+ points
-            if ((hemInfo.index > 0 || points.length > 1) && isEditMode) {
+            // Add edit button - always show for hems since they should be editable
+            if (hemInfo.index >= 0) {
                 const editBtn = document.createElementNS('http://www.w3.org/2000/svg', 'text');
                 editBtn.setAttribute('x', bestPos.x + boxWidth + 5);
                 editBtn.setAttribute('y', bestPos.y + 15);
@@ -2395,6 +2691,11 @@ function loadHtml2Canvas() {
                     // Middle hem: use standard geometric logic
                     foldDirection = crossProduct > 0 ? -1 : 1;
                 }
+            }
+            
+            // Apply flip if user selected "flipped" option
+            if (hem.hemData.side === 'flipped') {
+                foldDirection *= -1; // Reverse the fold direction
             }
             
             // Calculate perpendicular direction for fold orientation
@@ -2602,7 +2903,7 @@ function loadHtml2Canvas() {
             }
             lengthLabel.setAttribute('x', midX);
             lengthLabel.setAttribute('y', midY);
-            lengthLabel.textContent = `${length.toFixed(3)}"`;
+            lengthLabel.textContent = formatLength(length);
 
             // Calculate preview angle
             if (points.length > 1) {
@@ -2675,7 +2976,7 @@ function loadHtml2Canvas() {
                 // Move permanent label off the line, above it in white space
                 const midX = (current.x + next.x) / 2;
                 const midY = (current.y + next.y) / 2 - 24;
-                createClickableLabel(midX, midY, `${length.toFixed(3)}"`, 'measurement-label', 'length', i);
+                createClickableLabel(midX, midY, formatLength(length), 'measurement-label', 'length', i);
             }
             
             // Draw angle measurements for interior vertices
@@ -2947,7 +3248,7 @@ function loadHtml2Canvas() {
                         length: 1.0, // Default, user can edit
                         type: 'closed',
                         openAmount: null,
-                        side: 'colored',
+                        side: 'default',
                         index: idx
                     };
                     points[idx].isHem = true;
@@ -3033,7 +3334,7 @@ function loadHtml2Canvas() {
                 totalLength += Math.sqrt(deltaX * deltaX + deltaY * deltaY);
             }
             
-            document.getElementById('totalLength').textContent = `${totalLength.toFixed(3)}"`;
+            document.getElementById('totalLength').textContent = formatLength(totalLength);
         }
 
         function applyLengthEditByIndex(lineIndex, newLength) {
@@ -3140,11 +3441,39 @@ function getHemDirection(prev, curr, next) {
     return direction;
 }
 
-        // Initialize canvas size
+        // Initialize canvas size and calculate scale for 10-inch vertical span
         function resizeCanvas() {
             const container = document.querySelector('.canvas-container');
-            canvas.setAttribute('width', container.clientWidth);
-            canvas.setAttribute('height', container.clientHeight);
+            const canvasWidth = container.clientWidth;
+            const canvasHeight = container.clientHeight;
+            
+            canvas.setAttribute('width', canvasWidth);
+            canvas.setAttribute('height', canvasHeight);
+            
+            // Calculate scale so 10 inches fits top to bottom with padding
+            const padding = 100; // Total padding (50px top + 50px bottom)
+            const availableHeight = canvasHeight - padding;
+            const targetInches = 10;
+            
+            // Calculate new base scale (pixels per inch)
+            const newBaseScale = Math.max(availableHeight / targetInches, 10); // Minimum scale of 10
+            
+            // Update base scale and current scale
+            baseScale = newBaseScale;
+            scale = baseScale * zoomLevel;
+            
+            // Update grid size to maintain 1/8 inch spacing
+            const gridSpacing = scale * 0.125; // 1/8 inch in pixels
+            
+            // Update the canvas background grid
+            canvas.style.backgroundSize = `${gridSpacing}px ${gridSpacing}px`;
+            
+            console.log(`Canvas resized: ${canvasWidth}x${canvasHeight}, Scale: ${scale.toFixed(1)} px/inch, Grid: ${gridSpacing.toFixed(1)}px`);
+            
+            // Redraw profile if there are points to reflect the new scale
+            if (points.length > 0) {
+                redrawProfile();
+            }
         }
 
         // Close popup when clicking outside
@@ -3167,7 +3496,20 @@ function getHemDirection(prev, curr, next) {
         });
 
         window.addEventListener('resize', resizeCanvas);
+        canvas.addEventListener('wheel', handleWheelZoom, { passive: false });
+        canvas.addEventListener('mousedown', handlePanStart);
+        canvas.addEventListener('mousemove', handlePanMove);
+        canvas.addEventListener('mouseup', handlePanEnd);
+        canvas.addEventListener('contextmenu', (e) => e.preventDefault()); // Disable right-click menu
+        
+        // Space key drag functionality
+        document.addEventListener('keydown', handleKeyDown);
+        document.addEventListener('keyup', handleKeyUp);
+        
         resizeCanvas();
+        
+        // Initialize zoom display
+        updateZoomDisplay();
 
         function showLineCrossPopup() {
             let popup = document.getElementById('lineCrossPopup');
@@ -3304,7 +3646,7 @@ SPECIFICATIONS:
 - Color: ${document.getElementById('color').value.trim()}
 - Quantity: ${document.getElementById('quantity').value}
 - Ribs: ${document.getElementById('hasRibs').checked ? 'Yes' : 'No'}
-- Total Length: ${totalLength.toFixed(3)}"
+- Total Length: ${formatLength(totalLength)}
 - Coated Side: ${coatedSideRight ? 'Side B (Right)' : 'Side A (Left)'}
 - Number of Points: ${points.length}
 
