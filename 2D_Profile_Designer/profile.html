@@ -1095,7 +1095,7 @@
                     <button class="mode-btn" onclick="setMode('edit')" id="editModeBtn">Edit</button>
                 </div>
                 <button class="btn btn-warning" onclick="undoLastAction()" style="font-size: 14px; padding: 8px 12px;" id="undoBtn">Undo</button>
-                <button class="btn btn-danger" onclick="clearCanvas()" style="font-size: 14px; padding: 8px 12px;">Clear All</button>
+                <button class="btn btn-danger" onclick="clearCanvas()" style="font-size: 14px; padding: 8px 12px;">Clear Profile</button>
             </div>
             
             <div style="display: flex; gap: 8px; align-items: center;">
@@ -1104,9 +1104,9 @@
                 <span id="zoomValue" style="font-size: 12px; font-weight: 600; min-width: 45px;">100%</span>
             </div>
             
-            <button class="btn btn-success" onclick="submitProfileRequest()" style="font-size: 14px; padding: 10px 16px;">Submit Profile Request</button>
-            <button class="btn btn-primary" onclick="showPrintSheet()" style="font-size: 14px; padding: 10px 16px;">Print/Export Sheet</button>
-            <button class="btn btn-secondary" onclick="forcePrint()" style="font-size: 14px; padding: 10px 16px; background: #2c5f5f; color: white; border: none;">Force Print (Odoo)</button>
+            <!-- <button class="btn btn-success" onclick="submitProfileRequest()" style="font-size: 14px; padding: 10px 16px;">Submit Profile Request</button> -->
+            <!-- <button class="btn btn-primary" onclick="showPrintSheet()" style="font-size: 14px; padding: 10px 16px;">Print/Export Sheet</button> -->
+            <button class="btn btn-secondary" onclick="forcePrint()" style="font-size: 14px; padding: 10px 16px; background: #2c5f5f; color: white; border: none;">Print</button>
         </div>
     </div>
     <script>
@@ -2113,6 +2113,58 @@ function loadHtml2Canvas() {
                         .hem-modal-actions button:hover {
                             background: #2d3338;
                         }
+                        .toggle-switch {
+                            display: inline-block;
+                            margin-left: 10px;
+                        }
+                        .toggle-switch input[type="checkbox"] {
+                            display: none;
+                        }
+                        .toggle-label {
+                            display: flex;
+                            align-items: center;
+                            background: #e0e0e0;
+                            border-radius: 20px;
+                            padding: 2px;
+                            cursor: pointer;
+                            position: relative;
+                            width: 80px;
+                            height: 32px;
+                        }
+                        .toggle-option {
+                            flex: 1;
+                            text-align: center;
+                            font-weight: bold;
+                            font-size: 14px;
+                            z-index: 2;
+                            transition: color 0.3s;
+                        }
+                        .toggle-a {
+                            color: #fff;
+                        }
+                        .toggle-b {
+                            color: #666;
+                        }
+                        .toggle-slider {
+                            position: absolute;
+                            top: 2px;
+                            left: 2px;
+                            width: 36px;
+                            height: 28px;
+                            background: #3498db;
+                            border-radius: 16px;
+                            transition: transform 0.3s;
+                            z-index: 1;
+                        }
+                        .toggle-switch input:checked + .toggle-label .toggle-slider {
+                            transform: translateX(40px);
+                        }
+                        .toggle-switch input:checked + .toggle-label .toggle-a {
+                            color: #666;
+                        }
+                        .toggle-switch input:checked + .toggle-label .toggle-b {
+                            color: #fff;
+                        }
                     `;
                     document.head.appendChild(style);
                 }
@@ -2176,7 +2228,6 @@ function loadHtml2Canvas() {
                 const defaultHem = {
                     length: "1.0",
                     type: "closed",
-                    openAmount: "0.5",
                     side: "default"
                 };
                 const hemData = existingHem || defaultHem;
@@ -2185,7 +2236,7 @@ function loadHtml2Canvas() {
                         <div class="hem-modal-title">Hem Details</div>
                         <div class="hem-modal-body">
                             <div style="margin-bottom:12px;">
-                                <label>Length of Hem? <input id="hemLengthInput" type="number" min="0" step="0.0625" style="width:80px;" value="${hemData.length}"/> in</label>
+                                <label>Length of Hem? <input id="hemLengthInput" type="number" min="0" max="1" step="0.0625" style="width:80px;" value="${hemData.length}"/> in</label>
                             </div>
                             <div style="margin-bottom:12px;">
                                 <label>Open or Closed Hem? 
@@ -2195,15 +2246,16 @@ function loadHtml2Canvas() {
                                     </select>
                                 </label>
                             </div>
-                            <div id="openAmountRow" style="margin-bottom:12px; display:${hemData.type === 'open' ? 'block' : 'none'};">
-                                <label>If open, by how much? <input id="hemOpenAmountInput" type="number" min="0" step="0.1" style="width:80px;" value="${hemData.openAmount || '0.5'}"/> in</label>
-                            </div>
                             <div style="margin-bottom:12px;">
                                 <label>Side: 
-                                    <select id="hemSideSelect">
-                                        <option value="default" ${hemData.side === 'default' ? 'selected' : ''}>Default</option>
-                                        <option value="flipped" ${hemData.side === 'flipped' ? 'selected' : ''}>Flipped</option>
-                                    </select>
+                                    <div class="toggle-switch">
+                                        <input type="checkbox" id="hemSideToggle" ${hemData.side === 'flipped' ? 'checked' : ''}>
+                                        <label for="hemSideToggle" class="toggle-label">
+                                            <span class="toggle-option toggle-a">A</span>
+                                            <span class="toggle-slider"></span>
+                                            <span class="toggle-option toggle-b">B</span>
+                                        </label>
+                                    </div>
                                 </label>
                             </div>
                         </div>
@@ -2228,28 +2280,54 @@ function loadHtml2Canvas() {
             } else {
                 modal.style.display = 'flex';
             }
-            // Show/hide open amount row
-            const hemTypeSelect = document.getElementById('hemTypeSelect');
-            const openAmountRow = document.getElementById('openAmountRow');
-            hemTypeSelect.onchange = function() {
-                if (hemTypeSelect.value === 'open') {
-                    openAmountRow.style.display = '';
-                } else {
-                    openAmountRow.style.display = 'none';
-                }
-            };
+            // No longer need show/hide functionality for open amount
             
             // Add real-time flip functionality
-            const hemSideSelect = document.getElementById('hemSideSelect');
-            hemSideSelect.onchange = function() {
+            const hemSideToggle = document.getElementById('hemSideToggle');
+            hemSideToggle.onchange = function() {
                 // Get the point index from the modal
                 const pointIndex = parseInt(modal.getAttribute('data-editing-index'));
                 if (points[pointIndex] && points[pointIndex].hemData) {
+                    const newSide = hemSideToggle.checked ? 'flipped' : 'default';
                     // Save state before changing hem side
-                    saveState('Change Hem Side', { pointIndex, newSide: hemSideSelect.value });
+                    saveState('Change Hem Side', { pointIndex, newSide });
                     // Update the hem data
-                    points[pointIndex].hemData.side = hemSideSelect.value;
+                    points[pointIndex].hemData.side = newSide;
                     // Immediately redraw to show the flip
+                    redrawProfile();
+                }
+            };
+            
+            // Add real-time length update functionality
+            const hemLengthInput = document.getElementById('hemLengthInput');
+            hemLengthInput.oninput = function() {
+                // Get the point index from the modal
+                const pointIndex = parseInt(modal.getAttribute('data-editing-index'));
+                if (points[pointIndex] && points[pointIndex].hemData) {
+                    const inputLength = parseFloat(this.value);
+                    if (!isNaN(inputLength)) {
+                        const clampedLength = Math.min(Math.max(inputLength, 0), 1); // Clamp between 0 and 1 inch
+                        const newLength = snapToSixteenth(clampedLength); // Snap to nearest 1/16th
+                        // Update the hem data
+                        points[pointIndex].hemData.length = newLength;
+                        // Immediately redraw to show the length change
+                        redrawProfile();
+                    }
+                }
+            };
+            
+            // Add real-time type update functionality
+            const hemTypeSelect = document.getElementById('hemTypeSelect');
+            hemTypeSelect.onchange = function() {
+                // Get the point index from the modal
+                const pointIndex = parseInt(modal.getAttribute('data-editing-index'));
+                if (points[pointIndex] && points[pointIndex].hemData) {
+                    const newType = this.value;
+                    // Save state before changing hem type
+                    saveState('Change Hem Type', { pointIndex, newType });
+                    // Update the hem data
+                    points[pointIndex].hemData.type = newType;
+                    // Immediately redraw to show the type change
                     redrawProfile();
                 }
             };
@@ -2258,29 +2336,26 @@ function loadHtml2Canvas() {
             };
             document.getElementById('hemDetailsOkBtn').onclick = function() {
                 const inputLength = parseFloat(document.getElementById('hemLengthInput').value);
-                const length = snapToSixteenth(inputLength); // Snap to nearest 1/16th
+                const clampedLength = Math.min(Math.max(inputLength, 0), 1); // Clamp between 0 and 1 inch
+                const length = snapToSixteenth(clampedLength); // Snap to nearest 1/16th
                 const type = document.getElementById('hemTypeSelect').value;
-                let openAmount = null;
-                if (type === 'open') {
-                    openAmount = document.getElementById('hemOpenAmountInput').value;
-                }
                 modal.style.display = 'none';
 
                 if (!isNaN(length)) {
                     // Save state before creating/editing hem
-                    saveState('Create/Edit Hem', { pointIndex, length, type, openAmount });
+                    saveState('Create/Edit Hem', { pointIndex, length, type });
                     
                     let currentHemIndex;
                     let hemData;
                     // For first point, create the hem data immediately
                     if (points.length === 1) {
                         currentHemIndex = 0;
-                        const side = document.getElementById('hemSideSelect').value;
+                        const hemSideToggle = document.getElementById('hemSideToggle');
+                        const side = hemSideToggle.checked ? 'flipped' : 'default';
                         points[0].isHem = true;
                         hemData = {
                             length,
                             type,
-                            openAmount,
                             side,
                             index: 0
                         };
@@ -2290,12 +2365,12 @@ function loadHtml2Canvas() {
                         const isEditing = points[pointIndex] && points[pointIndex].hemData;
                         currentHemIndex = isEditing ? pointIndex : points.length - 2;
                         // No line shortening for hems!
-                        const side = document.getElementById('hemSideSelect').value;
+                        const hemSideToggle = document.getElementById('hemSideToggle');
+                        const side = hemSideToggle.checked ? 'flipped' : 'default';
                         points[currentHemIndex].isHem = true;
                         hemData = {
                             length,
                             type,
-                            openAmount,
                             side,
                             index: currentHemIndex
                         };
@@ -2716,9 +2791,12 @@ function loadHtml2Canvas() {
                 y: incomingNorm.x * foldDirection
             };
             
-            // Hem extension length (in screen px) - make it narrower
+            // Hem extension length (in screen px)
             const hemLengthIn = hem.hemData.length || 0.5; // fallback
-            const radius = hemLengthIn * scale * 0.4; // Reduced from full scale to 40% for tighter curve
+            // Set radius based on hem type only - independent of HEM length
+            const radius = hem.hemData.type === 'closed' 
+                ? scale * 0.15 // Fixed small radius for closed hems
+                : scale * 0.2;  // Fixed slightly larger radius for open hems
             
             // Calculate the center of the hemming curve - closer to the line
             const centerX = hem.x + perpendicular.x * radius;
@@ -2748,13 +2826,14 @@ function loadHtml2Canvas() {
             const foldedEdge = document.createElementNS('http://www.w3.org/2000/svg', 'line');
             
             // Calculate the direction of the folded edge - should run parallel to the ORIGINAL line, not perpendicular
-            const extensionLength = scale * 1.5; // Fixed length for visibility
+            // Use the actual HEM length specified by the user
+            const hemLengthPixels = hemLengthIn * scale; // Convert hem length to screen pixels
             
             // The folded edge should extend along the direction that the material came from (backward along incoming line)
-            // Start from the fold end point and extend backward along the incoming line direction
+            // Start from the fold end point and extend backward along the incoming line direction by the actual hem length
             const foldedEdgeStart = {
-                x: endX - incomingNorm.x * extensionLength, // Extend backward along the original line direction
-                y: endY - incomingNorm.y * extensionLength
+                x: endX - incomingNorm.x * hemLengthPixels, // Extend backward by actual hem length
+                y: endY - incomingNorm.y * hemLengthPixels
             };
             const foldedEdgeEnd = {
                 x: endX, // End at the fold point
@@ -2767,7 +2846,6 @@ function loadHtml2Canvas() {
             foldedEdge.setAttribute('y2', foldedEdgeEnd.y);
             foldedEdge.setAttribute('stroke', '#d35400');
             foldedEdge.setAttribute('stroke-width', 2 / zoomLevel); // Scale inversely with zoom
-            foldedEdge.setAttribute('stroke-dasharray', `${4 / zoomLevel},${4 / zoomLevel}`); // Scale dash pattern
             foldedEdge.setAttribute('opacity', '0.8');
             
             linesGroup.appendChild(foldedEdge);
@@ -2794,31 +2872,19 @@ function loadHtml2Canvas() {
         }
 
         function drawPoint(point, index) {
-            // Always draw the vertex unless it is a hem itself
-
-            if (point.isHem) {
-                const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-                const rectSize = 16 / zoomLevel; // Scale inversely with zoom
-                const halfSize = rectSize / 2;
-                rect.setAttribute('x', point.x - halfSize);
-                rect.setAttribute('y', point.y - halfSize);
-                rect.setAttribute('width', rectSize);
-                rect.setAttribute('height', rectSize);
-                rect.setAttribute('class', isEditMode ? 'draggable' : ''); // Remove point class for hems
-                rect.setAttribute('fill', '#ff6b35'); // Always orange for hems
-                rect.setAttribute('stroke', '#fffbe6');
-                rect.setAttribute('stroke-width', 3 / zoomLevel); // Scale inversely with zoom
-                rect.setAttribute('data-index', index);
-                rect.setAttribute('data-type', 'hem');
-                pointsGroup.appendChild(rect);
-                return;
-            }
+            // Draw all vertices as circles, including HEMs
             const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
             circle.setAttribute('cx', point.x);
             circle.setAttribute('cy', point.y);
             circle.setAttribute('r', (isEditMode ? 8 : 6) / zoomLevel); // Scale inversely with zoom
             circle.setAttribute('class', isEditMode ? 'point draggable' : 'point');
             circle.setAttribute('data-index', index);
+            
+            // Add hem data type if this is a hem point
+            if (point.isHem) {
+                circle.setAttribute('data-type', 'hem');
+            }
+            
             pointsGroup.appendChild(circle);
         }
 
@@ -3308,7 +3374,6 @@ function loadHtml2Canvas() {
                     let hemData = {
                         length: 1.0, // Default, user can edit
                         type: 'closed',
-                        openAmount: null,
                         side: 'default',
                         index: idx
                     };
@@ -3373,8 +3438,7 @@ function loadHtml2Canvas() {
             
             closeEditPopup();
             
-            // Clear form fields
-            resetForm();  // Add this line
+            // Only clear the canvas - preserve form fields in top bar
             
             document.getElementById('mode').textContent = 'Click on the canvas to start drawing your profile';
             updateStats();
