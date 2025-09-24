@@ -578,7 +578,7 @@
         }
 
         .status {
-            position: absolute;
+            position: fixed;
             bottom: 0;
             left: 0;
             right: 0;
@@ -588,6 +588,7 @@
             font-size: 14px;
             display: flex;
             justify-content: space-between;
+            z-index: 1000;
         }
 
         .coords {
@@ -1289,8 +1290,8 @@
         initialPrintSheet.style.display = 'none';
     }
     </script>
+        </div>
     </div>
-</div>
         
         <div class="main-content">
             <div class="canvas-container" id="canvasContainer">
@@ -2020,19 +2021,19 @@ function loadHtml2Canvas() {
             updateStats();
             clearPreviewLine();
             
-            // Hem logic: For every new vertex after the second, check if the previous angle is sharp
+            // Hem logic: For every new vertex after the second, check if the previous angle is nearly straight (150-180°)
             if (points.length >= 3) {
                 // For the third vertex, check V2 (index 1) for start hem
                 if (points.length === 3) {
                     const angle = calculateVertexAngle(1);
-                    if (angle < 30) {
+                    if (angle >= 150 && angle <= 180) {
                         showHemPopup(1, true); // Start hem special logic
                     }
                 } else {
                     // For all later vertices, check the previous vertex's angle
                     const prevIdx = points.length - 2;
                     const angle = calculateVertexAngle(prevIdx);
-                    if (angle < 30) {
+                    if (angle >= 150 && angle <= 180) {
                         showHemPopup(prevIdx, false); // End hem or mid hem
                     }
                 }
@@ -2121,7 +2122,7 @@ function loadHtml2Canvas() {
             // Button handlers
             document.getElementById('hemYesBtn').onclick = function() {
                 modal.style.display = 'none';
-                // If this is the start hem (third vertex, angle < 30), remove V1 and L1, then show hem details for new V1
+                // If this is the start hem (third vertex, angle 150-180°), remove V1 and L1, then show hem details for new V1
                 if (isFirstPoint && points.length === 3) {
                     points.splice(0, 1); // Remove V1
                     let firstLineIdx = entities.findIndex(e => e.type === 'LINE');
@@ -2359,12 +2360,11 @@ function loadHtml2Canvas() {
             const oldBox = document.getElementById(`hem-info-box-${hemInfo.index}`);
             if (oldBox) oldBox.remove();
             
-            // Info text stacked vertically
+            // Info text in single line
             const padding = 10; // Minimum distance from canvas edges
-            const lines = ['HEM', `Length: ${formatLength(hemInfo.length).replace('"', ' in')}`, `Type: ${hemInfo.type}`, `Side: ${hemInfo.side === 'default' ? 'Default' : 'Flipped'}`];
-            if (hemInfo.type === 'open' && hemInfo.openAmount) {
-                lines.push(`Open: ${hemInfo.openAmount} in`);
-            }
+            const lengthText = formatLength(hemInfo.length).replace('"', ' in');
+            const typeText = hemInfo.type === 'open' ? 'Open' : 'Closed';
+            const lines = [`HEM ${lengthText} ${typeText}`];
             const fontSize = 13;
             const lineHeight = fontSize + 5;
             const boxHeight = lines.length * lineHeight + padding;
@@ -2482,8 +2482,8 @@ function loadHtml2Canvas() {
             box.setAttribute('height', boxHeight);
             box.setAttribute('fill', '#fffbe6');
             box.setAttribute('stroke', '#ff6b35');
-            box.setAttribute('stroke-width', '2');
-            box.setAttribute('rx', '5');
+            box.setAttribute('stroke-width', 2 / zoomLevel); // Scale inversely with zoom
+            box.setAttribute('rx', 5 / zoomLevel); // Scale corner radius too
             boxGroup.appendChild(box);
 
             // Add text lines
@@ -2643,55 +2643,67 @@ function loadHtml2Canvas() {
             const CROSS_PRODUCT_TOLERANCE = 1e-10;
             const isNearZero = Math.abs(crossProduct) < CROSS_PRODUCT_TOLERANCE;
             
-            // Determine if this is a "left side" or "right side" hem based on the incoming vector direction
-            // For a vertical line: positive x-component = pointing right, negative = pointing left
-            const isRightSide = incomingVector.x > 0;
-            
-            // For near-zero cross products, use fallback logic based on vector directions
-            if (isNearZero) {
-                // Calculate dot product to determine if vectors are parallel (180°) or perpendicular (90°)
-                const dotProduct = incomingVector.x * outgoingVector.x + incomingVector.y * outgoingVector.y;
+            // Store the original fold direction if not already stored
+            if (!hem.hemData.originalFoldDirection) {
+                // Determine if this is a "left side" or "right side" hem based on the incoming vector direction
+                // For a vertical line: positive x-component = pointing right, negative = pointing left
+                const isRightSide = incomingVector.x > 0;
                 
-                if (Math.abs(dotProduct) > 0.9) {
-                    // Nearly parallel lines (180°) - fold based on position and side
+                // Calculate the base fold direction based on geometry
+                let baseFoldDirection;
+                
+                // For near-zero cross products, use fallback logic based on vector directions
+                if (isNearZero) {
+                    // Calculate dot product to determine if vectors are parallel (180°) or perpendicular (90°)
+                    const dotProduct = incomingVector.x * outgoingVector.x + incomingVector.y * outgoingVector.y;
+                    
+                    if (Math.abs(dotProduct) > 0.9) {
+                        // Nearly parallel lines (180°) - fold based on position and side
+                        if (vertexIndex === 0) {
+                            baseFoldDirection = isRightSide ? 1 : -1;
+                        } else {
+                            baseFoldDirection = isRightSide ? -1 : 1;
+                        }
+                    } else {
+                        // Nearly perpendicular lines (90°) - fold based on quadrant
+                        if (incomingVector.y > 0) {  // Incoming vector points up
+                            baseFoldDirection = outgoingVector.x > 0 ? 1 : -1;
+                        } else {  // Incoming vector points down
+                            baseFoldDirection = outgoingVector.x > 0 ? -1 : 1;
+                        }
+                    }
+                } else {
+                    // Normal case with reliable cross product
                     if (vertexIndex === 0) {
-                        foldDirection = isRightSide ? 1 : -1;
+                        // First hem logic based on patterns:
+                        // - Right side first hems: work with current logic
+                        // - Left side first hems: need inverted logic
+                        if (isRightSide) {
+                            baseFoldDirection = crossProduct > 0 ? -1 : 1;  // Original logic works
+                        } else {
+                            baseFoldDirection = crossProduct > 0 ? 1 : -1;  // Inverted for left side
+                        }
+                    } else if (vertexIndex === points.length - 1) {
+                        // Last/Second hem logic based on patterns:
+                        // - Left side second hems: work with current logic  
+                        // - Right side second hems: need inverted logic
+                        if (isRightSide) {
+                            baseFoldDirection = crossProduct > 0 ? -1 : 1;  // Inverted for right side
+                        } else {
+                            baseFoldDirection = crossProduct > 0 ? 1 : -1;  // Original logic works
+                        }
                     } else {
-                        foldDirection = isRightSide ? -1 : 1;
-                    }
-                } else {
-                    // Nearly perpendicular lines (90°) - fold based on quadrant
-                    if (incomingVector.y > 0) {  // Incoming vector points up
-                        foldDirection = outgoingVector.x > 0 ? 1 : -1;
-                    } else {  // Incoming vector points down
-                        foldDirection = outgoingVector.x > 0 ? -1 : 1;
+                        // Middle hem: use standard geometric logic
+                        baseFoldDirection = crossProduct > 0 ? -1 : 1;
                     }
                 }
-            } else {
-                // Normal case with reliable cross product
-                if (vertexIndex === 0) {
-                    // First hem logic based on patterns:
-                    // - Right side first hems: work with current logic
-                    // - Left side first hems: need inverted logic
-                    if (isRightSide) {
-                        foldDirection = crossProduct > 0 ? -1 : 1;  // Original logic works
-                    } else {
-                        foldDirection = crossProduct > 0 ? 1 : -1;  // Inverted for left side
-                    }
-                } else if (vertexIndex === points.length - 1) {
-                    // Last/Second hem logic based on patterns:
-                    // - Left side second hems: work with current logic  
-                    // - Right side second hems: need inverted logic
-                    if (isRightSide) {
-                        foldDirection = crossProduct > 0 ? -1 : 1;  // Inverted for right side
-                    } else {
-                        foldDirection = crossProduct > 0 ? 1 : -1;  // Original logic works
-                    }
-                } else {
-                    // Middle hem: use standard geometric logic
-                    foldDirection = crossProduct > 0 ? -1 : 1;
-                }
+                
+                // Store the original fold direction for consistency during dragging
+                hem.hemData.originalFoldDirection = baseFoldDirection;
             }
+            
+            // Use the stored original fold direction
+            foldDirection = hem.hemData.originalFoldDirection;
             
             // Apply flip if user selected "flipped" option
             if (hem.hemData.side === 'flipped') {
@@ -2726,7 +2738,7 @@ function loadHtml2Canvas() {
             
             hemCurve.setAttribute('d', pathData);
             hemCurve.setAttribute('stroke', '#e67e22');
-            hemCurve.setAttribute('stroke-width', '3');
+            hemCurve.setAttribute('stroke-width', 3 / zoomLevel); // Scale inversely with zoom
             hemCurve.setAttribute('fill', 'none');
             hemCurve.setAttribute('stroke-linecap', 'round');
             
@@ -2754,8 +2766,8 @@ function loadHtml2Canvas() {
             foldedEdge.setAttribute('x2', foldedEdgeEnd.x);
             foldedEdge.setAttribute('y2', foldedEdgeEnd.y);
             foldedEdge.setAttribute('stroke', '#d35400');
-            foldedEdge.setAttribute('stroke-width', '2');
-            foldedEdge.setAttribute('stroke-dasharray', '4,4');
+            foldedEdge.setAttribute('stroke-width', 2 / zoomLevel); // Scale inversely with zoom
+            foldedEdge.setAttribute('stroke-dasharray', `${4 / zoomLevel},${4 / zoomLevel}`); // Scale dash pattern
             foldedEdge.setAttribute('opacity', '0.8');
             
             linesGroup.appendChild(foldedEdge);
@@ -2764,7 +2776,7 @@ function loadHtml2Canvas() {
             const centerDot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
             centerDot.setAttribute('cx', centerX);
             centerDot.setAttribute('cy', centerY);
-            centerDot.setAttribute('r', '2');
+            centerDot.setAttribute('r', 2 / zoomLevel); // Scale inversely with zoom
             centerDot.setAttribute('fill', '#e67e22');
             centerDot.setAttribute('opacity', '0.6');
             
@@ -2786,14 +2798,16 @@ function loadHtml2Canvas() {
 
             if (point.isHem) {
                 const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-                rect.setAttribute('x', point.x - 8);
-                rect.setAttribute('y', point.y - 8);
-                rect.setAttribute('width', 16);
-                rect.setAttribute('height', 16);
+                const rectSize = 16 / zoomLevel; // Scale inversely with zoom
+                const halfSize = rectSize / 2;
+                rect.setAttribute('x', point.x - halfSize);
+                rect.setAttribute('y', point.y - halfSize);
+                rect.setAttribute('width', rectSize);
+                rect.setAttribute('height', rectSize);
                 rect.setAttribute('class', isEditMode ? 'draggable' : ''); // Remove point class for hems
                 rect.setAttribute('fill', '#ff6b35'); // Always orange for hems
                 rect.setAttribute('stroke', '#fffbe6');
-                rect.setAttribute('stroke-width', '3');
+                rect.setAttribute('stroke-width', 3 / zoomLevel); // Scale inversely with zoom
                 rect.setAttribute('data-index', index);
                 rect.setAttribute('data-type', 'hem');
                 pointsGroup.appendChild(rect);
@@ -2802,7 +2816,7 @@ function loadHtml2Canvas() {
             const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
             circle.setAttribute('cx', point.x);
             circle.setAttribute('cy', point.y);
-            circle.setAttribute('r', isEditMode ? 8 : 6);
+            circle.setAttribute('r', (isEditMode ? 8 : 6) / zoomLevel); // Scale inversely with zoom
             circle.setAttribute('class', isEditMode ? 'point draggable' : 'point');
             circle.setAttribute('data-index', index);
             pointsGroup.appendChild(circle);
@@ -2917,9 +2931,12 @@ function loadHtml2Canvas() {
                 const mag2 = Math.sqrt(vec2.x * vec2.x + vec2.y * vec2.y);
                 let angle = 0;
                 if (mag1 > 0 && mag2 > 0) {
-                    angle = Math.acos(dot / (mag1 * mag2)) * 180 / Math.PI;
+                    const interiorAngle = Math.acos(dot / (mag1 * mag2)) * 180 / Math.PI;
+                    angle = 180 - interiorAngle; // Show supplementary angle
                 }
-                // Place angle label at the previous vertex, above it
+                // Calculate exterior position for angle label
+                const labelPos = calculateExteriorLabelPosition(prev, last, mousePt);
+                
                 let angleLabel = document.getElementById('preview-angle-label');
                 if (!angleLabel) {
                     angleLabel = document.createElementNS('http://www.w3.org/2000/svg', 'text');
@@ -2929,8 +2946,8 @@ function loadHtml2Canvas() {
                     angleLabel.setAttribute('dominant-baseline', 'central');
                     linesGroup.appendChild(angleLabel);
                 }
-                angleLabel.setAttribute('x', last.x);
-                angleLabel.setAttribute('y', last.y - 44);
+                angleLabel.setAttribute('x', labelPos.x);
+                angleLabel.setAttribute('y', labelPos.y);
                 angleLabel.textContent = `${angle.toFixed(1)}°`;
             } else {
                 // Remove angle label if not needed
@@ -2992,7 +3009,10 @@ function loadHtml2Canvas() {
                     const angle = calculateVertexAngle(i);
                     labelText = `${angle.toFixed(1)}°`;
                 }
-                createClickableLabel(current.x + 25, current.y - 25, labelText, 'angle-label', 'angle', i - 1);
+                
+                // Calculate position for supplementary angle label (on exterior side)
+                const exteriorLabelPos = calculateExteriorLabelPosition(prev, current, next);
+                createClickableLabel(exteriorLabelPos.x, exteriorLabelPos.y, labelText, 'angle-label', 'angle', i - 1);
                 // Draw arc for angle (optional, keep as before)
                 if (labelText !== 'HEM') {
                     const angle = calculateVertexAngle(i);
@@ -3165,8 +3185,49 @@ function loadHtml2Canvas() {
             const mag1 = Math.sqrt(vec1.x * vec1.x + vec1.y * vec1.y);
             const mag2 = Math.sqrt(vec2.x * vec2.x + vec2.y * vec2.y);
             
-            let angle = Math.acos(dot / (mag1 * mag2)) * 180 / Math.PI;
-            return angle;
+            let interiorAngle = Math.acos(dot / (mag1 * mag2)) * 180 / Math.PI;
+            // Return supplementary angle (exterior angle)
+            let supplementaryAngle = 180 - interiorAngle;
+            return supplementaryAngle;
+        }
+
+        function calculateExteriorLabelPosition(prev, current, next) {
+            // Calculate vectors from current vertex to adjacent vertices
+            const vec1 = { x: prev.x - current.x, y: prev.y - current.y };
+            const vec2 = { x: next.x - current.x, y: next.y - current.y };
+            
+            // Normalize vectors
+            const mag1 = Math.sqrt(vec1.x * vec1.x + vec1.y * vec1.y);
+            const mag2 = Math.sqrt(vec2.x * vec2.x + vec2.y * vec2.y);
+            
+            const norm1 = { x: vec1.x / mag1, y: vec1.y / mag1 };
+            const norm2 = { x: vec2.x / mag2, y: vec2.y / mag2 };
+            
+            // Calculate bisector direction (average of normalized vectors)
+            let bisector = { x: norm1.x + norm2.x, y: norm1.y + norm2.y };
+            const bisectorMag = Math.sqrt(bisector.x * bisector.x + bisector.y * bisector.y);
+            
+            if (bisectorMag > 0) {
+                bisector.x /= bisectorMag;
+                bisector.y /= bisectorMag;
+            }
+            
+            // Determine if we need to flip the bisector to point to exterior
+            // Cross product to determine turn direction
+            const cross = vec1.x * vec2.y - vec1.y * vec2.x;
+            
+            // If cross product is positive, interior is to the left, so flip bisector
+            if (cross > 0) {
+                bisector.x = -bisector.x;
+                bisector.y = -bisector.y;
+            }
+            
+            // Position label 40 pixels away from vertex along exterior bisector
+            const labelDistance = 40;
+            return {
+                x: current.x + bisector.x * labelDistance,
+                y: current.y + bisector.y * labelDistance
+            };
         }
 
         function toggleCoatedSide() {
