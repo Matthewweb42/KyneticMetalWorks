@@ -976,6 +976,17 @@
             body > *:not(#printSheetSection) {
                 display: none !important;
             }
+            
+            /* Hide placeholder ghost text on print */
+            .data-field:empty::after {
+                display: none !important;
+            }
+            
+            /* Remove dotted grid from profile area for print */
+            .drawing-area {
+                background-image: none !important;
+                background: white !important;
+            }
         }
 
         /* Data insertion helpers */
@@ -2876,7 +2887,7 @@ function loadHtml2Canvas() {
             const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
             circle.setAttribute('cx', point.x);
             circle.setAttribute('cy', point.y);
-            circle.setAttribute('r', (isEditMode ? 8 : 6) / zoomLevel); // Scale inversely with zoom
+            circle.setAttribute('r', isEditMode ? 8 : 6); // Fixed size - no zoom scaling
             circle.setAttribute('class', isEditMode ? 'point draggable' : 'point');
             circle.setAttribute('data-index', index);
             
@@ -4054,7 +4065,7 @@ updateGaugeOptions();
             </div>
             
             <div class="drawing-area">
-                <div class="drawing-overlay">Profile Drawing/Specifications</div>
+                <div class="drawing-overlay"></div>
             </div>
         </div>
         
@@ -4092,15 +4103,15 @@ updateGaugeOptions();
         <div class="bottom-grid">
             <div class="bottom-field">
                 <span class="bottom-label">Shipping Weight:</span>
-                <span class="data-field" data-field="shipping_weight" data-placeholder="0.00 lbs"></span>
+                <span class="data-field" data-field="shipping_weight" ></span>
             </div>
             <div class="bottom-field">
                 <span class="bottom-label">Dimensions:</span>
-                <span class="data-field" data-field="dimensions" data-placeholder="L x W x H"></span>
+                <span class="data-field" data-field="dimensions"></span>
             </div>
             <div class="bottom-field">
                 <span class="bottom-label">Signature:</span>
-                <span class="data-field" data-field="signature" data-placeholder="Sign Here"></span>
+                <span class="data-field" data-field="signature"></span>
             </div>
         </div>
     </div>
