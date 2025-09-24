@@ -1331,6 +1331,18 @@
             color: #999;
             font-style: italic;
         }
+
+        /* Minimal Odoo compatibility fix - only target potential overlay issues */
+        .container {
+            position: relative !important;
+            z-index: 10000 !important;
+        }
+        
+        .canvas-container,
+        .control-panel {
+            position: relative !important;
+            z-index: 10001 !important;
+        }
     </style>
 
 
@@ -1414,14 +1426,14 @@
                             <div class="material-toggle" onclick="toggleMaterialType()">
                                 <div class="material-toggle-slider" id="materialToggleSlider">
                                     <span class="material-label left">Steel</span>
-                                    <span class="material-label right">Aluminum</span>
+                                    <span class="material-label right"></span>
                                 </div>
                             </div>
                         </div>
                     </div>
                     
                     <div class="material-group">
-                        <span class="material-label">Steel</span>
+                        <span class="material-label"></span>
                         <div class="option-group" id="steelOptions">
                             <div class="option">
                                 <span class="gauge-option" data-gauge="22">22</span>
@@ -1442,7 +1454,7 @@
                     </div>
                     
                     <div class="material-group">
-                        <span class="material-label">Al</span>
+                        <span class="material-label"></span>
                         <div class="option-group" id="aluminumOptions" style="display: none;">
                             <div class="option">
                                 <span class="gauge-option" data-gauge=".019">.019</span>
@@ -1574,6 +1586,9 @@
             </div>
         </div>
     <script>
+    // Simple Odoo compatibility check v2.4
+    console.log('Profile Designer v2.4 - Minimal Odoo Fix Applied');
+    
     // --- PRINT SHEET SHOW/HIDE AND PRINT LOGIC ---
     function showPrintSheet() {
         console.log('showPrintSheet called');
