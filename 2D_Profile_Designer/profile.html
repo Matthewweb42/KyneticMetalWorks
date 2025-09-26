@@ -1840,6 +1840,7 @@ function loadHtml2Canvas() {
         let isPanning = false;
         let lastPanPoint = { x: 0, y: 0 };
         let isSpacePressed = false;
+        let hasStartHem = false; // Flag to track if a start hem has been created
 
         // DXF layers
         const LAYERS = {
@@ -2507,8 +2508,8 @@ function loadHtml2Canvas() {
             
             // Hem logic: For every new vertex after the second, check if the previous angle is nearly straight (150-180°)
             if (points.length >= 3) {
-                // For the third vertex, check V2 (index 1) for start hem
-                if (points.length === 3) {
+                // For the third vertex (and no start hem created yet), check V2 (index 1) for start hem
+                if (points.length === 3 && !hasStartHem) {
                     const angle = calculateVertexAngle(1);
                     console.log('DEBUG: Third vertex, angle:', angle);
                     if (angle >= 150 && angle <= 180) {
@@ -2640,6 +2641,7 @@ function loadHtml2Canvas() {
                     
                     // If this is the start hem (third vertex, angle 150-180°), remove V1 and L1, then show hem details for new V1
                 if (isFirstPoint && points.length === 3) {
+                    hasStartHem = true; // Mark that a start hem has been created
                     points.splice(0, 1); // Remove V1
                     let firstLineIdx = entities.findIndex(e => e.type === 'LINE');
                     if (firstLineIdx !== -1) {
@@ -2679,8 +2681,7 @@ function loadHtml2Canvas() {
             
             if (noBtn) {
                 noBtn.onclick = function() {
-
-                    modal.style.display = 'none';
+                    modal.style.setProperty('display', 'none', 'important');
                 };
             }
         }
@@ -4095,6 +4096,7 @@ function loadHtml2Canvas() {
             isEditMode = false;
             isDragging = false;
             dragPointIndex = -1;
+            hasStartHem = false; // Reset start hem flag
             // Clear hem vertex index when starting a new profile
             window.hemVertexIndex = undefined;
             setMode('create');
