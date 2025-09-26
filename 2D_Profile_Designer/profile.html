@@ -1212,8 +1212,8 @@
         }
 
         .process-checkbox {
-            width: 14px;
-            height: 10px;
+            width: 18px;
+            height: 14px;
             border: 1px solid #333;
             position: relative;
         }
@@ -1222,8 +1222,8 @@
             content: '✓';
             position: absolute;
             top: -2px;
-            left: 1px;
-            font-size: 9px;
+            left: 2px;
+            font-size: 12px;
             font-weight: bold;
         }
 
@@ -1238,7 +1238,7 @@
             display: grid;
             grid-template-columns: 1fr 1fr 1fr;
             gap: 6px;
-            margin-top: 2px;
+            margin-top: 12px;
         }
 
         .bottom-field {
@@ -1377,10 +1377,11 @@
             </div>
         </div>
         
-        <!-- Material and Color Section -->
+        <!-- Material Properties and Order Information Section -->
         <div class="section bordered">
             <div class="row">
-                <div class="col wide">
+                <!-- Left Column: Material Properties -->
+                <div class="col">
                     <!-- Hidden selects for compatibility -->
                     <select id="metalType" style="display: none;" onchange="updateGaugeOptions()">
                         <option value="steel" selected>Steel</option>
@@ -1451,7 +1452,7 @@
                     
                     <div class="field-group">
                         <span class="field-label inline">Color:</span>
-                        <select id="color" class="order-select" style="width: 200px;">
+                        <select id="color" class="order-select" style="width: 100%;">
                             <option value="White" selected>White</option>
                             <option value="Black">Black</option>
                             <option value="Gray">Gray</option>
@@ -1477,23 +1478,27 @@
                     
                     <div class="field-group" style="margin-top: 15px;">
                         <span class="field-label inline">Color Manufacturer:</span>
-                        <input type="text" id="colorManufacturer" class="order-input" placeholder="e.g. Sherwin Williams" style="width: 200px;">
+                        <input type="text" id="colorManufacturer" class="order-input" placeholder="e.g. Sherwin Williams" style="width: 100%;">
                     </div>
                 </div>
                 
-                <div class="col narrow">
+                <!-- Right Column: Quantity & Measurements -->
+                <div class="col">
                     <div class="field-group">
                         <span class="field-label">Quantity:</span>
-                        <input type="number" id="quantity" class="order-input" value="1" min="1" style="width: 80px;">
+                        <input type="number" id="quantity" class="order-input" value="1" min="1" style="width: 100px;">
                     </div>
+                    
                     <div class="field-group">
                         <span class="field-label">Length (inches):</span>
-                        <input type="number" id="lengthInput" class="order-input" step="0.01" min="0" placeholder="Enter length" style="width: 100px;">
+                        <input type="number" id="lengthInput" class="order-input" step="0.01" min="0" placeholder="Enter length" style="width: 120px;">
                     </div>
+                    
                     <div class="field-group">
                         <span class="field-label">Total Material Usage (inches):</span>
                         <span class="data-field" id="totalLength">0.00</span>
                     </div>
+                    
                     <div class="field-group">
                         <input type="checkbox" id="hasRibs" style="margin-right: 8px;">
                         <span class="field-label inline">Include Ribs</span>
