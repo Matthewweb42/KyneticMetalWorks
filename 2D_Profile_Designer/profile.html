@@ -1733,11 +1733,18 @@ ${printSheet.outerHTML}
         <h4 id="popupTitle">Edit Element</h4>
         <div class="input-group">
             <label id="popupLabel">Value:</label>
-            <!-- Length input with fraction controls -->
+            <!-- Length input with fraction controls and arrows -->
             <div id="lengthInputs" style="display: none;">
                 <div style="display: flex; align-items: center; gap: 5px;">
                     <input type="number" id="wholeInches" min="0" step="1" style="width: 60px;" placeholder="0"> inches
-                    <input type="number" id="sixteenths" min="0" max="15" step="1" style="width: 50px;" placeholder="0"> / 16
+                    <div style="display: flex; align-items: center; gap: 2px;">
+                        <div id="fractionDisplay" style="min-width: 40px; text-align: center; border: 1px solid #ccc; padding: 2px 4px; background: white;">0</div>
+                        <div style="display: flex; flex-direction: column;">
+                            <button type="button" onclick="adjustFraction(1)" style="font-size: 10px; width: 20px; height: 15px; padding: 0; margin: 0;">▲</button>
+                            <button type="button" onclick="adjustFraction(-1)" style="font-size: 10px; width: 20px; height: 15px; padding: 0; margin: 0;">▼</button>
+                        </div>
+                    </div>
+                    <span>in</span>
                 </div>
             </div>
             <!-- Angle input (decimal) -->
@@ -2238,24 +2245,69 @@ function loadHtml2Canvas() {
             currentEditElement = null;
         }
 
+        // Global variable to track current sixteenths value for line length edit
+        let currentSixteenths = 0;
+
+        function simplifyFraction(numerator, denominator = 16) {
+            if (numerator === 0) return "0";
+            
+            const gcd = (a, b) => {
+                a = Math.abs(a);
+                b = Math.abs(b);
+                while (b !== 0) {
+                    const temp = b;
+                    b = a % b;
+                    a = temp;
+                }
+                return a;
+            };
+            
+            const divisor = gcd(numerator, denominator);
+            const simplifiedNum = numerator / divisor;
+            const simplifiedDen = denominator / divisor;
+            
+            if (simplifiedDen === 1) return simplifiedNum.toString();
+            return `${simplifiedNum}/${simplifiedDen}`;
+        }
+
+        function adjustFraction(direction) {
+            currentSixteenths = Math.max(0, Math.min(15, currentSixteenths + direction));
+            const fractionDisplay = document.getElementById('fractionDisplay');
+            fractionDisplay.textContent = simplifyFraction(currentSixteenths);
+        }
+
+        // Global variable to track current HEM sixteenths value
+        let currentHemSixteenths = 16; // Default 1 inch = 16 sixteenths
+
+        function adjustHemFraction(direction) {
+            currentHemSixteenths = Math.max(1, Math.min(16, currentHemSixteenths + direction));
+            const hemFractionDisplay = document.getElementById('hemFractionDisplay');
+            hemFractionDisplay.textContent = simplifyFraction(currentHemSixteenths);
+            
+            // Update the HEM data in real time
+            const pointIndex = parseInt(document.getElementById('hemDetailsModal').getAttribute('data-editing-index'));
+            if (points[pointIndex] && points[pointIndex].hemData) {
+                points[pointIndex].hemData.length = currentHemSixteenths / 16;
+                redrawProfile();
+            }
+        }
+
         function applyPopupEdit() {
             if (!currentEditElement) return;
             
             if (currentEditElement.type === 'length') {
                 // Get values from fraction inputs
                 const wholeInches = document.getElementById('wholeInches');
-                const sixteenths = document.getElementById('sixteenths');
                 
                 const wholeValue = parseInt(wholeInches.value) || 0;
-                const sixteenthsValue = parseInt(sixteenths.value) || 0;
                 
-                if (wholeValue < 0 || sixteenthsValue < 0 || sixteenthsValue > 15) {
-                    alert('Please enter valid values (whole inches ≥ 0, sixteenths 0-15).');
+                if (wholeValue < 0) {
+                    alert('Please enter valid values (whole inches ≥ 0).');
                     return;
                 }
                 
-                // Convert to decimal inches
-                const newValue = wholeValue + (sixteenthsValue / 16);
+                // Convert to decimal inches using current sixteenths
+                const newValue = wholeValue + (currentSixteenths / 16);
                 applyLengthEditByIndex(currentEditElement.index, newValue);
             } else if (currentEditElement.type === 'angle') {
                 // Get value from decimal input
@@ -2699,22 +2751,22 @@ function loadHtml2Canvas() {
                         addHemArcAtVertex(0);
                     }
                 } else if (pointIndex === points.length - 2) {
-                    // This is the end hem (last possible hem): show modal for second-to-last vertex, then after modal, delete last vertex and last line
-                    showSimpleHemDetailsModal(pointIndex, isFirstPoint, function afterHem() {
-                        points.splice(points.length - 1, 1); // Remove last vertex
-                        // Remove last LINE entity (last line in entities)
-                        let lastLineIdx = -1;
-                        for (let i = entities.length - 1; i >= 0; i--) {
-                            if (entities[i].type === 'LINE') {
-                                lastLineIdx = i;
-                                break;
-                            }
+                    // This is the end hem (last possible hem): delete last vertex and line IMMEDIATELY after confirmation
+                    points.splice(points.length - 1, 1); // Remove last vertex
+                    // Remove last LINE entity (last line in entities)
+                    let lastLineIdx = -1;
+                    for (let i = entities.length - 1; i >= 0; i--) {
+                        if (entities[i].type === 'LINE') {
+                            lastLineIdx = i;
+                            break;
                         }
-                        if (lastLineIdx !== -1) {
-                            entities.splice(lastLineIdx, 1);
-                        }
-                        redrawProfile();
-                    });
+                    }
+                    if (lastLineIdx !== -1) {
+                        entities.splice(lastLineIdx, 1);
+                    }
+                    redrawProfile();
+                    // Now show hem details modal for the second-to-last vertex (which is now the last vertex)
+                    showSimpleHemDetailsModal(pointIndex, isFirstPoint);
                 } else {
                     // For mid-profile hems, just show hem details modal
                     showSimpleHemDetailsModal(pointIndex, isFirstPoint);
@@ -2764,7 +2816,16 @@ function loadHtml2Canvas() {
                         <div class="hem-modal-title">Hem Details</div>
                         <div class="hem-modal-body">
                             <div style="margin-bottom:12px;">
-                                <label>Length of Hem? <input id="hemLengthInput" type="number" min="0" max="1" step="0.0625" style="width:80px;" value="${hemData.length}"/> in</label>
+                                <label>Length of Hem? 
+                                    <div style="display: inline-flex; align-items: center; gap: 5px;">
+                                        <div id="hemFractionDisplay" style="min-width: 40px; text-align: center; border: 1px solid #ccc; padding: 2px 4px; background: white;">1</div>
+                                        <div style="display: flex; flex-direction: column;">
+                                            <button type="button" onclick="adjustHemFraction(1)" style="font-size: 10px; width: 20px; height: 15px; padding: 0; margin: 0;">▲</button>
+                                            <button type="button" onclick="adjustHemFraction(-1)" style="font-size: 10px; width: 20px; height: 15px; padding: 0; margin: 0;">▼</button>
+                                        </div>
+                                        <span>in</span>
+                                    </div>
+                                </label>
                             </div>
                             <div style="margin-bottom:12px;">
                                 <label>Open or Closed Hem? 
@@ -2813,11 +2874,13 @@ function loadHtml2Canvas() {
                 const hemData = points[pointIndex].hemData;
                 
                 // Update the form fields with this HEM's data
-                const hemLengthInput = document.getElementById('hemLengthInput');
+                const hemFractionDisplay = document.getElementById('hemFractionDisplay');
                 const hemTypeSelect = document.getElementById('hemTypeSelect');
                 const hemSideToggle = document.getElementById('hemSideToggle');
                 
-                if (hemLengthInput) hemLengthInput.value = hemData.length;
+                // Set HEM fraction display
+                currentHemSixteenths = Math.round(hemData.length * 16);
+                if (hemFractionDisplay) hemFractionDisplay.textContent = simplifyFraction(currentHemSixteenths);
                 if (hemTypeSelect) hemTypeSelect.value = hemData.type;
                 if (hemSideToggle) hemSideToggle.checked = hemData.side === 'flipped';
                 
@@ -2841,23 +2904,15 @@ function loadHtml2Canvas() {
                 }
             };
             
-            // Add real-time length update functionality
-            const hemLengthInput = document.getElementById('hemLengthInput');
-            hemLengthInput.oninput = function() {
-                // Get the point index from the modal
-                const pointIndex = parseInt(modal.getAttribute('data-editing-index'));
-                if (points[pointIndex] && points[pointIndex].hemData) {
-                    const inputLength = parseFloat(this.value);
-                    if (!isNaN(inputLength)) {
-                        const clampedLength = Math.min(Math.max(inputLength, 0), 1); // Clamp between 0 and 1 inch
-                        const newLength = snapToSixteenth(clampedLength); // Snap to nearest 1/16th
-                        // Update the hem data
-                        points[pointIndex].hemData.length = newLength;
-                        // Immediately redraw to show the length change
-                        redrawProfile();
-                    }
+            // Initialize HEM fraction display
+            const hemFractionDisplay = document.getElementById('hemFractionDisplay');
+            if (hemFractionDisplay) {
+                const existingHem = points[pointIndex] && points[pointIndex].hemData;
+                if (existingHem) {
+                    currentHemSixteenths = Math.round(existingHem.length * 16);
+                    hemFractionDisplay.textContent = simplifyFraction(currentHemSixteenths);
                 }
-            };
+            }
             
             // Add real-time type update functionality
             const hemTypeSelect = document.getElementById('hemTypeSelect');
@@ -2893,16 +2948,15 @@ function loadHtml2Canvas() {
                 redrawProfile(); // Redraw to remove any visual changes
             };
             document.getElementById('hemDetailsOkBtn').onclick = function() {
-                const inputLength = parseFloat(document.getElementById('hemLengthInput').value);
-                const clampedLength = Math.min(Math.max(inputLength, 0), 1); // Clamp between 0 and 1 inch
-                const length = snapToSixteenth(clampedLength); // Snap to nearest 1/16th
+                // Get length from current HEM sixteenths
+                const length = currentHemSixteenths / 16;
                 const type = document.getElementById('hemTypeSelect').value;
                 modal.style.display = 'none';
 
                 // Always use pointIndex as the currentHemIndex since we now create HEM data immediately
                 const currentHemIndex = pointIndex;
 
-                if (!isNaN(length)) {
+                if (length > 0) {
                     // Save state before finalizing hem
                     saveState('Finalize Hem', { pointIndex, length, type });
                     
@@ -3800,7 +3854,7 @@ function loadHtml2Canvas() {
             const input = document.getElementById('popupInput');
             const lengthInputs = document.getElementById('lengthInputs');
             const wholeInches = document.getElementById('wholeInches');
-            const sixteenths = document.getElementById('sixteenths');
+            const fractionDisplay = document.getElementById('fractionDisplay');
             
             currentEditElement = { type: type, index: index };
             
@@ -3851,19 +3905,10 @@ function loadHtml2Canvas() {
                 const remainder = snappedValue - wholeInchesValue;
                 const sixteenthsValue = Math.round(remainder * 16);
                 
-                // Debug logging
-                console.log('Edit popup conversion:', {
-                    currentValue: currentValue,
-                    cleanValue: cleanValue,
-                    decimalValue: decimalValue,
-                    snappedValue: snappedValue,
-                    wholeInchesValue: wholeInchesValue,
-                    remainder: remainder,
-                    sixteenthsValue: sixteenthsValue
-                });
-                
+                // Set global variable and update display
+                currentSixteenths = sixteenthsValue;
                 wholeInches.value = wholeInchesValue;
-                sixteenths.value = sixteenthsValue;
+                fractionDisplay.textContent = simplifyFraction(currentSixteenths);
             } else {
                 title.textContent = `Edit Vertex ${index + 1} Angle`;
                 label.textContent = 'Angle (degrees):';
