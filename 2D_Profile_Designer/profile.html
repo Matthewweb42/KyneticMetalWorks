@@ -2641,6 +2641,44 @@ function loadHtml2Canvas() {
                     
                     // If this is the start hem (third vertex, angle 150-180°), remove V1 and L1, then show hem details for new V1
                 if (isFirstPoint && points.length === 3) {
+                    // Calculate HEM direction BEFORE removing vertices using signed area method
+                    const point1 = points[0];  // start of short segment
+                    const point2 = points[1];  // bend vertex (shared point)
+                    const point3 = points[2];  // end of long segment
+                    
+                    const signedArea = 0.5 * ((point2.x - point1.x) * (point3.y - point1.y) - 
+                                             (point3.x - point1.x) * (point2.y - point1.y));
+                    
+                    // Debug logging for start HEM
+                    console.log('Start HEM Direction Debug - Signed Area Method:');
+                    console.log('Point 1:', point1);
+                    console.log('Point 2 (bend):', point2);
+                    console.log('Point 3:', point3);
+                    console.log('Signed Area:', signedArea);
+                    
+                    // Determine HEM direction based on winding (FLIPPED logic for start HEM)
+                    let startHemDirection;
+                    if (signedArea > 0) {
+                        startHemDirection = -1; // LEFT - Counterclockwise winding (FLIPPED)
+                        console.log('Counterclockwise winding → Start HEM direction: LEFT (flipped)');
+                    } else if (signedArea < 0) {
+                        startHemDirection = 1;  // RIGHT - Clockwise winding (FLIPPED)
+                        console.log('Clockwise winding → Start HEM direction: RIGHT (flipped)');
+                    } else {
+                        startHemDirection = -1; // Default to LEFT
+                        console.log('Collinear points detected → Start HEM default to LEFT');
+                    }
+                    
+                    // Store the direction in the point that will become the new V1 (current points[1])
+                    if (!points[1].hemData) {
+                        points[1].hemData = {
+                            length: 1,        // Default hem length
+                            type: 'closed',     // Default hem type
+                            radius: 0.032       // Default radius
+                        };
+                    }
+                    points[1].hemData.originalFoldDirection = startHemDirection;
+                    
                     hasStartHem = true; // Mark that a start hem has been created
                     points.splice(0, 1); // Remove V1
                     let firstLineIdx = entities.findIndex(e => e.type === 'LINE');
@@ -3310,56 +3348,65 @@ function loadHtml2Canvas() {
             
             // Store the original fold direction if not already stored
             if (!hem.hemData.originalFoldDirection) {
-                // Determine if this is a "left side" or "right side" hem based on the incoming vector direction
-                // For a vertical line: positive x-component = pointing right, negative = pointing left
-                const isRightSide = incomingVector.x > 0;
-                
-                // Calculate the base fold direction based on geometry
+                // HEM Direction Detection Using Signed Area Method
+                // Determine HEM direction based on the winding order of three consecutive vertices
+                console.log('DEBUG: Starting HEM direction calculation for vertex index:', vertexIndex, 'Total points:', points.length);
                 let baseFoldDirection;
                 
-                // For near-zero cross products, use fallback logic based on vector directions
-                if (isNearZero) {
-                    // Calculate dot product to determine if vectors are parallel (180°) or perpendicular (90°)
-                    const dotProduct = incomingVector.x * outgoingVector.x + incomingVector.y * outgoingVector.y;
-                    
-                    if (Math.abs(dotProduct) > 0.9) {
-                        // Nearly parallel lines (180°) - fold based on position and side
-                        if (vertexIndex === 0) {
-                            baseFoldDirection = isRightSide ? 1 : -1;
-                        } else {
-                            baseFoldDirection = isRightSide ? -1 : 1;
-                        }
+                // Step 1: Identify HEM type and get three points
+                let point1, point2, point3;
+                
+                if (vertexIndex <= 2) {
+                    // First HEM (beginning of profile)
+                    // Need at least 3 points for signed area calculation
+                    if (points.length >= 3) {
+                        point1 = points[0];  // start of short segment
+                        point2 = points[1];  // bend vertex (shared point)
+                        point3 = points[2];  // end of long segment
+                        console.log('First HEM: Using points', point1, point2, point3);
                     } else {
-                        // Nearly perpendicular lines (90°) - fold based on quadrant
-                        if (incomingVector.y > 0) {  // Incoming vector points up
-                            baseFoldDirection = outgoingVector.x > 0 ? 1 : -1;
-                        } else {  // Incoming vector points down
-                            baseFoldDirection = outgoingVector.x > 0 ? -1 : 1;
-                        }
+                        // Fallback for insufficient points
+                        console.log('First HEM: Insufficient points (', points.length, '), using default LEFT direction');
+                        baseFoldDirection = -1; // Default to LEFT
                     }
                 } else {
-                    // Normal case with reliable cross product
-                    if (vertexIndex === 0) {
-                        // First hem logic based on patterns:
-                        // - Right side first hems: work with current logic
-                        // - Left side first hems: need inverted logic
-                        if (isRightSide) {
-                            baseFoldDirection = crossProduct > 0 ? -1 : 1;  // Original logic works
-                        } else {
-                            baseFoldDirection = crossProduct > 0 ? 1 : -1;  // Inverted for left side
-                        }
-                    } else if (vertexIndex === points.length - 1) {
-                        // Last/Second hem logic based on patterns:
-                        // - Left side second hems: work with current logic  
-                        // - Right side second hems: need inverted logic
-                        if (isRightSide) {
-                            baseFoldDirection = crossProduct > 0 ? -1 : 1;  // Inverted for right side
-                        } else {
-                            baseFoldDirection = crossProduct > 0 ? 1 : -1;  // Original logic works
-                        }
+                    // Second HEM (end of profile)
+                    const n = points.length;
+                    if (n >= 3) {
+                        point1 = points[n-3]; // start of long segment
+                        point2 = points[n-2]; // bend vertex (shared point)
+                        point3 = points[n-1]; // end of short segment
+                        console.log('Second HEM: Using points', point1, point2, point3);
                     } else {
-                        // Middle hem: use standard geometric logic
-                        baseFoldDirection = crossProduct > 0 ? -1 : 1;
+                        // Fallback for insufficient points
+                        console.log('Second HEM: Insufficient points (', n, '), using default LEFT direction');
+                        baseFoldDirection = -1; // Default to LEFT
+                    }
+                }
+                
+                // Step 2: Calculate signed area (if we have three points)
+                if (point1 && point2 && point3) {
+                    const signedArea = 0.5 * ((point2.x - point1.x) * (point3.y - point1.y) - 
+                                             (point3.x - point1.x) * (point2.y - point1.y));
+                    
+                    // Debug logging
+                    console.log('HEM Direction Debug - Signed Area Method:');
+                    console.log('Point 1:', point1);
+                    console.log('Point 2 (bend):', point2);
+                    console.log('Point 3:', point3);
+                    console.log('Signed Area:', signedArea);
+                    
+                    // Step 3: Determine HEM direction based on winding (flipped from initial logic)
+                    if (signedArea > 0) {
+                        baseFoldDirection = 1;  // RIGHT - Counterclockwise winding
+                        console.log('Counterclockwise winding → HEM direction: RIGHT');
+                    } else if (signedArea < 0) {
+                        baseFoldDirection = -1; // LEFT - Clockwise winding
+                        console.log('Clockwise winding → HEM direction: LEFT');
+                    } else {
+                        // Points are collinear - shouldn't happen with <30° angle
+                        baseFoldDirection = -1; // Default to LEFT
+                        console.log('Collinear points detected → Default to LEFT');
                     }
                 }
                 
