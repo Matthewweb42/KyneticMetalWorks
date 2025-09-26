@@ -484,7 +484,7 @@
             border-radius: 10px;
             padding: 20px;
             box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-            z-index: 1000;
+            z-index: 99999;
             min-width: 250px;
             display: none;
         }
@@ -1556,8 +1556,8 @@
             
             <div class="zoom-control">
                 <label for="zoomSlider">Zoom:</label>
-                <input type="range" id="zoomSlider" min="0.75" max="3" step="0.25" value="1" oninput="handleZoomSlider(this.value)">
-                <span id="zoomValue">100%</span>
+                <input type="range" id="zoomSlider" min="0" max="2" step="0.25" value="1" oninput="handleZoomSlider(this.value)">
+                <span id="zoomValue">150%</span>
             </div>
         </div>
     </div> <!-- End profile-designer wrapper -->
@@ -1728,7 +1728,15 @@ ${printSheet.outerHTML}
         <h4 id="popupTitle">Edit Element</h4>
         <div class="input-group">
             <label id="popupLabel">Value:</label>
-            <input type="number" id="popupInput" step="0.0625" placeholder="Enter value">
+            <!-- Length input with fraction controls -->
+            <div id="lengthInputs" style="display: none;">
+                <div style="display: flex; align-items: center; gap: 5px;">
+                    <input type="number" id="wholeInches" min="0" step="1" style="width: 60px;" placeholder="0"> inches
+                    <input type="number" id="sixteenths" min="0" max="15" step="1" style="width: 50px;" placeholder="0"> / 16
+                </div>
+            </div>
+            <!-- Angle input (decimal) -->
+            <input type="number" id="popupInput" step="0.1" placeholder="Enter value" style="display: none;">
         </div>
         <div>
             <button class="btn btn-primary" onclick="applyPopupEdit()">Apply</button>
@@ -2061,7 +2069,8 @@ function loadHtml2Canvas() {
         function updateZoomDisplay() {
             const zoomValueSpan = document.getElementById('zoomValue');
             if (zoomValueSpan) {
-                zoomValueSpan.textContent = Math.round(zoomLevel * 100) + '%';
+                // Rescale display: internal 1.0 becomes "150%"
+                zoomValueSpan.textContent = Math.round(zoomLevel * 150) + '%';
             }
         }
 
@@ -2226,19 +2235,31 @@ function loadHtml2Canvas() {
         function applyPopupEdit() {
             if (!currentEditElement) return;
             
-            const input = document.getElementById('popupInput');
-            const newValue = parseFloat(input.value);
-            
-            if (isNaN(newValue)) {
-                alert('Please enter a valid number.');
-                return;
-            }
-            
             if (currentEditElement.type === 'length') {
-                // Snap length to nearest 1/16th inch
-                const snappedLength = snapToSixteenth(newValue);
-                applyLengthEditByIndex(currentEditElement.index, snappedLength);
+                // Get values from fraction inputs
+                const wholeInches = document.getElementById('wholeInches');
+                const sixteenths = document.getElementById('sixteenths');
+                
+                const wholeValue = parseInt(wholeInches.value) || 0;
+                const sixteenthsValue = parseInt(sixteenths.value) || 0;
+                
+                if (wholeValue < 0 || sixteenthsValue < 0 || sixteenthsValue > 15) {
+                    alert('Please enter valid values (whole inches ≥ 0, sixteenths 0-15).');
+                    return;
+                }
+                
+                // Convert to decimal inches
+                const newValue = wholeValue + (sixteenthsValue / 16);
+                applyLengthEditByIndex(currentEditElement.index, newValue);
             } else if (currentEditElement.type === 'angle') {
+                // Get value from decimal input
+                const input = document.getElementById('popupInput');
+                const newValue = parseFloat(input.value);
+                
+                if (isNaN(newValue)) {
+                    alert('Please enter a valid angle.');
+                    return;
+                }
                 applyAngleEditByIndex(currentEditElement.index, newValue);
             }
             
@@ -3713,16 +3734,79 @@ function loadHtml2Canvas() {
             const title = document.getElementById('popupTitle');
             const label = document.getElementById('popupLabel');
             const input = document.getElementById('popupInput');
+            const lengthInputs = document.getElementById('lengthInputs');
+            const wholeInches = document.getElementById('wholeInches');
+            const sixteenths = document.getElementById('sixteenths');
             
             currentEditElement = { type: type, index: index };
             
             if (type === 'length') {
                 title.textContent = `Edit Line ${index + 1} Length`;
-                label.textContent = 'Length (inches):';
-                input.value = parseFloat(currentValue.replace('"', '')).toFixed(3);
+                label.textContent = 'Length:';
+                
+                // Show fraction inputs, hide decimal input
+                lengthInputs.style.display = 'block';
+                input.style.display = 'none';
+                
+                // Convert current value to whole inches and sixteenths
+                // Parse fraction string like "3 15/16"" to decimal
+                let decimalValue;
+                const cleanValue = currentValue.replace('"', '').trim();
+                
+                if (cleanValue.includes('/')) {
+                    // Parse fraction format like "3 15/16" or "15/16"
+                    const parts = cleanValue.split(' ');
+                    let wholeNumber = 0;
+                    let fractionPart = '';
+                    
+                    if (parts.length === 2) {
+                        // Format: "3 15/16"
+                        wholeNumber = parseFloat(parts[0]) || 0;
+                        fractionPart = parts[1];
+                    } else {
+                        // Format: "15/16"
+                        fractionPart = parts[0];
+                    }
+                    
+                    // Parse the fraction
+                    if (fractionPart.includes('/')) {
+                        const fractionParts = fractionPart.split('/');
+                        const numerator = parseFloat(fractionParts[0]) || 0;
+                        const denominator = parseFloat(fractionParts[1]) || 1;
+                        decimalValue = wholeNumber + (numerator / denominator);
+                    } else {
+                        decimalValue = wholeNumber;
+                    }
+                } else {
+                    // Simple decimal or whole number
+                    decimalValue = parseFloat(cleanValue) || 0;
+                }
+                
+                const snappedValue = snapToSixteenth(decimalValue);
+                const wholeInchesValue = Math.floor(snappedValue);
+                const remainder = snappedValue - wholeInchesValue;
+                const sixteenthsValue = Math.round(remainder * 16);
+                
+                // Debug logging
+                console.log('Edit popup conversion:', {
+                    currentValue: currentValue,
+                    cleanValue: cleanValue,
+                    decimalValue: decimalValue,
+                    snappedValue: snappedValue,
+                    wholeInchesValue: wholeInchesValue,
+                    remainder: remainder,
+                    sixteenthsValue: sixteenthsValue
+                });
+                
+                wholeInches.value = wholeInchesValue;
+                sixteenths.value = sixteenthsValue;
             } else {
                 title.textContent = `Edit Vertex ${index + 1} Angle`;
                 label.textContent = 'Angle (degrees):';
+                
+                // Show decimal input, hide fraction inputs
+                lengthInputs.style.display = 'none';
+                input.style.display = 'block';
                 input.value = parseFloat(currentValue.replace('°', '')).toFixed(1);
             }
             
