@@ -3393,7 +3393,7 @@ function loadHtml2Canvas() {
             const hemLengthIn = hem.hemData.length || 0.5; // fallback
             // Set radius based on hem type only - independent of HEM length
             const radius = hem.hemData.type === 'closed' 
-                ? scale * 0.15 // Fixed small radius for closed hems
+                ? scale * 0.12 // Fixed small radius for closed hems
                 : scale * 0.2;  // Fixed slightly larger radius for open hems
             
             // Calculate the center of the hemming curve - closer to the line
@@ -4178,9 +4178,14 @@ function loadHtml2Canvas() {
             const deltaY = nextPoint.y - currentPoint.y;
             const lineLength = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
 
+            // Convert the displayed supplementary angle to the interior angle for calculation
+            // newAngle is the supplementary angle the user entered (what they see)
+            // We need the interior angle for the geometry calculation
+            const interiorAngle = 180 - newAngle;
+            
             const prevAngle = Math.atan2(prevPoint.y - currentPoint.y, prevPoint.x - currentPoint.x);
-            // Set the angle directly to newAngle (relative to previous segment)
-            const newAngleRad = prevAngle + (newAngle * Math.PI / 180);
+            // Use the interior angle for the calculation
+            const newAngleRad = prevAngle + (interiorAngle * Math.PI / 180);
 
             // Calculate new coordinates for the next point
             const newX = currentPoint.x + Math.cos(newAngleRad) * lineLength;
