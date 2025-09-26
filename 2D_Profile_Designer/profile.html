@@ -2731,19 +2731,34 @@ function loadHtml2Canvas() {
 
         // Simple modal for hem details
     function showSimpleHemDetailsModal(pointIndex, isFirstPoint = false, afterHemCallback) {
+            // CRITICAL FIX: Create/initialize HEM data immediately when modal opens
+            // This ensures each HEM has its own object from the start
+            if (!points[pointIndex]) {
+                console.error('Point index', pointIndex, 'does not exist');
+                return;
+            }
+            
+            // Create HEM data immediately if it doesn't exist
+            if (!points[pointIndex].hemData) {
+                points[pointIndex].isHem = true;
+                points[pointIndex].hemData = {
+                    length: "1.0",
+                    type: "closed",
+                    side: "default",
+                    index: pointIndex
+                };
+            } else {
+                // Ensure existing HEM data has the correct index
+                points[pointIndex].hemData.index = pointIndex;
+            }
+            
             let modal = document.getElementById('hemDetailsModal');
             if (!modal) {
                 modal = document.createElement('div');
                 modal.id = 'hemDetailsModal';
                 modal.setAttribute('data-editing-index', pointIndex);
-                // Get existing hem data or create default values
-                const existingHem = points[pointIndex] && points[pointIndex].hemData;
-                const defaultHem = {
-                    length: "1.0",
-                    type: "closed",
-                    side: "default"
-                };
-                const hemData = existingHem || defaultHem;
+                // Use the now-guaranteed hem data
+                const hemData = points[pointIndex].hemData;
                 modal.innerHTML = `
                     <div class="hem-modal-content">
                         <div class="hem-modal-title">Hem Details</div>
@@ -2791,6 +2806,21 @@ function loadHtml2Canvas() {
                 modal.style.zIndex = '9999999';
                 document.body.appendChild(modal);
             } else {
+                // CRITICAL FIX: Update the data-editing-index for the reused modal
+                modal.setAttribute('data-editing-index', pointIndex);
+                
+                // Use the now-guaranteed hem data (created above)
+                const hemData = points[pointIndex].hemData;
+                
+                // Update the form fields with this HEM's data
+                const hemLengthInput = document.getElementById('hemLengthInput');
+                const hemTypeSelect = document.getElementById('hemTypeSelect');
+                const hemSideToggle = document.getElementById('hemSideToggle');
+                
+                if (hemLengthInput) hemLengthInput.value = hemData.length;
+                if (hemTypeSelect) hemTypeSelect.value = hemData.type;
+                if (hemSideToggle) hemSideToggle.checked = hemData.side === 'flipped';
+                
                 modal.style.display = 'flex';
             }
             // No longer need show/hide functionality for open amount
@@ -2845,7 +2875,22 @@ function loadHtml2Canvas() {
                 }
             };
             document.getElementById('hemDetailsCancelBtn').onclick = function() {
+                // Get the point index from the modal
+                const pointIndex = parseInt(modal.getAttribute('data-editing-index'));
+                
+                // If this was a new HEM (not editing existing), clean up the HEM data
+                // We can detect this by checking if the HEM data has default values
+                if (points[pointIndex] && points[pointIndex].hemData) {
+                    const hemData = points[pointIndex].hemData;
+                    // If it has default values, it was just created, so remove it
+                    if (hemData.length === "1.0" && hemData.type === "closed" && hemData.side === "default") {
+                        delete points[pointIndex].hemData;
+                        points[pointIndex].isHem = false;
+                    }
+                }
+                
                 modal.style.display = 'none';
+                redrawProfile(); // Redraw to remove any visual changes
             };
             document.getElementById('hemDetailsOkBtn').onclick = function() {
                 const inputLength = parseFloat(document.getElementById('hemLengthInput').value);
@@ -2854,51 +2899,24 @@ function loadHtml2Canvas() {
                 const type = document.getElementById('hemTypeSelect').value;
                 modal.style.display = 'none';
 
+                // Always use pointIndex as the currentHemIndex since we now create HEM data immediately
+                const currentHemIndex = pointIndex;
+
                 if (!isNaN(length)) {
-                    // Save state before creating/editing hem
-                    saveState('Create/Edit Hem', { pointIndex, length, type });
+                    // Save state before finalizing hem
+                    saveState('Finalize Hem', { pointIndex, length, type });
                     
-                    let currentHemIndex;
-                    let hemData;
-                    // For first point, create the hem data immediately
-                    if (points.length === 1) {
-                        currentHemIndex = 0;
-                        const hemSideToggle = document.getElementById('hemSideToggle');
-                        const side = hemSideToggle.checked ? 'flipped' : 'default';
-                        points[0].isHem = true;
-                        
-                        // Preserve existing hem orientation data if it exists
-                        const existingData = points[0].hemData || {};
-                        hemData = {
-                            length,
-                            type,
-                            side,
-                            index: 0,
-                            userSideA: existingData.userSideA,
-                            originalFoldDirection: existingData.originalFoldDirection
-                        };
-                        points[0].hemData = hemData;
-                    } else {
-                        // Handle existing points
-                        const isEditing = points[pointIndex] && points[pointIndex].hemData;
-                        currentHemIndex = isEditing ? pointIndex : points.length - 2;
-                        // No line shortening for hems!
-                        const hemSideToggle = document.getElementById('hemSideToggle');
-                        const side = hemSideToggle.checked ? 'flipped' : 'default';
-                        points[currentHemIndex].isHem = true;
-                        
-                        // Preserve existing hem orientation data if it exists
-                        const existingData = points[currentHemIndex].hemData || {};
-                        hemData = {
-                            length,
-                            type,
-                            side,
-                            index: currentHemIndex,
-                            userSideA: existingData.userSideA,
-                            originalFoldDirection: existingData.originalFoldDirection
-                        };
-                        points[currentHemIndex].hemData = hemData;
-                    }
+                    // HEM data already exists (created when modal opened), just update it
+                    const hemSideToggle = document.getElementById('hemSideToggle');
+                    const side = hemSideToggle.checked ? 'flipped' : 'default';
+                    
+                    // Update the existing HEM data with final values
+                    const hemData = points[pointIndex].hemData;
+                    hemData.length = length;
+                    hemData.type = type;
+                    hemData.side = side;
+                    hemData.index = pointIndex; // CRITICAL: Ensure index is set
+                    
                     // Create DXF HEM entity
                     entities.push({
                         type: 'POINT',
@@ -2913,16 +2931,9 @@ function loadHtml2Canvas() {
                     // Update most recent hem for compatibility
                     window.hemVertexIndex = currentHemIndex;
                     window.hemInfo = hemData;
-                    // Only enter edit mode if not the first point or if we have 2+ points
-                    if (currentHemIndex > 0 || points.length > 1) {
-                        if (currentHemIndex > 0) {
-                            addHemArcAtVertex(currentHemIndex);
-                        }
-                        showHemInfoBox(window.hemInfo);
-                    }
-                } else {
                 }
-                // Redraw profile to update the SVG
+                
+                // Redraw profile to update the SVG (this will handle showing HEM info boxes)
                 redrawProfile();
                 // If a callback is provided (for end hem), call it after hem creation
                 if (typeof afterHemCallback === 'function') {
@@ -3968,6 +3979,7 @@ function loadHtml2Canvas() {
             let interiorAngle = Math.acos(dot / (mag1 * mag2)) * 180 / Math.PI;
             // Return supplementary angle (exterior angle)
             let supplementaryAngle = 180 - interiorAngle;
+            
             return supplementaryAngle;
         }
 
@@ -4237,9 +4249,28 @@ function loadHtml2Canvas() {
             // We need the interior angle for the geometry calculation
             const interiorAngle = 180 - newAngle;
             
-            const prevAngle = Math.atan2(prevPoint.y - currentPoint.y, prevPoint.x - currentPoint.x);
-            // Use the interior angle for the calculation
-            const newAngleRad = prevAngle + (interiorAngle * Math.PI / 180);
+            // Calculate both rotation options and choose the one that keeps
+            // the next point on the same side of the current line
+            
+            // Get the angle of the incoming line (from prev to current)
+            const incomingAngle = Math.atan2(currentPoint.y - prevPoint.y, currentPoint.x - prevPoint.x);
+            
+            // Try both rotation directions
+            const ccwAngle = incomingAngle + (interiorAngle * Math.PI / 180);  // counter-clockwise
+            const cwAngle = incomingAngle - (interiorAngle * Math.PI / 180);   // clockwise
+            
+            // Calculate potential new positions for both options
+            const ccwX = currentPoint.x + Math.cos(ccwAngle) * lineLength;
+            const ccwY = currentPoint.y + Math.sin(ccwAngle) * lineLength;
+            const cwX = currentPoint.x + Math.cos(cwAngle) * lineLength;
+            const cwY = currentPoint.y + Math.sin(cwAngle) * lineLength;
+            
+            // Choose the option that results in a point closer to the current next point
+            // This preserves the "side" the line is on
+            const ccwDistance = Math.sqrt((ccwX - nextPoint.x)**2 + (ccwY - nextPoint.y)**2);
+            const cwDistance = Math.sqrt((cwX - nextPoint.x)**2 + (cwY - nextPoint.y)**2);
+            
+            const newAngleRad = ccwDistance < cwDistance ? ccwAngle : cwAngle;
 
             // Calculate new coordinates for the next point
             const newX = currentPoint.x + Math.cos(newAngleRad) * lineLength;
