@@ -1371,7 +1371,7 @@
                 <div class="col">
                     <div class="field-group">
                         <span class="field-label inline">Job:</span>
-                        <input type="text" id="jobName" class="order-input" placeholder="Job Number">
+                        <input type="text" id="jobName" class="order-input" placeholder="Job Name">
                     </div>
                 </div>
             </div>
@@ -1556,6 +1556,7 @@
                     <button class="btn btn-warning" onclick="undoLastAction()" id="undoBtn">Undo</button>
                     <button class="btn btn-danger" onclick="clearCanvas()">Clear Profile</button>
                     <button class="btn btn-primary" onclick="forcePrint()">Print</button>
+                    <button class="btn btn-success" onclick="sendToKynetic()" id="sendToKyneticBtn" style="background: #27ae60 !important; color: white !important; border: 1px solid #27ae60 !important;">Send to Kynetic</button>
                 </div>
             </div>
             
@@ -4824,6 +4825,122 @@ function resetForm() {
 
 // Initialize gauge options on page load
 updateGaugeOptions();
+
+// --- ODOO INTEGRATION ---
+async function sendToKynetic() {
+    // Get button and original text first
+    const button = document.getElementById('sendToKyneticBtn');
+    const originalText = button.textContent;
+    
+    try {
+        // Show confirmation dialog
+        const confirmed = confirm('Send this order to Kynetic Manufacturing System?');
+        if (!confirmed) return;
+
+        // Collect the order data
+        const orderData = getOrderSheetData();
+        
+        // Validate required fields
+        if (!orderData.customer_name || !orderData.job_number || !orderData.profile_name) {
+            alert('Please fill in Customer Name, Job Number, and Profile Name before sending to Kynetic.');
+            return;
+        }
+
+        // Show loading state
+        button.textContent = 'Sending...';
+        button.disabled = true;
+
+        // Send to Odoo
+        const result = await createManufacturingTask(orderData);
+        
+        if (result.success) {
+            alert('Successfully sent to Kynetic Manufacturing System!\nTask ID: ' + result.task_id);
+        } else {
+            alert('Error sending to Kynetic: ' + (result.error || 'Unknown error'));
+        }
+
+    } catch (error) {
+        console.error('Error in sendToKynetic:', error);
+        alert('Error sending to Kynetic: ' + error.message);
+    } finally {
+        // Restore button state
+        button.textContent = originalText;
+        button.disabled = false;
+    }
+}
+
+function getOrderSheetData() {
+    // Use the same data collection logic as the print sheet
+    const data = {};
+    data.customer_name = document.getElementById('customerName')?.value || '';
+    data.job_number = document.getElementById('jobName')?.value || '';
+    data.profile_name = document.getElementById('profileName')?.value || '';
+    data.color = document.getElementById('color')?.value || '';
+    data.color_manufacturer = document.getElementById('colorManufacturer')?.value || '';
+    data.quantity = document.getElementById('quantity')?.value || '';
+    data.length = document.getElementById('lengthInput')?.value || '';
+    data.material_usage = document.getElementById('totalLength') ? document.getElementById('totalLength').textContent.replace('"','') : '';
+    data.date_ordered = new Date().toLocaleDateString();
+
+    // Metal type and gauge
+    const metalType = document.getElementById('metalType').value;
+    const metalGauge = document.getElementById('metalGauge').value;
+    data.metal_type = metalType;
+    data.metal_gauge = metalGauge;
+
+    // Calculate ribs from hems data
+    data.ribs = window.hems ? window.hems.length : 0;
+
+    return data;
+}
+
+async function createManufacturingTask(orderData) {
+    try {
+        // Create the manufacturing task using existing Odoo session
+        const taskData = {
+            name: `${orderData.profile_name} - ${orderData.customer_name}`,
+            description: `Job: ${orderData.job_number}\nProfile: ${orderData.profile_name}\nCustomer: ${orderData.customer_name}\nMaterial: ${orderData.metal_type} ${orderData.metal_gauge}\nColor: ${orderData.color} (${orderData.color_manufacturer})\nQuantity: ${orderData.quantity}\nLength: ${orderData.length} inches\nMaterial Usage: ${orderData.material_usage} inches\nRibs: ${orderData.ribs}\nDate Ordered: ${orderData.date_ordered}`,
+            project_id: false,  // You may want to create a default project or ask user to select
+            date_deadline: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]  // 1 week from now
+        };
+
+        const createResponse = await fetch('/web/dataset/call_kw', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                jsonrpc: '2.0',
+                method: 'call',
+                params: {
+                    model: 'project.task',
+                    method: 'create',
+                    args: [taskData],
+                    kwargs: {}
+                },
+                id: Math.floor(Math.random() * 1000000)
+            })
+        });
+
+        const createResult = await createResponse.json();
+        
+        if (createResult.error) {
+            throw new Error(createResult.error.data.message || 'Error creating task');
+        }
+
+        return {
+            success: true,
+            task_id: createResult.result
+        };
+
+    } catch (error) {
+        console.error('Odoo integration error:', error);
+        return {
+            success: false,
+            error: error.message
+        };
+    }
+}
     </script>
     
     <div id="printSheetSection" style="display:none;">
@@ -4876,7 +4993,7 @@ updateGaugeOptions();
                 <div class="col">
                     <div class="field-group">
                         <span class="field-label inline">Job:</span>
-                        <span class="data-field wide" data-field="job_number" data-placeholder="Job Number"></span>
+                        <span class="data-field wide" data-field="job_number" data-placeholder="Job Name"></span>
                     </div>
                 </div>
             </div>
