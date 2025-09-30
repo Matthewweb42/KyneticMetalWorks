@@ -794,23 +794,26 @@
             background: linear-gradient(135deg, #007cba, #0056b3);
         }
 
-        .material-label {
-            position: absolute;
+        .material-toggle-slider .material-label {
+            position: relative;
             width: 50%;
-            text-align: center;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             font-size: 11px;
             font-weight: bold;
             color: white;
             z-index: 2;
-            transition: all 0.3s ease;
+            transition: color 0.3s ease;
+            pointer-events: none; /* let clicks pass to the toggle */
         }
 
-        .material-label.left {
-            left: 0;
+        .material-toggle-slider .material-label.left {
+            margin-left: 0;
         }
 
-        .material-label.right {
-            right: 0;
+        .material-toggle-slider .material-label.right {
+            margin-right: 0;
         }
 
         .material-toggle-slider:not(.aluminum) .material-label.left {
@@ -998,9 +1001,10 @@
 
         /* Print Sheet Header Section */
         .header {
+            position: relative;
             display: flex;
             justify-content: space-between;
-            align-items: flex-start;
+            align-items: center;
             margin-bottom: 10px;
             border-bottom: 2px solid black;
             padding: 8px 15px;
@@ -1047,14 +1051,18 @@
         }
 
         .title-section {
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            top: 8px;
             text-align: center;
-            flex-grow: 1;
+            pointer-events: none; /* allow clicks through header to controls */
         }
 
         .order-sheet-title {
             font-size: 28px;
             font-weight: bold;
-            margin-bottom: 3px;
+            margin: 0 6px 3px;
         }
 
         .dates-section {
@@ -3026,7 +3034,7 @@ function loadHtml2Canvas() {
             
             // Info text in single line
             const padding = 10; // Minimum distance from canvas edges
-            const lengthText = formatLength(hemInfo.length).replace('"', ' in');
+            const lengthText = formatLength(hemInfo.length);
             const typeText = hemInfo.type === 'open' ? 'Open' : 'Closed';
             const lines = [`HEM ${lengthText} ${typeText}`];
             const fontSize = 13;
@@ -3468,16 +3476,17 @@ function loadHtml2Canvas() {
                     console.log('Signed Area:', signedArea);
                     
                     // Step 3: Determine HEM direction based on winding (flipped from initial logic)
+                    // Unified rule: positive signed area -> LEFT (-1), negative -> RIGHT (1)
                     if (signedArea > 0) {
-                        baseFoldDirection = 1;  // RIGHT - Counterclockwise winding
-                        console.log('Counterclockwise winding → HEM direction: RIGHT');
+                        baseFoldDirection = -1;  // LEFT - Counterclockwise winding
+                        console.log('Counterclockwise winding -> HEM direction: LEFT');
                     } else if (signedArea < 0) {
-                        baseFoldDirection = -1; // LEFT - Clockwise winding
-                        console.log('Clockwise winding → HEM direction: LEFT');
+                        baseFoldDirection = 1; // RIGHT - Clockwise winding
+                        console.log('Clockwise winding -> HEM direction: RIGHT');
                     } else {
-                        // Points are collinear - shouldn't happen with <30° angle
+                        // Points are collinear - fallback
                         baseFoldDirection = -1; // Default to LEFT
-                        console.log('Collinear points detected → Default to LEFT');
+                        console.log('Collinear points detected -> Default to LEFT');
                     }
                 }
                 
@@ -4827,6 +4836,94 @@ function resetForm() {
 updateGaugeOptions();
 
 // --- ODOO INTEGRATION ---
+// Convert an inline SVG element to a PNG Blob, inlining computed styles for fidelity
+async function svgToPngBlob(svgElement, scale = 2) {
+    try {
+        if (!svgElement) return null;
+
+        // Clone to avoid mutating original
+        const clone = svgElement.cloneNode(true);
+        if (!clone.getAttribute('xmlns')) clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+
+        // Use bounding rect for pixel dimensions
+        const rect = svgElement.getBoundingClientRect();
+        const width = Math.max(1, rect.width || svgElement.clientWidth || parseFloat(clone.getAttribute('width')) || 800);
+        const height = Math.max(1, rect.height || svgElement.clientHeight || parseFloat(clone.getAttribute('height')) || 600);
+        clone.setAttribute('width', width);
+        clone.setAttribute('height', height);
+
+        // Inline computed styles: walk original and clone in parallel
+        try {
+            const originals = svgElement.querySelectorAll('*');
+            const clones = clone.querySelectorAll('*');
+            for (let i = 0; i < originals.length && i < clones.length; i++) {
+                const orig = originals[i];
+                const cl = clones[i];
+                try {
+                    const cs = window.getComputedStyle(orig);
+                    // Build minimal style string from common SVG presentation properties
+                    const props = [
+                        'fill','fill-opacity','stroke','stroke-width','stroke-linecap','stroke-linejoin','stroke-dasharray',
+                        'opacity','font-family','font-size','font-weight','visibility','display','pointer-events'
+                    ];
+                    let s = cl.getAttribute('style') || '';
+                    props.forEach(p => {
+                        const v = cs.getPropertyValue(p);
+                        if (v && v !== '' && v !== 'none' && v !== 'normal' && v !== '0px') {
+                            s += `${p}:${v};`;
+                        }
+                    });
+                    if (s) cl.setAttribute('style', s);
+                } catch (e) {
+                    // ignore per-element failures
+                }
+            }
+        } catch (e) {
+            // ignore style inlining failures
+            console.warn('Failed to inline styles for SVG:', e);
+        }
+
+        // Ensure viewBox exists
+        if (!clone.getAttribute('viewBox')) {
+            try {
+                const vb = svgElement.getAttribute('viewBox');
+                if (vb) clone.setAttribute('viewBox', vb);
+                else clone.setAttribute('viewBox', `0 0 ${width} ${height}`);
+            } catch (e) {
+                clone.setAttribute('viewBox', `0 0 ${width} ${height}`);
+            }
+        }
+
+        const serializer = new XMLSerializer();
+        let svgString = serializer.serializeToString(clone);
+        if (!svgString.match(/^<\?xml/)) {
+            svgString = '<?xml version="1.0" encoding="UTF-8"?>\n' + svgString;
+        }
+
+        const svgData = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgString);
+
+        const img = new Image();
+        img.src = svgData;
+        await new Promise((resolve, reject) => {
+            img.onload = () => resolve();
+            img.onerror = (err) => reject(err || new Error('SVG image load failed'));
+        });
+
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.round(width * scale);
+        canvas.height = Math.round(height * scale);
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+        return await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
+    } catch (err) {
+        console.warn('svgToPngBlob failed:', err);
+        return null;
+    }
+}
+
 async function sendToKynetic() {
     // Get button and original text first
     const button = document.getElementById('sendToKyneticBtn');
@@ -4850,8 +4947,39 @@ async function sendToKynetic() {
         button.textContent = 'Sending...';
         button.disabled = true;
 
-        // Send to Odoo
-        const result = await createManufacturingTask(orderData);
+        // Capture profile image. Prefer serializing the SVG directly (more reliable).
+        let imageBlob = null;
+        try {
+            const svgEl = document.getElementById('canvas');
+            if (svgEl) {
+                imageBlob = await svgToPngBlob(svgEl, 2);
+            }
+
+            // Fallback to html2canvas if SVG serialization didn't work or produced null
+            if (!imageBlob) {
+                if (typeof html2canvas === 'undefined') await loadHtml2Canvas();
+                const container = document.querySelector('.canvas-container');
+                if (container) {
+                    const canvasEl = await html2canvas(container, {
+                        backgroundColor: 'white',
+                        scale: 2,
+                        useCORS: true,
+                        allowTaint: true,
+                        logging: false,
+                        width: container.offsetWidth,
+                        height: container.offsetHeight,
+                        scrollX: 0,
+                        scrollY: 0
+                    });
+                    imageBlob = await new Promise((resolve) => canvasEl.toBlob(resolve, 'image/png'));
+                }
+            }
+        } catch (captureErr) {
+            console.warn('Image capture failed, continuing without image:', captureErr);
+        }
+
+        // Send to Odoo (include imageBlob when available)
+        const result = await createManufacturingTask(orderData, imageBlob);
         
         if (result.success) {
             alert('Successfully sent to Kynetic Manufacturing System!\nTask ID: ' + result.task_id);
@@ -4894,7 +5022,7 @@ function getOrderSheetData() {
     return data;
 }
 
-async function createManufacturingTask(orderData) {
+async function createManufacturingTask(orderData, imageBlob) {
     try {
         // Create the manufacturing task using existing Odoo session
         const taskData = {
@@ -4928,9 +5056,52 @@ async function createManufacturingTask(orderData) {
             throw new Error(createResult.error.data.message || 'Error creating task');
         }
 
+        const taskId = createResult.result;
+
+        // If we have an image, convert to base64 and post it to the task chatter via message_post
+        if (imageBlob && taskId) {
+            try {
+                const base64 = await new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = () => resolve(reader.result.split(',')[1]);
+                    reader.onerror = () => reject(new Error('Failed to read image blob'));
+                    reader.readAsDataURL(imageBlob);
+                });
+
+                const filename = `${(orderData.profile_name || 'profile').replace(/[^a-z0-9\-_.]/gi, '_')}.png`;
+
+                // message_post on project.task to attach the image
+                const postResponse = await fetch('/web/dataset/call_kw', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        jsonrpc: '2.0',
+                        method: 'call',
+                        params: {
+                            model: 'project.task',
+                            method: 'message_post',
+                            args: [[taskId]],
+                            kwargs: {
+                                body: 'Profile Design Image',
+                                attachments: [[filename, base64]]
+                            }
+                        },
+                        id: Math.floor(Math.random() * 1000000)
+                    })
+                });
+
+                const postResult = await postResponse.json();
+                if (postResult.error) {
+                    console.warn('Failed to post attachment via message_post:', postResult.error);
+                }
+            } catch (attachErr) {
+                console.warn('Failed to attach image to task via message_post:', attachErr);
+            }
+        }
+
         return {
             success: true,
-            task_id: createResult.result
+            task_id: taskId
         };
 
     } catch (error) {
