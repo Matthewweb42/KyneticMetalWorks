@@ -2722,14 +2722,14 @@ function loadHtml2Canvas() {
                     console.log('Point 3:', point3);
                     console.log('Signed Area:', signedArea);
                     
-                    // Determine HEM direction based on winding (FLIPPED logic for start HEM)
+                    // Determine HEM direction based on winding (UNIFIED RULE)
                     let startHemDirection;
                     if (signedArea > 0) {
-                        startHemDirection = -1; // LEFT - Counterclockwise winding (FLIPPED)
-                        console.log('Counterclockwise winding → Start HEM direction: LEFT (flipped)');
+                        startHemDirection = -1; // LEFT - Counterclockwise winding
+                        console.log('Counterclockwise winding → Start HEM direction: LEFT');
                     } else if (signedArea < 0) {
-                        startHemDirection = 1;  // RIGHT - Clockwise winding (FLIPPED)
-                        console.log('Clockwise winding → Start HEM direction: RIGHT (flipped)');
+                        startHemDirection = 1;  // RIGHT - Clockwise winding
+                        console.log('Clockwise winding → Start HEM direction: RIGHT');
                     } else {
                         startHemDirection = -1; // Default to LEFT
                         console.log('Collinear points detected → Start HEM default to LEFT');
@@ -3475,7 +3475,7 @@ function loadHtml2Canvas() {
                     console.log('Point 3:', point3);
                     console.log('Signed Area:', signedArea);
                     
-                    // Step 3: Determine HEM direction based on winding (flipped from initial logic)
+                    // Step 3: Determine HEM direction based on winding (UNIFIED RULE)
                     // Unified rule: positive signed area -> LEFT (-1), negative -> RIGHT (1)
                     if (signedArea > 0) {
                         baseFoldDirection = -1;  // LEFT - Counterclockwise winding
