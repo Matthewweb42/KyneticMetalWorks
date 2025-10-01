@@ -4947,89 +4947,69 @@ async function sendToKynetic() {
         button.textContent = 'Sending...';
         button.disabled = true;
 
-        // Capture profile image using the same logic as downloadProfileImage but show entire profile
+        // Capture complete profile using the same logic as populatePrintSheetFromDesigner
         let imageBlob = null;
         try {
             console.log('Capturing complete profile image for Odoo upload...');
-            const container = document.querySelector('.canvas-container');
-            const svgElement = document.getElementById('canvas');
+            const originalSvg = document.getElementById('canvas');
             
-            if (!container || !svgElement) {
-                console.warn('Canvas container or SVG not found for image capture');
+            if (!originalSvg) {
+                console.warn('SVG canvas not found for image capture');
             } else {
-                // Store original viewBox and styles
-                const originalViewBox = svgElement.getAttribute('viewBox');
-                const originalContainerStyle = {
-                    transform: container.style.transform,
-                    transformOrigin: container.style.transformOrigin
-                };
+                // Use the same logic as the print sheet to get the complete profile view
+                const svgClone = originalSvg.cloneNode(true);
+                
+                // Get the bounding box of the actual content (same as print logic)
+                const bbox = originalSvg.getBBox ? originalSvg.getBBox() : null;
+                
+                if (bbox && bbox.width > 0 && bbox.height > 0) {
+                    console.log('Profile bbox:', bbox);
+                    
+                    // Use the same padding as the print logic
+                    const padding = 50;
+                    svgClone.setAttribute('viewBox', `${bbox.x - padding} ${bbox.y - padding} ${bbox.width + padding * 2} ${bbox.height + padding * 2}`);
+                    svgClone.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+                } else {
+                    console.log('Using fallback viewBox');
+                    svgClone.setAttribute('viewBox', '0 0 800 600');
+                    svgClone.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+                }
+                
+                // Set up the SVG for capture (similar to print sheet styling)
+                svgClone.style.width = '800px';
+                svgClone.style.height = '600px';
+                svgClone.style.background = 'white';
+                svgClone.id = 'temp-capture-svg';
+                
+                // Create a temporary container (like the print drawing area)
+                const tempContainer = document.createElement('div');
+                tempContainer.style.position = 'absolute';
+                tempContainer.style.top = '-9999px';
+                tempContainer.style.left = '-9999px';
+                tempContainer.style.width = '800px';
+                tempContainer.style.height = '600px';
+                tempContainer.style.background = 'white';
+                tempContainer.style.display = 'flex';
+                tempContainer.style.alignItems = 'center';
+                tempContainer.style.justifyContent = 'center';
+                tempContainer.appendChild(svgClone);
+                document.body.appendChild(tempContainer);
                 
                 try {
-                    // Calculate the bounding box of all profile elements
-                    const profileGroup = svgElement.querySelector('.profile-group') || svgElement;
-                    let bbox;
-                    
-                    try {
-                        bbox = profileGroup.getBBox();
-                    } catch (e) {
-                        // Fallback: calculate bounds manually from path data
-                        console.log('Using fallback bounds calculation...');
-                        const paths = svgElement.querySelectorAll('path, line, circle, rect');
-                        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-                        
-                        paths.forEach(path => {
-                            try {
-                                const pathBBox = path.getBBox();
-                                minX = Math.min(minX, pathBBox.x);
-                                minY = Math.min(minY, pathBBox.y);
-                                maxX = Math.max(maxX, pathBBox.x + pathBBox.width);
-                                maxY = Math.max(maxY, pathBBox.y + pathBBox.height);
-                            } catch (e) {
-                                // Skip elements that can't provide bbox
-                            }
-                        });
-                        
-                        if (minX !== Infinity) {
-                            bbox = { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
-                        } else {
-                            // Ultimate fallback
-                            bbox = { x: 0, y: 0, width: 800, height: 600 };
-                        }
-                    }
-                    
-                    console.log('Profile bounds:', bbox);
-                    
-                    // Add padding around the profile (10% on each side)
-                    const padding = Math.max(bbox.width, bbox.height) * 0.1;
-                    const paddedX = bbox.x - padding;
-                    const paddedY = bbox.y - padding;
-                    const paddedWidth = bbox.width + (padding * 2);
-                    const paddedHeight = bbox.height + (padding * 2);
-                    
-                    // Set viewBox to show the complete profile with padding
-                    svgElement.setAttribute('viewBox', `${paddedX} ${paddedY} ${paddedWidth} ${paddedHeight}`);
-                    
-                    // Reset container transform to show the SVG naturally
-                    container.style.transform = 'none';
-                    container.style.transformOrigin = 'center';
-                    
-                    // Force a reflow to apply the changes
-                    container.offsetHeight;
-                    
                     // Load html2canvas if not available
                     if (typeof html2canvas === 'undefined') {
                         await loadHtml2Canvas();
                     }
                     
-                    // Capture with appropriate dimensions for the complete profile
-                    const canvas = await html2canvas(container, {
+                    // Capture the temporary container (same approach as print)
+                    const canvas = await html2canvas(tempContainer, {
                         backgroundColor: 'white',
-                        scale: 2, // Higher resolution for crisp image
+                        scale: 2,
                         useCORS: true,
                         allowTaint: true,
                         logging: false,
-                        width: Math.max(800, paddedWidth * 0.5), // Ensure minimum width
-                        height: Math.max(600, paddedHeight * 0.5), // Ensure minimum height
+                        width: 800,
+                        height: 600,
                         scrollX: 0,
                         scrollY: 0
                     });
@@ -5039,21 +5019,12 @@ async function sendToKynetic() {
                     });
                     
                 } finally {
-                    // Restore original viewBox and container styles
-                    if (originalViewBox) {
-                        svgElement.setAttribute('viewBox', originalViewBox);
-                    } else {
-                        svgElement.removeAttribute('viewBox');
-                    }
-                    container.style.transform = originalContainerStyle.transform || '';
-                    container.style.transformOrigin = originalContainerStyle.transformOrigin || '';
-                    
-                    // Force reflow to restore view
-                    container.offsetHeight;
+                    // Clean up temporary elements
+                    document.body.removeChild(tempContainer);
                 }
                 
                 if (imageBlob) {
-                    console.log('Successfully captured complete profile image, size:', imageBlob.size, 'bytes');
+                    console.log('Successfully captured complete profile image using print logic, size:', imageBlob.size, 'bytes');
                 } else {
                     console.warn('Failed to create image blob from canvas');
                 }
