@@ -4947,31 +4947,115 @@ async function sendToKynetic() {
         button.textContent = 'Sending...';
         button.disabled = true;
 
-        // Capture profile image. Prefer serializing the SVG directly (more reliable).
+        // Capture profile image using the same logic as downloadProfileImage but show entire profile
         let imageBlob = null;
         try {
-            const svgEl = document.getElementById('canvas');
-            if (svgEl) {
-                imageBlob = await svgToPngBlob(svgEl, 2);
-            }
-
-            // Fallback to html2canvas if SVG serialization didn't work or produced null
-            if (!imageBlob) {
-                if (typeof html2canvas === 'undefined') await loadHtml2Canvas();
-                const container = document.querySelector('.canvas-container');
-                if (container) {
-                    const canvasEl = await html2canvas(container, {
+            console.log('Capturing complete profile image for Odoo upload...');
+            const container = document.querySelector('.canvas-container');
+            const svgElement = document.getElementById('canvas');
+            
+            if (!container || !svgElement) {
+                console.warn('Canvas container or SVG not found for image capture');
+            } else {
+                // Store original viewBox and styles
+                const originalViewBox = svgElement.getAttribute('viewBox');
+                const originalContainerStyle = {
+                    transform: container.style.transform,
+                    transformOrigin: container.style.transformOrigin
+                };
+                
+                try {
+                    // Calculate the bounding box of all profile elements
+                    const profileGroup = svgElement.querySelector('.profile-group') || svgElement;
+                    let bbox;
+                    
+                    try {
+                        bbox = profileGroup.getBBox();
+                    } catch (e) {
+                        // Fallback: calculate bounds manually from path data
+                        console.log('Using fallback bounds calculation...');
+                        const paths = svgElement.querySelectorAll('path, line, circle, rect');
+                        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+                        
+                        paths.forEach(path => {
+                            try {
+                                const pathBBox = path.getBBox();
+                                minX = Math.min(minX, pathBBox.x);
+                                minY = Math.min(minY, pathBBox.y);
+                                maxX = Math.max(maxX, pathBBox.x + pathBBox.width);
+                                maxY = Math.max(maxY, pathBBox.y + pathBBox.height);
+                            } catch (e) {
+                                // Skip elements that can't provide bbox
+                            }
+                        });
+                        
+                        if (minX !== Infinity) {
+                            bbox = { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+                        } else {
+                            // Ultimate fallback
+                            bbox = { x: 0, y: 0, width: 800, height: 600 };
+                        }
+                    }
+                    
+                    console.log('Profile bounds:', bbox);
+                    
+                    // Add padding around the profile (10% on each side)
+                    const padding = Math.max(bbox.width, bbox.height) * 0.1;
+                    const paddedX = bbox.x - padding;
+                    const paddedY = bbox.y - padding;
+                    const paddedWidth = bbox.width + (padding * 2);
+                    const paddedHeight = bbox.height + (padding * 2);
+                    
+                    // Set viewBox to show the complete profile with padding
+                    svgElement.setAttribute('viewBox', `${paddedX} ${paddedY} ${paddedWidth} ${paddedHeight}`);
+                    
+                    // Reset container transform to show the SVG naturally
+                    container.style.transform = 'none';
+                    container.style.transformOrigin = 'center';
+                    
+                    // Force a reflow to apply the changes
+                    container.offsetHeight;
+                    
+                    // Load html2canvas if not available
+                    if (typeof html2canvas === 'undefined') {
+                        await loadHtml2Canvas();
+                    }
+                    
+                    // Capture with appropriate dimensions for the complete profile
+                    const canvas = await html2canvas(container, {
                         backgroundColor: 'white',
-                        scale: 2,
+                        scale: 2, // Higher resolution for crisp image
                         useCORS: true,
                         allowTaint: true,
                         logging: false,
-                        width: container.offsetWidth,
-                        height: container.offsetHeight,
+                        width: Math.max(800, paddedWidth * 0.5), // Ensure minimum width
+                        height: Math.max(600, paddedHeight * 0.5), // Ensure minimum height
                         scrollX: 0,
                         scrollY: 0
                     });
-                    imageBlob = await new Promise((resolve) => canvasEl.toBlob(resolve, 'image/png'));
+                    
+                    imageBlob = await new Promise((resolve) => {
+                        canvas.toBlob(resolve, 'image/png', 1.0);
+                    });
+                    
+                } finally {
+                    // Restore original viewBox and container styles
+                    if (originalViewBox) {
+                        svgElement.setAttribute('viewBox', originalViewBox);
+                    } else {
+                        svgElement.removeAttribute('viewBox');
+                    }
+                    container.style.transform = originalContainerStyle.transform || '';
+                    container.style.transformOrigin = originalContainerStyle.transformOrigin || '';
+                    
+                    // Force reflow to restore view
+                    container.offsetHeight;
+                }
+                
+                if (imageBlob) {
+                    console.log('Successfully captured complete profile image, size:', imageBlob.size, 'bytes');
+                } else {
+                    console.warn('Failed to create image blob from canvas');
                 }
             }
         } catch (captureErr) {
@@ -5061,42 +5145,119 @@ async function createManufacturingTask(orderData, imageBlob) {
         // If we have an image, convert to base64 and post it to the task chatter via message_post
         if (imageBlob && taskId) {
             try {
+                console.log('Converting image to base64 for Odoo upload...');
                 const base64 = await new Promise((resolve, reject) => {
                     const reader = new FileReader();
-                    reader.onload = () => resolve(reader.result.split(',')[1]);
+                    reader.onload = () => {
+                        try {
+                            const result = reader.result.split(',')[1]; // Remove data URL prefix
+                            resolve(result);
+                        } catch (e) {
+                            reject(e);
+                        }
+                    };
                     reader.onerror = () => reject(new Error('Failed to read image blob'));
                     reader.readAsDataURL(imageBlob);
                 });
 
-                const filename = `${(orderData.profile_name || 'profile').replace(/[^a-z0-9\-_.]/gi, '_')}.png`;
+                console.log('Base64 conversion successful, length:', base64.length);
+                console.log('First 100 chars of base64:', base64.substring(0, 100));
+                console.log('Last 100 chars of base64:', base64.substring(base64.length - 100));
 
-                // message_post on project.task to attach the image
-                const postResponse = await fetch('/web/dataset/call_kw', {
+                const filename = `${(orderData.profile_name || 'profile').replace(/[^a-z0-9\-_.]/gi, '_')}_${Date.now()}.png`;
+
+                // Try creating ir.attachment first, then link it via message_post
+                console.log('Creating ir.attachment record...');
+                const attachResponse = await fetch('/web/dataset/call_kw', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         jsonrpc: '2.0',
                         method: 'call',
                         params: {
-                            model: 'project.task',
-                            method: 'message_post',
-                            args: [[taskId]],
-                            kwargs: {
-                                body: 'Profile Design Image',
-                                attachments: [[filename, base64]]
-                            }
+                            model: 'ir.attachment',
+                            method: 'create',
+                            args: [{
+                                name: filename,
+                                datas: base64,
+                                res_model: 'project.task',
+                                res_id: taskId,
+                                type: 'binary',
+                                mimetype: 'image/png'
+                            }],
+                            kwargs: {}
                         },
                         id: Math.floor(Math.random() * 1000000)
                     })
                 });
+                
+                const attachResult = await attachResponse.json();
+                console.log('ir.attachment create response:', attachResult);
+                
+                if (attachResult.error) {
+                    console.error('Failed to create ir.attachment:', attachResult.error);
+                    // Fallback: try message_post with inline attachments
+                    console.log('Falling back to message_post with inline attachments...');
+                    const postResponse = await fetch('/web/dataset/call_kw', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            jsonrpc: '2.0',
+                            method: 'call',
+                            params: {
+                                model: 'project.task',
+                                method: 'message_post',
+                                args: [[taskId]],
+                                kwargs: {
+                                    body: 'Profile Design Image',
+                                    attachments: [[filename, base64]]
+                                }
+                            },
+                            id: Math.floor(Math.random() * 1000000)
+                        })
+                    });
 
-                const postResult = await postResponse.json();
-                if (postResult.error) {
-                    console.warn('Failed to post attachment via message_post:', postResult.error);
+                    const postResult = await postResponse.json();
+                    console.log('Fallback message_post response:', postResult);
+                } else {
+                    const attachmentId = attachResult.result;
+                    console.log('Successfully created attachment with ID:', attachmentId);
+                    
+                    // Now link the attachment to the task via message_post
+                    console.log('Linking attachment to task chatter...');
+                    const postResponse = await fetch('/web/dataset/call_kw', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            jsonrpc: '2.0',
+                            method: 'call',
+                            params: {
+                                model: 'project.task',
+                                method: 'message_post',
+                                args: [[taskId]],
+                                kwargs: {
+                                    body: 'Profile Design Image',
+                                    attachment_ids: [attachmentId]
+                                }
+                            },
+                            id: Math.floor(Math.random() * 1000000)
+                        })
+                    });
+
+                    const postResult = await postResponse.json();
+                    console.log('message_post with attachment_ids response:', postResult);
+                    
+                    if (postResult.error) {
+                        console.error('Failed to link attachment via message_post:', postResult.error);
+                    } else {
+                        console.log('Successfully linked attachment to task chatter');
+                    }
                 }
             } catch (attachErr) {
-                console.warn('Failed to attach image to task via message_post:', attachErr);
+                console.error('Failed to attach image to task:', attachErr);
             }
+        } else if (!imageBlob) {
+            console.log('No image blob captured, task created without image');
         }
 
         return {
