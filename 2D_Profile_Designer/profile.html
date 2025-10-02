@@ -35,6 +35,20 @@
         data.al_040 = metalType === 'aluminum' && metalGauge === '.040';
         data.al_050 = metalType === 'aluminum' && metalGauge === '.050';
 
+        // Hole specifications
+        data.has_holes = document.getElementById('hasHoles')?.checked || false;
+        data.hole_size = getHoleSizeValue().toString();
+        data.hole_spacing = getHoleSpacingValue().toString();
+        data.start_from_end = document.getElementById('startFromEnd')?.value || '';
+        data.distance_from_edge = document.getElementById('distanceFromEdge')?.value || '';
+
+        // Ribs specifications
+        data.has_ribs = document.getElementById('hasRibs')?.checked || false;
+
+        // DXF and task specifications  
+        data.dxf_standards = document.getElementById('dxfStandards')?.value || '';
+        data.task_priority = document.getElementById('taskPriority')?.value || '';
+
         // Process checkboxes (example: not tracked in designer, so default to false)
         data.process_slit = false;
         data.process_punched = false;
@@ -407,8 +421,8 @@
         #canvas {
             cursor: crosshair;
             background: 
-                radial-gradient(circle, #e8e8e8 1px, transparent 1px);
-            background-size: 20px 20px;
+                radial-gradient(circle, #666666 1px, transparent 1px);
+            background-size: 24px 24px;
         }
 
         .measurement-label {
@@ -1085,7 +1099,7 @@
 
         /* Main Content Sections */
         .section {
-            margin: 8px 0;
+            margin: 4px 0;
             padding: 5px 15px;
         }
 
@@ -1103,6 +1117,7 @@
 
         .col {
             flex: 1;
+            padding: 0 10px;
         }
 
         .col.narrow {
@@ -1115,6 +1130,11 @@
 
         .field-group {
             margin-bottom: 6px;
+        }
+
+        .field-group.centered-field {
+            text-align: center;
+            margin-bottom: 15px;
         }
 
         .field-label {
@@ -1177,14 +1197,14 @@
 
         /* Profile Drawing Area */
         .profile-section {
-            margin: 8px 0 4px 0;
+            margin: 4px 0 2px 0;
             padding: 0 15px;
         }
 
         .drawing-area {
             height: 580px;
-            background-image: radial-gradient(circle, #474747 1px, transparent 1px);
-            background-size: 15px 15px;
+            background-image: radial-gradient(circle, #666666 1px, transparent 1px);
+            background-size: 24px 24px;
             border: 1px solid #ddd;
             margin-top: 3px;
             position: relative;
@@ -1246,7 +1266,7 @@
             display: grid;
             grid-template-columns: 1fr 1fr 1fr;
             gap: 6px;
-            margin-top: 12px;
+            margin-top: 6px;
         }
 
         .bottom-field {
@@ -1326,9 +1346,97 @@
             position: relative !important;
             z-index: 10001 !important;
         }
+        
+        /* TOP NAVIGATION BAR */
+        .top-nav {
+            background: linear-gradient(135deg, #2c3e50, #34495e);
+            color: white;
+            padding: 10px 20px;
+            display: none; /* Hidden for now */
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        
+        .nav-brand {
+            font-size: 18px;
+            font-weight: bold;
+            color: #ecf0f1;
+        }
+        
+        .nav-menu {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+        }
+        
+        .nav-item {
+            color: #bdc3c7;
+            text-decoration: none;
+            padding: 8px 12px;
+            border-radius: 4px;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        
+        .nav-item:hover {
+            background: rgba(255,255,255,0.1);
+            color: #ecf0f1;
+        }
+        
+        .nav-item.active {
+            background: rgba(52, 152, 219, 0.8);
+            color: white;
+        }
+        
+        .nav-actions {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        
+        .nav-btn {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: background 0.3s ease;
+        }
+        
+        .nav-btn:hover {
+            background: #2980b9;
+        }
+        
+        .nav-btn.success {
+            background: #27ae60;
+        }
+        
+        .nav-btn.success:hover {
+            background: #229954;
+        }
     </style>
 
 <div class="profile-designer">
+    <!-- Top Navigation Bar -->
+    <div class="top-nav">
+        <div class="nav-brand">Kynetic MetalWorks - 2D Profile Designer</div>
+        <div class="nav-menu">
+            <a href="#" class="nav-item active" onclick="showDesigner()">Designer</a>
+            <a href="#" class="nav-item" onclick="showTemplates()">Templates</a>
+            <a href="#" class="nav-item" onclick="showHistory()">History</a>
+            <a href="#" class="nav-item" onclick="showHelp()">Help</a>
+        </div>
+        <div class="nav-actions">
+            <button class="nav-btn" onclick="saveProject()">Save</button>
+            <button class="nav-btn" onclick="loadProject()">Load</button>
+            <button class="nav-btn success" onclick="exportDXF()">Export DXF</button>
+        </div>
+    </div>
+    
     <div class="container">
         <!-- Order Sheet Style Header -->
         <div class="header">
@@ -1511,21 +1619,100 @@
                         <input type="checkbox" id="hasRibs" style="margin-right: 8px;">
                         <span class="field-label inline">Include Ribs</span>
                     </div>
+                    
+                    <div class="field-group">
+                        <input type="checkbox" id="hasHoles" style="margin-right: 8px;">
+                        <span class="field-label inline">Holes</span>
+                    </div>
+                </div>
+                
+                <!-- Third Column: Hole Specifications -->
+                <div class="col">
+                    <div id="holeFields" style="display: none; margin-top: 10px;">
+                        <div class="field-group">
+                            <span class="field-label">Hole Size (inches):</span>
+                            <div class="increment-input-container">
+                                <input type="number" id="holeSizeWhole" class="order-input" min="0" value="0" style="width: 50px;">
+                                <span class="increment-controls">
+                                    <button type="button" onclick="adjustHoleSize('holeSize', 1)" style="font-size: 10px; width: 20px; height: 15px;">+</button>
+                                    <span id="holeSizeFraction" class="fraction-display">1/4</span>
+                                    <button type="button" onclick="adjustHoleSize('holeSize', -1)" style="font-size: 10px; width: 20px; height: 15px;">-</button>
+                                </span>
+                            </div>
+                        </div>
+                        
+                        <div class="field-group">
+                            <span class="field-label">Hole Spacing (OC inches):</span>
+                            <div class="increment-input-container">
+                                <input type="number" id="holeSpacingWhole" class="order-input" min="0" value="12" style="width: 50px;">
+                                <span class="increment-controls">
+                                    <button type="button" onclick="adjustHoleSize('holeSpacing', 1)" style="font-size: 10px; width: 20px; height: 15px;">+</button>
+                                    <span id="holeSpacingFraction" class="fraction-display">0</span>
+                                    <button type="button" onclick="adjustHoleSize('holeSpacing', -1)" style="font-size: 10px; width: 20px; height: 15px;">-</button>
+                                </span>
+                            </div>
+                        </div>
+                        
+                        <div class="field-group">
+                            <span class="field-label">Start From End (OC inches):</span>
+                            <div class="increment-input-container">
+                                <input type="number" id="startFromEndWhole" class="order-input" min="0" value="6" style="width: 50px;">
+                                <span class="increment-controls">
+                                    <button type="button" onclick="adjustHoleSize('startFromEnd', 1)" style="font-size: 10px; width: 20px; height: 15px;">+</button>
+                                    <span id="startFromEndFraction" class="fraction-display">0</span>
+                                    <button type="button" onclick="adjustHoleSize('startFromEnd', -1)" style="font-size: 10px; width: 20px; height: 15px;">-</button>
+                                </span>
+                            </div>
+                        </div>
+                        
+                        <div class="field-group">
+                            <span class="field-label">Distance From Edge (OC inches):</span>
+                            <div class="increment-input-container">
+                                <input type="number" id="distanceFromEdgeWhole" class="order-input" min="0" value="1" style="width: 50px;">
+                                <span class="increment-controls">
+                                    <button type="button" onclick="adjustHoleSize('distanceFromEdge', 1)" style="font-size: 10px; width: 20px; height: 15px;">+</button>
+                                    <span id="distanceFromEdgeFraction" class="fraction-display">0</span>
+                                    <button type="button" onclick="adjustHoleSize('distanceFromEdge', -1)" style="font-size: 10px; width: 20px; height: 15px;">-</button>
+                                </span>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
         
         <!-- Profile Drawing Section -->
         <div class="profile-section">
-            <div class="field-group">
+            <div class="field-group centered-field">
                 <span class="field-label">Profile Name:</span>
                 <input type="text" id="profileName" class="order-input full" value="Custom Profile" placeholder="Profile Description" required>
+            </div>
+            
+            <div class="field-group" style="display: none;">
+                <span class="field-label">DXF Standards:</span>
+                <select id="dxfStandards" class="order-select full">
+                    <option value="Imperial (Inches)" selected>Imperial (Inches)</option>
+                    <option value="Metric (Millimeters)">Metric (Millimeters)</option>
+                    <option value="AutoCAD 2018">AutoCAD 2018</option>
+                    <option value="AutoCAD 2021">AutoCAD 2021</option>
+                    <option value="Custom">Custom Standards</option>
+                </select>
+            </div>
+            
+            <div class="field-group" style="display: none;">
+                <span class="field-label">Task Submission Priority:</span>
+                <select id="taskPriority" class="order-select full">
+                    <option value="Standard" selected>Standard (5-7 business days)</option>
+                    <option value="Rush">Rush (2-3 business days)</option>
+                    <option value="Expedited">Expedited (1-2 business days)</option>
+                    <option value="Emergency">Emergency (Same day)</option>
+                </select>
             </div>
             
             <div class="drawing-area">
                 <div class="canvas-container" id="canvasContainer">
                     <svg id="canvas" class="drawing-canvas" 
-                         style="cursor: crosshair; background: radial-gradient(circle, #e8e8e8 1px, transparent 1px); background-size: 20px 20px;">
+                         style="cursor: crosshair; background: radial-gradient(circle, #666666 1px, transparent 1px); background-size: 24px 24px;">
                         <g id="grid"></g>
                         <g id="lines"></g>
                         <g id="points"></g>
@@ -1756,8 +1943,8 @@ ${printSheet.outerHTML}
                     <span>in</span>
                 </div>
             </div>
-            <!-- Angle input (decimal) -->
-            <input type="number" id="popupInput" step="0.1" placeholder="Enter value" style="display: none;">
+            <!-- Angle input (whole degrees only) -->
+            <input type="number" id="popupInput" step="1" placeholder="Enter angle in degrees" style="display: none;">
         </div>
         <div>
             <button class="btn btn-primary" onclick="applyPopupEdit()">Apply</button>
@@ -1847,7 +2034,7 @@ function loadHtml2Canvas() {
         let coatedSideRight = false; // false = left/top coated, true = right/bottom coated
         let points = [];
         let entities = []; // DXF entity storage
-        let scale = 20; // pixels per inch
+        let scale = 24; // Initialize to baseScale - this will be used for measurements only
         let offset = { x: 50, y: 50 };
 
         // Undo system
@@ -1856,7 +2043,7 @@ function loadHtml2Canvas() {
 
         // Zoom system
         let zoomLevel = 1.0;
-        let baseScale = 20; // Base pixels per inch (will be set by resizeCanvas)
+        let baseScale = 24; // Base pixels per inch (1/4" grid spacing)
         let panOffset = { x: 0, y: 0 };
         let isPanning = false;
         let lastPanPoint = { x: 0, y: 0 };
@@ -1944,15 +2131,17 @@ function loadHtml2Canvas() {
             // Convert from screen coordinates to DXF coordinates
             // Screen: origin top-left, Y increases downward
             // DXF: standard Cartesian, Y increases upward
-            const dxfX = (screenPoint.x - offset.x) / scale;
-            const dxfY = (canvas.clientHeight - screenPoint.y - offset.y) / scale;
+            // Use baseScale for consistent measurements regardless of zoom
+            const dxfX = (screenPoint.x - offset.x) / baseScale;
+            const dxfY = (canvas.clientHeight - screenPoint.y - offset.y) / baseScale;
             return { x: dxfX, y: dxfY };
         }
 
         function dxfToScreen(dxfPoint) {
             // Convert from DXF coordinates to screen coordinates
-            const screenX = dxfPoint.x * scale + offset.x;
-            const screenY = canvas.clientHeight - (dxfPoint.y * scale + offset.y);
+            // Use baseScale for consistent measurements regardless of zoom
+            const screenX = dxfPoint.x * baseScale + offset.x;
+            const screenY = canvas.clientHeight - (dxfPoint.y * baseScale + offset.y);
             return { x: screenX, y: screenY };
         }
 
@@ -2068,8 +2257,8 @@ function loadHtml2Canvas() {
         }
 
         function applyZoom() {
-            // Update the scale based on base scale and zoom level
-            scale = baseScale * zoomLevel;
+            // Do NOT update the scale for measurements - keep it at baseScale
+            // scale = baseScale * zoomLevel; // REMOVED - this was causing the bug!
             
             // Apply transform to the main canvas groups, preserving top bar
             const groups = ['grid', 'lines', 'points', 'labels'];
@@ -2080,8 +2269,8 @@ function loadHtml2Canvas() {
                 }
             });
             
-            // Update grid size
-            const gridSpacing = scale * 0.125;
+            // Update grid size to 1/4" spacing - scale with zoom for visual consistency
+            const gridSpacing = baseScale * zoomLevel * 0.25;
             canvas.style.backgroundSize = `${gridSpacing}px ${gridSpacing}px`;
             
             // Update any hem info boxes that might be showing
@@ -2248,6 +2437,174 @@ function loadHtml2Canvas() {
             }
         }
 
+        // TOP NAVIGATION BAR FUNCTIONS
+        function showDesigner() {
+            // Set active nav item
+            document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            // Show main designer (already visible)
+            document.querySelector('.container').style.display = 'block';
+        }
+        
+        function showTemplates() {
+            document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            alert('Templates feature coming soon! This will allow you to save and load common profile templates.');
+        }
+        
+        function showHistory() {
+            document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            alert('History feature coming soon! This will show your previously created profiles.');
+        }
+        
+        function showHelp() {
+            document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            const helpText = `2D Profile Designer Help:
+
+DRAWING:
+• Click to place points
+• Press ESC to finish current line
+• Click and drag to pan the canvas
+• Use mouse wheel to zoom
+
+EDITING:
+• Click on any line to edit length or angle
+• Right-click on points to add hems
+• Use the control buttons to adjust settings
+
+FEATURES:
+• Set material type, gauge, and color
+• Add holes with precise specifications  
+• Include ribs and custom specifications
+• Export to DXF format for manufacturing
+
+ORDERING:
+• Fill in customer and job information
+• Specify quantity and measurements
+• Submit directly to manufacturing queue`;
+            
+            alert(helpText);
+        }
+        
+        function saveProject() {
+            const projectData = {
+                customerName: document.getElementById('customerName').value,
+                jobName: document.getElementById('jobName').value,
+                profileName: document.getElementById('profileName').value,
+                metalType: document.getElementById('metalType').value,
+                metalGauge: document.getElementById('metalGauge').value,
+                color: document.getElementById('color').value,
+                colorManufacturer: document.getElementById('colorManufacturer').value,
+                quantity: document.getElementById('quantity').value,
+                hasRibs: document.getElementById('hasRibs').checked,
+                hasHoles: document.getElementById('hasHoles').checked,
+                holeSize: getHoleSizeValue(),
+                holeSpacing: getHoleSpacingValue(),
+                startFromEnd: document.getElementById('startFromEnd').value,
+                distanceFromEdge: document.getElementById('distanceFromEdge').value,
+                dxfStandards: document.getElementById('dxfStandards').value,
+                taskPriority: document.getElementById('taskPriority').value,
+                points: points,
+                savedDate: new Date().toISOString()
+            };
+            
+            const dataStr = JSON.stringify(projectData, null, 2);
+            const dataBlob = new Blob([dataStr], {type: 'application/json'});
+            const url = URL.createObjectURL(dataBlob);
+            
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `profile-${projectData.profileName.replace(/[^a-z0-9]/gi, '_')}-${Date.now()}.json`;
+            link.click();
+            
+            URL.revokeObjectURL(url);
+        }
+        
+        function loadProject() {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.json';
+            
+            input.onchange = function(e) {
+                const file = e.target.files[0];
+                if (!file) return;
+                
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    try {
+                        const projectData = JSON.parse(e.target.result);
+                        
+                        // Restore form fields
+                        if (projectData.customerName) document.getElementById('customerName').value = projectData.customerName;
+                        if (projectData.jobName) document.getElementById('jobName').value = projectData.jobName;
+                        if (projectData.profileName) document.getElementById('profileName').value = projectData.profileName;
+                        if (projectData.metalType) document.getElementById('metalType').value = projectData.metalType;
+                        if (projectData.metalGauge) document.getElementById('metalGauge').value = projectData.metalGauge;
+                        if (projectData.color) document.getElementById('color').value = projectData.color;
+                        if (projectData.colorManufacturer) document.getElementById('colorManufacturer').value = projectData.colorManufacturer;
+                        if (projectData.quantity) document.getElementById('quantity').value = projectData.quantity;
+                        if (projectData.hasRibs !== undefined) document.getElementById('hasRibs').checked = projectData.hasRibs;
+                        if (projectData.hasHoles !== undefined) {
+                            document.getElementById('hasHoles').checked = projectData.hasHoles;
+                            document.getElementById('holeFields').style.display = projectData.hasHoles ? 'block' : 'none';
+                        }
+                        if (projectData.holeSize) setHoleSizeValue(parseFloat(projectData.holeSize));
+                        if (projectData.holeSpacing) setHoleSpacingValue(parseFloat(projectData.holeSpacing));
+                        if (projectData.startFromEnd) document.getElementById('startFromEnd').value = projectData.startFromEnd;
+                        if (projectData.distanceFromEdge) document.getElementById('distanceFromEdge').value = projectData.distanceFromEdge;
+                        if (projectData.dxfStandards) document.getElementById('dxfStandards').value = projectData.dxfStandards;
+                        if (projectData.taskPriority) document.getElementById('taskPriority').value = projectData.taskPriority;
+                        
+                        // Restore points and redraw
+                        if (projectData.points) {
+                            points.length = 0;
+                            points.push(...projectData.points);
+                            redrawCanvas();
+                        }
+                        
+                        // Update metal type and gauge display
+                        updateGaugeOptions();
+                        updateOrderSheetGaugeDisplay();
+                        
+                        alert('Project loaded successfully!');
+                    } catch (error) {
+                        alert('Error loading project file: ' + error.message);
+                    }
+                };
+                reader.readAsText(file);
+            };
+            
+            input.click();
+        }
+        
+        function exportDXF() {
+            if (points.length < 2) {
+                alert('Please create a profile with at least 2 points before exporting.');
+                return;
+            }
+            
+            // Generate DXF data
+            const dxfData = generateDXFData();
+            const profileName = document.getElementById('profileName').value || 'CustomProfile';
+            
+            // Create and download DXF file
+            const dataBlob = new Blob([dxfData], {type: 'application/dxf'});
+            const url = URL.createObjectURL(dataBlob);
+            
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `${profileName.replace(/[^a-z0-9]/gi, '_')}-${Date.now()}.dxf`;
+            link.click();
+            
+            URL.revokeObjectURL(url);
+        }
+
         function closeEditPopup() {
             const popup = document.getElementById('editPopup');
             popup.style.display = 'none';
@@ -2287,6 +2644,112 @@ function loadHtml2Canvas() {
 
         // Global variable to track current HEM sixteenths value
         let currentHemSixteenths = 16; // Default 1 inch = 16 sixteenths
+
+        // Global variables to track hole size sixteenths values
+        let currentHoleSizeSixteenths = 4; // Default 1/4 inch = 4 sixteenths
+        let currentHoleSpacingSixteenths = 0; // Default 12 inches = 0 sixteenths (whole numbers)
+        let currentStartFromEndSixteenths = 0; // Default 6 inches = 0 sixteenths
+        let currentDistanceFromEdgeSixteenths = 0; // Default 1 inch = 0 sixteenths
+
+        function adjustHoleSize(fieldType, direction) {
+            let currentSixteenths;
+            let displayElement;
+            let wholeElement;
+            
+            switch(fieldType) {
+                case 'holeSize':
+                    currentHoleSizeSixteenths = Math.max(1, Math.min(16, currentHoleSizeSixteenths + direction));
+                    currentSixteenths = currentHoleSizeSixteenths;
+                    displayElement = document.getElementById('holeSizeFraction');
+                    wholeElement = document.getElementById('holeSizeWhole');
+                    break;
+                case 'holeSpacing':
+                    currentHoleSpacingSixteenths = Math.max(0, Math.min(16, currentHoleSpacingSixteenths + direction));
+                    currentSixteenths = currentHoleSpacingSixteenths;
+                    displayElement = document.getElementById('holeSpacingFraction');
+                    wholeElement = document.getElementById('holeSpacingWhole');
+                    break;
+                case 'startFromEnd':
+                    currentStartFromEndSixteenths = Math.max(0, Math.min(16, currentStartFromEndSixteenths + direction));
+                    currentSixteenths = currentStartFromEndSixteenths;
+                    displayElement = document.getElementById('startFromEndFraction');
+                    wholeElement = document.getElementById('startFromEndWhole');
+                    break;
+                case 'distanceFromEdge':
+                    currentDistanceFromEdgeSixteenths = Math.max(0, Math.min(16, currentDistanceFromEdgeSixteenths + direction));
+                    currentSixteenths = currentDistanceFromEdgeSixteenths;
+                    displayElement = document.getElementById('distanceFromEdgeFraction');
+                    wholeElement = document.getElementById('distanceFromEdgeWhole');
+                    break;
+            }
+            
+            // Handle rollover to next whole inch
+            if (currentSixteenths > 16) {
+                currentSixteenths = 1;
+                wholeElement.value = parseInt(wholeElement.value) + 1;
+                switch(fieldType) {
+                    case 'holeSize': currentHoleSizeSixteenths = 1; break;
+                    case 'holeSpacing': currentHoleSpacingSixteenths = 1; break;
+                    case 'startFromEnd': currentStartFromEndSixteenths = 1; break;
+                    case 'distanceFromEdge': currentDistanceFromEdgeSixteenths = 1; break;
+                }
+            }
+            // Handle rollunder to previous whole inch
+            else if (currentSixteenths < 0 && parseInt(wholeElement.value) > 0) {
+                currentSixteenths = 16;
+                wholeElement.value = parseInt(wholeElement.value) - 1;
+                switch(fieldType) {
+                    case 'holeSize': currentHoleSizeSixteenths = 16; break;
+                    case 'holeSpacing': currentHoleSpacingSixteenths = 16; break;
+                    case 'startFromEnd': currentStartFromEndSixteenths = 16; break;
+                    case 'distanceFromEdge': currentDistanceFromEdgeSixteenths = 16; break;
+                }
+            }
+            
+            if (currentSixteenths === 0) {
+                displayElement.textContent = '0';
+            } else {
+                displayElement.textContent = simplifyFraction(currentSixteenths);
+            }
+        }
+
+        // Helper functions to get hole values in decimal format for compatibility
+        function getHoleSizeValue() {
+            const whole = parseInt(document.getElementById('holeSizeWhole').value) || 0;
+            return whole + (currentHoleSizeSixteenths / 16);
+        }
+
+        function getHoleSpacingValue() {
+            const whole = parseInt(document.getElementById('holeSpacingWhole').value) || 0;
+            return whole + (currentHoleSpacingSixteenths / 16);
+        }
+
+        function getStartFromEndValue() {
+            const whole = parseInt(document.getElementById('startFromEndWhole').value) || 0;
+            return whole + (currentStartFromEndSixteenths / 16);
+        }
+
+        function getDistanceFromEdgeValue() {
+            const whole = parseInt(document.getElementById('distanceFromEdgeWhole').value) || 0;
+            return whole + (currentDistanceFromEdgeSixteenths / 16);
+        }
+
+        // Helper functions to set hole values from decimal format
+        function setHoleSizeValue(decimalValue) {
+            const whole = Math.floor(decimalValue);
+            const sixteenths = Math.round((decimalValue - whole) * 16);
+            document.getElementById('holeSizeWhole').value = whole;
+            currentHoleSizeSixteenths = sixteenths;
+            document.getElementById('holeSizeFraction').textContent = sixteenths === 0 ? '0' : simplifyFraction(sixteenths);
+        }
+
+        function setHoleSpacingValue(decimalValue) {
+            const whole = Math.floor(decimalValue);
+            const sixteenths = Math.round((decimalValue - whole) * 16);
+            document.getElementById('holeSpacingWhole').value = whole;
+            currentHoleSpacingSixteenths = sixteenths;
+            document.getElementById('holeSpacingFraction').textContent = sixteenths === 0 ? '0' : simplifyFraction(sixteenths);
+        }
 
         function adjustHemFraction(direction) {
             currentHemSixteenths = Math.max(1, Math.min(16, currentHemSixteenths + direction));
@@ -2378,10 +2841,10 @@ function loadHtml2Canvas() {
                         const hemLength = hemInfo.length || length;
                         // Calculate the angle
                         const angle = Math.atan2(dy, dx);
-                        // Calculate new endpoint
+                        // Calculate new endpoint using baseScale for consistent measurements
                         const newEnd = {
-                            x: base.x + Math.cos(angle) * hemLength * scale,
-                            y: base.y + Math.sin(angle) * hemLength * scale
+                            x: base.x + Math.cos(angle) * hemLength * baseScale,
+                            y: base.y + Math.sin(angle) * hemLength * baseScale
                         };
                         points[hemInfo.index + 1] = newEnd;
                     }
@@ -3477,16 +3940,31 @@ function loadHtml2Canvas() {
                     
                     // Step 3: Determine HEM direction based on winding (UNIFIED RULE)
                     // Unified rule: positive signed area -> LEFT (-1), negative -> RIGHT (1)
-                    if (signedArea > 0) {
-                        baseFoldDirection = -1;  // LEFT - Counterclockwise winding
-                        console.log('Counterclockwise winding -> HEM direction: LEFT');
-                    } else if (signedArea < 0) {
-                        baseFoldDirection = 1; // RIGHT - Clockwise winding
-                        console.log('Clockwise winding -> HEM direction: RIGHT');
+                    // BUT: For second hem, we need to invert this logic due to different geometry
+                    if (vertexIndex > 2) {
+                        // Second HEM: Invert the logic
+                        if (signedArea > 0) {
+                            baseFoldDirection = 1;   // RIGHT - Counterclockwise winding (inverted)
+                            console.log('Second HEM: Counterclockwise winding -> HEM direction: RIGHT');
+                        } else if (signedArea < 0) {
+                            baseFoldDirection = -1;  // LEFT - Clockwise winding (inverted)
+                            console.log('Second HEM: Clockwise winding -> HEM direction: LEFT');
+                        } else {
+                            baseFoldDirection = -1; // Default to LEFT
+                            console.log('Second HEM: Collinear points detected -> Default to LEFT');
+                        }
                     } else {
-                        // Points are collinear - fallback
-                        baseFoldDirection = -1; // Default to LEFT
-                        console.log('Collinear points detected -> Default to LEFT');
+                        // First HEM: Original logic
+                        if (signedArea > 0) {
+                            baseFoldDirection = -1;  // LEFT - Counterclockwise winding
+                            console.log('Counterclockwise winding -> HEM direction: LEFT');
+                        } else if (signedArea < 0) {
+                            baseFoldDirection = 1; // RIGHT - Clockwise winding
+                            console.log('Clockwise winding -> HEM direction: RIGHT');
+                        } else {
+                            baseFoldDirection = -1; // Default to LEFT
+                            console.log('Collinear points detected -> Default to LEFT');
+                        }
                     }
                 }
                 
@@ -3521,8 +3999,8 @@ function loadHtml2Canvas() {
             const hemLengthIn = hem.hemData.length || 0.5; // fallback
             // Set radius based on hem type only - independent of HEM length
             const radius = hem.hemData.type === 'closed' 
-                ? scale * 0.12 // Fixed small radius for closed hems
-                : scale * 0.2;  // Fixed slightly larger radius for open hems
+                ? baseScale * 0.05 // Much smaller radius for closed hems (was 0.12)
+                : baseScale * 0.10;  // Slightly larger radius for open hems (was 0.2)
             
             // Calculate the center of the hemming curve - closer to the line
             const centerX = hem.x + perpendicular.x * radius;
@@ -3553,7 +4031,7 @@ function loadHtml2Canvas() {
             
             // Calculate the direction of the folded edge - should run parallel to the ORIGINAL line, not perpendicular
             // Use the actual HEM length specified by the user
-            const hemLengthPixels = hemLengthIn * scale; // Convert hem length to screen pixels
+            const hemLengthPixels = hemLengthIn * baseScale; // Convert hem length to screen pixels using baseScale
             
             // The folded edge should extend along the direction that the material came from (backward along incoming line)
             // Start from the fold end point and extend backward along the incoming line direction by the actual hem length
@@ -4398,8 +4876,8 @@ function getHemDirection(prev, curr, next) {
             // Update current scale
             scale = baseScale * zoomLevel;
             
-            // Update grid size to maintain 1/8 inch spacing
-            const gridSpacing = scale * 0.125; // 1/8 inch in pixels
+            // Update grid size to maintain 1/4 inch spacing
+            const gridSpacing = scale * 0.25; // 1/4 inch in pixels
             
             // Update the canvas background grid
             canvas.style.backgroundSize = `${gridSpacing}px ${gridSpacing}px`;
@@ -4623,6 +5101,29 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     updateOrderSheetGaugeDisplay();
+    
+    // Add hole checkbox event listener
+    const hasHolesCheckbox = document.getElementById('hasHoles');
+    const holeFields = document.getElementById('holeFields');
+    
+    if (hasHolesCheckbox && holeFields) {
+        hasHolesCheckbox.addEventListener('change', function() {
+            if (this.checked) {
+                holeFields.style.display = 'block';
+            } else {
+                holeFields.style.display = 'none';
+                // Clear hole field values when unchecked
+                setHoleSizeValue(0.25); // Reset to 1/4 inch
+                setHoleSpacingValue(12); // Reset to 12 inches
+                document.getElementById('startFromEndWhole').value = 6;
+                currentStartFromEndSixteenths = 0;
+                document.getElementById('startFromEndFraction').textContent = '0';
+                document.getElementById('distanceFromEdgeWhole').value = 1;
+                currentDistanceFromEdgeSixteenths = 0;
+                document.getElementById('distanceFromEdgeFraction').textContent = '0';
+            }
+        });
+    }
 });
 
 // Submit profile request function
@@ -4701,6 +5202,13 @@ SPECIFICATIONS:
 - Color: ${document.getElementById('color').value.trim()}
 - Quantity: ${document.getElementById('quantity').value}
 - Ribs: ${document.getElementById('hasRibs').checked ? 'Yes' : 'No'}
+- Holes: ${document.getElementById('hasHoles').checked ? 'Yes' : 'No'}${document.getElementById('hasHoles').checked ? `
+  • Hole Size: ${document.getElementById('holeSize').value || 'Not specified'} inches
+  • Hole Spacing (OC): ${document.getElementById('holeSpacing').value || 'Not specified'} inches  
+  • Start From End (OC): ${document.getElementById('startFromEnd').value || 'Not specified'} inches
+  • Distance From Edge (OC): ${document.getElementById('distanceFromEdge').value || 'Not specified'} inches` : ''}
+- DXF Standards: ${document.getElementById('dxfStandards').value}
+- Task Priority: ${document.getElementById('taskPriority').value}
 - Total Length: ${formatLength(totalLength)}
 - Coated Side: ${coatedSideRight ? 'Side B (Right)' : 'Side A (Left)'}
 - Number of Points: ${points.length}
@@ -4828,6 +5336,18 @@ function resetForm() {
     document.getElementById('colorManufacturer').value = '';
     document.getElementById('quantity').value = '1';
     document.getElementById('hasRibs').checked = false;
+    document.getElementById('hasHoles').checked = false;
+    setHoleSizeValue(0.25); // Reset to 1/4 inch
+    setHoleSpacingValue(12); // Reset to 12 inches
+    document.getElementById('startFromEndWhole').value = 6;
+    currentStartFromEndSixteenths = 0;
+    document.getElementById('startFromEndFraction').textContent = '0';
+    document.getElementById('distanceFromEdgeWhole').value = 1;
+    currentDistanceFromEdgeSixteenths = 0;
+    document.getElementById('distanceFromEdgeFraction').textContent = '0';
+    document.getElementById('holeFields').style.display = 'none';
+    document.getElementById('dxfStandards').value = 'Imperial (Inches)';
+    document.getElementById('taskPriority').value = 'Standard';
     document.getElementById('metalType').value = 'steel';
     updateGaugeOptions();
 }
@@ -5074,6 +5594,17 @@ function getOrderSheetData() {
     // Calculate ribs from hems data
     data.ribs = window.hems ? window.hems.length : 0;
 
+    // Hole specifications
+    data.has_holes = document.getElementById('hasHoles')?.checked || false;
+    data.hole_size = document.getElementById('holeSize')?.value || '';
+    data.hole_spacing = document.getElementById('holeSpacing')?.value || '';
+    data.start_from_end = document.getElementById('startFromEnd')?.value || '';
+    data.distance_from_edge = document.getElementById('distanceFromEdge')?.value || '';
+
+    // DXF and task specifications
+    data.dxf_standards = document.getElementById('dxfStandards')?.value || '';
+    data.task_priority = document.getElementById('taskPriority')?.value || '';
+
     return data;
 }
 
@@ -5082,7 +5613,7 @@ async function createManufacturingTask(orderData, imageBlob) {
         // Create the manufacturing task using existing Odoo session
         const taskData = {
             name: `${orderData.profile_name} - ${orderData.customer_name}`,
-            description: `Job: ${orderData.job_number}\nProfile: ${orderData.profile_name}\nCustomer: ${orderData.customer_name}\nMaterial: ${orderData.metal_type} ${orderData.metal_gauge}\nColor: ${orderData.color} (${orderData.color_manufacturer})\nQuantity: ${orderData.quantity}\nLength: ${orderData.length} inches\nMaterial Usage: ${orderData.material_usage} inches\nRibs: ${orderData.ribs}\nDate Ordered: ${orderData.date_ordered}`,
+            description: `Job: ${orderData.job_number}\nProfile: ${orderData.profile_name}\nCustomer: ${orderData.customer_name}\nMaterial: ${orderData.metal_type} ${orderData.metal_gauge}\nColor: ${orderData.color} (${orderData.color_manufacturer})\nQuantity: ${orderData.quantity}\nLength: ${orderData.length} inches\nMaterial Usage: ${orderData.material_usage} inches\nRibs: ${orderData.ribs}\nHoles: ${orderData.has_holes ? 'Yes' : 'No'}${orderData.has_holes ? `\nHole Size: ${orderData.hole_size || 'Not specified'} inches\nHole Spacing (OC): ${orderData.hole_spacing || 'Not specified'} inches\nStart From End (OC): ${orderData.start_from_end || 'Not specified'} inches\nDistance From Edge (OC): ${orderData.distance_from_edge || 'Not specified'} inches` : ''}\nDXF Standards: ${orderData.dxf_standards}\nTask Priority: ${orderData.task_priority}\nDate Ordered: ${orderData.date_ordered}`,
             project_id: false,  // You may want to create a default project or ask user to select
             date_deadline: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]  // 1 week from now
         };
@@ -5382,15 +5913,52 @@ async function createManufacturingTask(orderData, imageBlob) {
                         <span class="field-label">Total Material Usage (inches):</span>
                         <span class="data-field" data-field="material_usage" data-placeholder="0.00"></span>
                     </div>
+                    <div class="field-group">
+                        <span class="checkbox" data-field="has_ribs"></span>
+                        <span class="field-label inline">Include Ribs</span>
+                    </div>
+                    <div class="field-group">
+                        <span class="checkbox" data-field="has_holes"></span>
+                        <span class="field-label inline">Holes</span>
+                    </div>
+                </div>
+                
+                <div class="col narrow">
+                    <div class="field-group">
+                        <span class="field-label">Hole Size (inches):</span>
+                        <span class="data-field compact" data-field="hole_size" data-placeholder="N/A"></span>
+                    </div>
+                    <div class="field-group">
+                        <span class="field-label">Hole Spacing (OC):</span>
+                        <span class="data-field compact" data-field="hole_spacing" data-placeholder="N/A"></span>
+                    </div>
+                    <div class="field-group">
+                        <span class="field-label">Start From End (OC):</span>
+                        <span class="data-field compact" data-field="start_from_end" data-placeholder="N/A"></span>
+                    </div>
+                    <div class="field-group">
+                        <span class="field-label">Distance From Edge (OC):</span>
+                        <span class="data-field compact" data-field="distance_from_edge" data-placeholder="N/A"></span>
+                    </div>
                 </div>
             </div>
         </div>
         
         
         <div class="profile-section">
-            <div class="field-group">
+            <div class="field-group" style="text-align: center;">
                 <span class="field-label">Profile Name:</span>
                 <span class="data-field full" data-field="profile_name" data-placeholder="Profile Description"></span>
+            </div>
+            
+            <div class="field-group" style="display: none;">
+                <span class="field-label">DXF Standards:</span>
+                <span class="data-field wide" data-field="dxf_standards" data-placeholder="Imperial (Inches)"></span>
+            </div>
+            
+            <div class="field-group" style="display: none;">
+                <span class="field-label">Task Priority:</span>
+                <span class="data-field wide" data-field="task_priority" data-placeholder="Standard"></span>
             </div>
             
             <div class="drawing-area">
