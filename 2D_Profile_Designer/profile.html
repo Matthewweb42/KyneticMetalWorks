@@ -491,6 +491,20 @@
             opacity: 0.8;
         }
 
+        .snap-guide {
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        .snap-guide[stroke] {
+            animation: snapPulse 1s ease-in-out infinite alternate;
+        }
+
+        @keyframes snapPulse {
+            from { opacity: 0.6; }
+            to { opacity: 1.0; }
+        }
+
         .edit-popup {
             position: absolute;
             background: white;
@@ -2126,6 +2140,44 @@ function loadHtml2Canvas() {
         const linesGroup = document.getElementById('lines');
         const labelsGroup = document.getElementById('labels');
 
+        // Visual snap guide function
+        function showSnapGuides(fromPoint, toPoint, isSnapped) {
+            // Remove existing snap guides
+            const existingGuides = document.querySelectorAll('.snap-guide');
+            existingGuides.forEach(guide => guide.remove());
+            
+            if (isSnapped) {
+                // Create a visual guide line to show snapping
+                const guide = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                guide.classList.add('snap-guide');
+                guide.setAttribute('x1', fromPoint.x);
+                guide.setAttribute('y1', fromPoint.y);
+                guide.setAttribute('x2', toPoint.x);
+                guide.setAttribute('y2', toPoint.y);
+                guide.setAttribute('stroke', '#00ff00'); // Bright green for snap
+                guide.setAttribute('stroke-width', '3');
+                guide.setAttribute('stroke-dasharray', '5,5');
+                guide.setAttribute('opacity', '0.8');
+                guide.style.pointerEvents = 'none';
+                
+                // Add to lines group so it appears under other elements
+                linesGroup.appendChild(guide);
+                
+                // Add a small "SNAP" indicator near the cursor
+                const snapText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                snapText.classList.add('snap-guide');
+                snapText.setAttribute('x', toPoint.x + 15);
+                snapText.setAttribute('y', toPoint.y - 10);
+                snapText.setAttribute('fill', '#00ff00');
+                snapText.setAttribute('font-size', '12');
+                snapText.setAttribute('font-weight', 'bold');
+                snapText.textContent = 'SNAP';
+                snapText.style.pointerEvents = 'none';
+                
+                labelsGroup.appendChild(snapText);
+            }
+        }
+
         // DXF Coordinate conversion functions
         function screenToDxf(screenPoint) {
             // Convert from screen coordinates to DXF coordinates
@@ -2963,16 +3015,29 @@ ORDERING:
                 // Normalize angle to [0, 360)
                 let normAngle = angle;
                 if (normAngle < 0) normAngle += 360;
-                // Snap thresholds (degrees)
-                const threshold = 10;
-                // Snap to horizontal (0 or 180)
-                if ((Math.abs(normAngle) < threshold) || (Math.abs(normAngle - 180) < threshold)) {
+                // Snap thresholds (degrees) - increased for more pronounced snapping
+                const threshold = 15;
+                let isSnapped = false;
+                
+                // Snap to horizontal (0 or 180) - handle both positive and negative angles
+                const isHorizontal = (Math.abs(normAngle) < threshold) || 
+                                   (Math.abs(normAngle - 180) < threshold) || 
+                                   (Math.abs(normAngle - 360) < threshold) ||
+                                   (Math.abs(angle - 180) < threshold) ||
+                                   (Math.abs(angle + 180) < threshold);
+                
+                if (isHorizontal) {
                     snapY = last.y;
+                    isSnapped = true;
                 }
                 // Snap to vertical (90 or 270)
                 else if ((Math.abs(normAngle - 90) < threshold) || (Math.abs(normAngle - 270) < threshold)) {
                     snapX = last.x;
+                    isSnapped = true;
                 }
+                
+                // Show visual snap feedback
+                showSnapGuides(last, { x: snapX, y: snapY }, isSnapped);
             }
             const point = { x: snapX, y: snapY };
             // Prevent line crossing
@@ -4231,6 +4296,9 @@ ORDERING:
             if (preview) {
                 preview.remove();
             }
+            // Also clear snap guides
+            const snapGuides = document.querySelectorAll('.snap-guide');
+            snapGuides.forEach(guide => guide.remove());
         }
 
         function drawMeasurements() {
