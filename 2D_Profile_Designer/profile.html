@@ -4218,7 +4218,7 @@ ORDERING:
                 }
                 angleLabel.setAttribute('x', labelPos.x);
                 angleLabel.setAttribute('y', labelPos.y);
-                angleLabel.textContent = `${angle.toFixed(1)}°`;
+                angleLabel.textContent = `${Math.round(angle)}°`;
             } else {
                 // Remove angle label if not needed
                 const angleLabel = document.getElementById('preview-angle-label');
@@ -4277,7 +4277,7 @@ ORDERING:
                     labelText = 'HEM';
                 } else {
                     const angle = calculateVertexAngle(i);
-                    labelText = `${angle.toFixed(1)}°`;
+                    labelText = `${Math.round(angle)}°`;
                 }
                 
                 // Calculate position for supplementary angle label (on exterior side)
