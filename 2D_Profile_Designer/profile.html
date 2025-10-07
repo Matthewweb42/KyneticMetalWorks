@@ -505,6 +505,65 @@
             to { opacity: 1.0; }
         }
 
+        /* Color Picker Styles */
+        .color-picker-input {
+            background: white;
+            border: 1px solid #ddd;
+            padding: 8px;
+            border-radius: 4px;
+        }
+
+        .color-picker-popup {
+            position: absolute;
+            left: 100%;
+            top: 0;
+            margin-left: 10px;
+            background: white;
+            border: 2px solid #3498db;
+            border-radius: 10px;
+            padding: 15px;
+            box-shadow: 0 8px 25px rgba(0,0,0,0.2);
+            z-index: 99999;
+            min-width: 280px;
+        }
+
+        .color-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 12px;
+            margin-bottom: 10px;
+        }
+
+        .color-option {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            cursor: pointer;
+            padding: 8px;
+            border-radius: 6px;
+            transition: background-color 0.2s;
+        }
+
+        .color-option:hover {
+            background-color: #f0f8ff;
+        }
+
+        .color-square {
+            width: 32px;
+            height: 32px;
+            border-radius: 6px;
+            border: 2px solid #ddd;
+            margin-bottom: 5px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .color-name {
+            font-size: 11px;
+            text-align: center;
+            color: #333;
+            font-weight: 500;
+        }
+
         .edit-popup {
             position: absolute;
             background: white;
@@ -1582,28 +1641,10 @@
                     
                     <div class="field-group">
                         <span class="field-label inline">Color:</span>
-                        <select id="color" class="order-select" style="width: 100%;">
-                            <option value="White" selected>White</option>
-                            <option value="Black">Black</option>
-                            <option value="Gray">Gray</option>
-                            <option value="Red">Red</option>
-                            <option value="Blue">Blue</option>
-                            <option value="Green">Green</option>
-                            <option value="Brown">Brown</option>
-                            <option value="Tan">Tan</option>
-                            <option value="Charcoal">Charcoal</option>
-                            <option value="Burgundy">Burgundy</option>
-                            <option value="Forest Green">Forest Green</option>
-                            <option value="Navy Blue">Navy Blue</option>
-                            <option value="Copper">Copper</option>
-                            <option value="Bronze">Bronze</option>
-                            <option value="Ivory">Ivory</option>
-                            <option value="Cream">Cream</option>
-                            <option value="Slate">Slate</option>
-                            <option value="Stone">Stone</option>
-                            <option value="Clay">Clay</option>
-                            <option value="Custom Color">Custom Color...</option>
-                        </select>
+                        <div style="position: relative;">
+                            <input type="text" id="color" class="order-input color-picker-input" placeholder="Select color..." style="width: 100%; cursor: pointer;" readonly>
+                            <div id="colorPickerPopup" class="color-picker-popup" style="display: none;"></div>
+                        </div>
                     </div>
                     
                     <div class="field-group" style="margin-top: 15px;">
@@ -2175,6 +2216,242 @@ function loadHtml2Canvas() {
                 snapText.style.pointerEvents = 'none';
                 
                 labelsGroup.appendChild(snapText);
+            }
+        }
+
+        // Color data for different material types
+        const colorData = {
+            steel: [
+                { name: "Deep Black", hex: "#1a1a1a", manufacturer: "CMG" },
+                { name: "Matte Black", hex: "#2d2d2d", manufacturer: "CMG" },
+                { name: "Charcoal Gray", hex: "#4a4a4a", manufacturer: "CMG" },
+                { name: "Musket Gray", hex: "#6b6b6b", manufacturer: "CMG" },
+                { name: "Slate Gray", hex: "#8a8a8a", manufacturer: "CMG" },
+                { name: "Ash Gray", hex: "#a8a8a8", manufacturer: "CMG" },
+                { name: "Almond", hex: "#e8dcc0", manufacturer: "CMG" },
+                { name: "Bright White", hex: "#f8f8ff", manufacturer: "CMG" },
+                { name: "Bone White", hex: "#f5f5dc", manufacturer: "CMG" },
+                { name: "Stone White", hex: "#e6e6e6", manufacturer: "CMG" },
+                { name: "Cityscape", hex: "#7a7a7a", manufacturer: "CMG" },
+                { name: "Pebble Clay", hex: "#9d9d8a", manufacturer: "CMG" },
+                { name: "Sandstone", hex: "#c4b59a", manufacturer: "CMG" },
+                { name: "Sierra Tan", hex: "#d2b48c", manufacturer: "CMG" },
+                { name: "Antique Ivory", hex: "#f2e7d5", manufacturer: "CMG" },
+                { name: "Medium Bronze", hex: "#6b5d4f", manufacturer: "CMG" },
+                { name: "Dark Bronze", hex: "#4a3f35", manufacturer: "CMG" },
+                { name: "Extra Dark Bronze", hex: "#3d3529", manufacturer: "CMG" },
+                { name: "Regal Red", hex: "#8b1538", manufacturer: "CMG" },
+                { name: "Colonial Red", hex: "#722f37", manufacturer: "CMG" },
+                { name: "Burgundy", hex: "#4a1c2b", manufacturer: "CMG" },
+                { name: "Terra Cotta", hex: "#cd853f", manufacturer: "CMG" },
+                { name: "Mansard Brown", hex: "#654321", manufacturer: "CMG" },
+                { name: "Burnished Slate", hex: "#4f4f3a", manufacturer: "CMG" },
+                { name: "Hartford Green", hex: "#355e3b", manufacturer: "CMG" },
+                { name: "Classic Green", hex: "#2d5016", manufacturer: "CMG" },
+                { name: "Hemlock Green", hex: "#4a5d23", manufacturer: "CMG" },
+                { name: "Teal", hex: "#4682b4", manufacturer: "CMG" },
+                { name: "Slate Blue", hex: "#6a5acd", manufacturer: "CMG" },
+                { name: "Royal Blue", hex: "#4169e1", manufacturer: "CMG" },
+                { name: "Galvalume Plus", hex: "#b8b8b8", manufacturer: "CMG" },
+                { name: "Copper Penny", hex: "#b87333", manufacturer: "CMG" },
+                { name: "Weathered Zinc", hex: "#71797e", manufacturer: "CMG" },
+                { name: "Silver Metallic", hex: "#c0c0c0", manufacturer: "CMG" },
+                { name: "Champagne", hex: "#daa520", manufacturer: "CMG" },
+                { name: "Aged Copper", hex: "#8fbc8f", manufacturer: "CMG" },
+                { name: "Black Ore", hex: "#2f2f2f", manufacturer: "CMG" },
+                { name: "Vintage", hex: "#8b7355", manufacturer: "CMG" },
+                { name: "Western Rust", hex: "#8b4513", manufacturer: "CMG" },
+                { name: "Rustic Rawhide", hex: "#a0522d", manufacturer: "CMG" },
+            ],
+            aluminum: [
+                // Gemstone Colors
+                { name: "White Select 0104", hex: "#FFFFFF", manufacturer: "Gemstone" },
+                { name: "Almond 0306", hex: "#F0E68C", manufacturer: "Gemstone" },
+                { name: "Cashmere 0201", hex: "#E6E6FA", manufacturer: "Gemstone" },
+                { name: "Black 1601", hex: "#000000", manufacturer: "Gemstone" },
+                { name: "Caribou Brown 1402", hex: "#8B4513", manufacturer: "Gemstone" },
+                { name: "Pebble 1007", hex: "#A9A9A9", manufacturer: "Gemstone" },
+                { name: "Pottery 0309", hex: "#8B4513", manufacturer: "Gemstone" },
+                { name: "Charcoal 0907", hex: "#36454F", manufacturer: "Gemstone" },
+                { name: "Champagne 0402", hex: "#F7E7CE", manufacturer: "Gemstone" },
+                { name: "Amber 0310", hex: "#FFBF00", manufacturer: "Gemstone" },
+                { name: "Harvard Slate 0809", hex: "#2F4F4F", manufacturer: "Gemstone" },
+                { name: "Wrought Iron 0609", hex: "#4B4B4D", manufacturer: "Gemstone" },
+                { name: "RV Brownstone 1009", hex: "#8B4513", manufacturer: "Gemstone" },
+                { name: "Sandalwood LG 0409", hex: "#F4A460", manufacturer: "Gemstone" },
+                { name: "Linen 0205", hex: "#FAF0E6", manufacturer: "Gemstone" },
+                { name: "Dark Drift 1105", hex: "#696969", manufacturer: "Gemstone" },
+                { name: "Brown 1404", hex: "#8B4513", manufacturer: "Gemstone" },
+                { name: "Musket Brown 1406", hex: "#8B4513", manufacturer: "Gemstone" },
+                { name: "Khaki XL 1103", hex: "#BC9A6A", manufacturer: "Gemstone" },
+                { name: "Khaki Brown 1010", hex: "#8B4513", manufacturer: "Gemstone" },
+                { name: "Mist Grey XL 0802", hex: "#B8B8B8", manufacturer: "Gemstone" },
+                { name: "Lite Maple 0410", hex: "#DEB887", manufacturer: "Gemstone" },
+                { name: "Pearl 0107", hex: "#F8F8FF", manufacturer: "Gemstone" },
+                { name: "Sable 0906", hex: "#87653A", manufacturer: "Gemstone" },
+                { name: "Rockport Brown 1106", hex: "#8B4513", manufacturer: "Gemstone" },
+                { name: "Wolf White 0102", hex: "#F5F5F5", manufacturer: "Gemstone" },
+                { name: "Wicker 1002", hex: "#D2B48C", manufacturer: "Gemstone" },
+                { name: "Smoked Timber 0909", hex: "#A0522D", manufacturer: "Gemstone" },
+                { name: "Bright White 0103", hex: "#FFFFFF", manufacturer: "Gemstone" },
+                { name: "Brownstone 1102", hex: "#8B4513", manufacturer: "Gemstone" },
+                { name: "Linen Select 0203", hex: "#FAF0E6", manufacturer: "Gemstone" },
+                { name: "Mocha 0406", hex: "#8B4513", manufacturer: "Gemstone" },
+                { name: "Sandalwood Matchcoat 0307", hex: "#F4A460", manufacturer: "Gemstone" },
+                { name: "Tan 1101", hex: "#D2B48C", manufacturer: "Gemstone" },
+                
+                // Norandex Colors
+                { name: "Almond", hex: "#F0E68C", manufacturer: "Norandex" },
+                { name: "Herringbone", hex: "#D2B48C", manufacturer: "Norandex" },
+                { name: "Black", hex: "#000000", manufacturer: "Norandex" },
+                { name: "Desert Sand", hex: "#EDC9AF", manufacturer: "Norandex" },
+                { name: "Linen", hex: "#FAF0E6", manufacturer: "Norandex" },
+                { name: "Musket Brown", hex: "#8B4513", manufacturer: "Norandex" },
+                { name: "Pebblestone Clay", hex: "#BC9A6A", manufacturer: "Norandex" },
+                { name: "Sandstone D46", hex: "#F5DEB3", manufacturer: "Norandex" },
+                { name: "80 White", hex: "#FFFFFF", manufacturer: "Norandex" },
+                
+                // Kaycan Colors
+                { name: "MC White (actual color)", hex: "#FFFFFF", manufacturer: "Kaycan" },
+                { name: "Charcoal", hex: "#36454F", manufacturer: "Kaycan" },
+                { name: "Wolf White", hex: "#F5F5F5", manufacturer: "Kaycan" },
+                { name: "Wicker", hex: "#D2B48C", manufacturer: "Kaycan" },
+                { name: "Sandalwood", hex: "#F4A460", manufacturer: "Kaycan" },
+                
+                // ALC Colors
+                { name: "30 White 002", hex: "#FFFFFF", manufacturer: "ALC" },
+                { name: "Almond 008", hex: "#F0E68C", manufacturer: "ALC" },
+                { name: "Aspen Grey 019", hex: "#C0C0C0", manufacturer: "ALC" },
+                { name: "Black 001", hex: "#000000", manufacturer: "ALC" },
+                { name: "Brandy Wood 018", hex: "#8B4513", manufacturer: "ALC" },
+                { name: "Carmel 030", hex: "#DEB887", manufacturer: "ALC" },
+                { name: "Cashmere 009", hex: "#E6E6FA", manufacturer: "ALC" },
+                { name: "Charcoal Grey 025", hex: "#36454F", manufacturer: "ALC" },
+                { name: "Cobblestone 012", hex: "#A9A9A9", manufacturer: "ALC" },
+                { name: "Corn Silk 021", hex: "#FFF8DC", manufacturer: "ALC" },
+                { name: "Harbor Grey 024", hex: "#708090", manufacturer: "ALC" },
+                { name: "Iron 014", hex: "#4B4B4D", manufacturer: "ALC" },
+                { name: "Jefferson Tan 006", hex: "#CD853F", manufacturer: "ALC" },
+                { name: "Jefferson Tan AL 007", hex: "#CD853F", manufacturer: "ALC" },
+                { name: "Linen 004", hex: "#FAF0E6", manufacturer: "ALC" },
+                { name: "London Brown 011", hex: "#8B4513", manufacturer: "ALC" },
+                { name: "Montana Suede 016", hex: "#BC9A6A", manufacturer: "ALC" },
+                { name: "Musket Brown 015", hex: "#8B4513", manufacturer: "ALC" },
+                { name: "Musket Brown AL 022", hex: "#8B4513", manufacturer: "ALC" },
+                { name: "Pebblestone Clay 010", hex: "#BC9A6A", manufacturer: "ALC" },
+                { name: "Rugged Canyon 017", hex: "#A0522D", manufacturer: "ALC" },
+                { name: "Sage 020", hex: "#9CAF88", manufacturer: "ALC" },
+                { name: "Sandtone 013", hex: "#F5DEB3", manufacturer: "ALC" },
+                { name: "Savannah Wicker 031", hex: "#DEB887", manufacturer: "ALC" },
+                { name: "Silver Grey 028", hex: "#C0C0C0", manufacturer: "ALC" },
+                { name: "Terra Bronze 026", hex: "#8B4513", manufacturer: "ALC" },
+                { name: "Whispering Timber 032", hex: "#D2B48C", manufacturer: "ALC" },
+                { name: "White 003", hex: "#FFFFFF", manufacturer: "ALC" },
+                { name: "Wicker 027", hex: "#D2B48C", manufacturer: "ALC" },
+                { name: "Woodland Retreat 005", hex: "#8FBC8F", manufacturer: "ALC" },
+                
+                // Kynetic Colors
+                { name: "White TWK 30", hex: "#FFFFFF", manufacturer: "Kynetic" },
+                { name: "Almond 53", hex: "#F0E68C", manufacturer: "Kynetic" },
+                { name: "Aspen Grey E8", hex: "#C0C0C0", manufacturer: "Kynetic" },
+                { name: "Black 33", hex: "#000000", manufacturer: "Kynetic" },
+                { name: "Brandy Wood 147", hex: "#8B4513", manufacturer: "Kynetic" },
+                { name: "60 Carmel", hex: "#DEB887", manufacturer: "Kynetic" },
+                { name: "Cashmere 413", hex: "#E6E6FA", manufacturer: "Kynetic" },
+                { name: "Charcoal Grey 80", hex: "#36454F", manufacturer: "Kynetic" },
+                { name: "902 Cobblestone", hex: "#A9A9A9", manufacturer: "Kynetic" },
+                { name: "Cornsilk 210", hex: "#FFF8DC", manufacturer: "Kynetic" },
+                { name: "Harbor Grey 35", hex: "#708090", manufacturer: "Kynetic" },
+                { name: "Iron 814", hex: "#4B4B4D", manufacturer: "Kynetic" },
+                { name: "Jefferson Tan AO", hex: "#CD853F", manufacturer: "Kynetic" },
+                { name: "067-Jefferson Tan", hex: "#CD853F", manufacturer: "Kynetic" },
+                { name: "Linen 44", hex: "#FAF0E6", manufacturer: "Kynetic" },
+                { name: "London Brown JN", hex: "#8B4513", manufacturer: "Kynetic" },
+                { name: "Montana Suede IF", hex: "#BC9A6A", manufacturer: "Kynetic" },
+                { name: "Musket Brown 59", hex: "#8B4513", manufacturer: "Kynetic" },
+                { name: "TMK Musket Brown", hex: "#8B4513", manufacturer: "Kynetic" },
+                { name: "Pebblestone Clay 052", hex: "#BC9A6A", manufacturer: "Kynetic" },
+                { name: "Rugged Canyon 100", hex: "#A0522D", manufacturer: "Kynetic" },
+                { name: "Sage 18", hex: "#9CAF88", manufacturer: "Kynetic" },
+                { name: "Sandtone 39", hex: "#F5DEB3", manufacturer: "Kynetic" },
+                { name: "Savannah Wicker", hex: "#DEB887", manufacturer: "Kynetic" },
+                { name: "Silver Grey 02", hex: "#C0C0C0", manufacturer: "Kynetic" },
+                { name: "Terra Bronze 34", hex: "#8B4513", manufacturer: "Kynetic" },
+                { name: "Whispering Timber 354", hex: "#D2B48C", manufacturer: "Kynetic" },
+                { name: "White 04", hex: "#FFFFFF", manufacturer: "Kynetic" },
+                { name: "Wicker A7", hex: "#D2B48C", manufacturer: "Kynetic" },
+                { name: "Woodland Retreat 355", hex: "#8FBC8F", manufacturer: "Kynetic" }
+            ]
+        };
+
+        // Color picker functionality
+        function initializeColorPicker() {
+            const colorInput = document.getElementById('color');
+            const colorPickerPopup = document.getElementById('colorPickerPopup');
+            const colorManufacturerInput = document.getElementById('colorManufacturer');
+            
+            // Set default color
+            colorInput.value = 'White';
+            colorManufacturerInput.value = 'Standard Steel Coating';
+            
+            // Click handler for color input
+            colorInput.addEventListener('click', function(e) {
+                e.preventDefault();
+                showColorPickerPopup();
+            });
+            
+            // Close popup when mouse leaves
+            colorPickerPopup.addEventListener('mouseleave', function() {
+                hideColorPickerPopup();
+            });
+        }
+
+        function showColorPickerPopup() {
+            const popup = document.getElementById('colorPickerPopup');
+            const metalType = document.getElementById('metalType').value;
+            
+            // Get colors for current material type
+            const colors = colorData[metalType] || colorData.steel;
+            
+            // Build the color grid HTML
+            let gridHTML = '<div class="color-grid">';
+            colors.forEach(color => {
+                gridHTML += `
+                    <div class="color-option" onclick="selectColor('${color.name}', '${color.manufacturer}')">
+                        <div class="color-square" style="background-color: ${color.hex};"></div>
+                        <div class="color-name">${color.name}</div>
+                    </div>
+                `;
+            });
+            gridHTML += '</div>';
+            
+            popup.innerHTML = gridHTML;
+            popup.style.display = 'block';
+        }
+
+        function hideColorPickerPopup() {
+            const popup = document.getElementById('colorPickerPopup');
+            popup.style.display = 'none';
+        }
+
+        function selectColor(colorName, manufacturer) {
+            const colorInput = document.getElementById('color');
+            const colorManufacturerInput = document.getElementById('colorManufacturer');
+            
+            // Set the selected color and manufacturer
+            colorInput.value = colorName;
+            colorManufacturerInput.value = manufacturer;
+            
+            // Hide the popup
+            hideColorPickerPopup();
+        }
+
+        // Update color picker when metal type changes
+        function updateColorPickerForMaterial() {
+            // If popup is open, refresh it with new material colors
+            const popup = document.getElementById('colorPickerPopup');
+            if (popup.style.display !== 'none') {
+                showColorPickerPopup();
             }
         }
 
@@ -5057,6 +5334,9 @@ function updateGaugeOptions() {
     
     // Handle the new order sheet gauge selection
     updateOrderSheetGaugeDisplay();
+    
+    // Update color picker for new material type
+    updateColorPickerForMaterial();
 }
 
 // Toggle material type with clickable toggle
@@ -5157,6 +5437,9 @@ document.addEventListener('DOMContentLoaded', function() {
     if (defaultGauge) {
         defaultGauge.classList.add('selected');
     }
+    
+    // Initialize color picker
+    initializeColorPicker();
     
     // Set current date
     const dateCreatedField = document.getElementById('dateCreated');
