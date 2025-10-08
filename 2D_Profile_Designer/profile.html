@@ -5964,7 +5964,97 @@ async function createManufacturingTask(orderData, imageBlob) {
         // Create the manufacturing task using existing Odoo session
         const taskData = {
             name: `${orderData.profile_name} - ${orderData.customer_name}`,
-            description: `Job: ${orderData.job_number}\nProfile: ${orderData.profile_name}\nCustomer: ${orderData.customer_name}\nMaterial: ${orderData.metal_type} ${orderData.metal_gauge}\nColor: ${orderData.color} (${orderData.color_manufacturer})\nQuantity: ${orderData.quantity}\nLength: ${orderData.length} inches\nMaterial Usage: ${orderData.material_usage} inches\nRibs: ${orderData.ribs}\nHoles: ${orderData.has_holes ? 'Yes' : 'No'}${orderData.has_holes ? `\nHole Size: ${orderData.hole_size || 'Not specified'} inches\nHole Spacing (OC): ${orderData.hole_spacing || 'Not specified'} inches\nStart From End (OC): ${orderData.start_from_end || 'Not specified'} inches\nDistance From Edge (OC): ${orderData.distance_from_edge || 'Not specified'} inches` : ''}\nDXF Standards: ${orderData.dxf_standards}\nTask Priority: ${orderData.task_priority}\nDate Ordered: ${orderData.date_ordered}`,
+            description: `
+<h3>📋 Order Information</h3>
+<table style="width:100%; border-collapse: collapse; margin-bottom: 20px;">
+    <tr style="background-color: #f0f0f0;">
+        <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold; width: 30%;">Job Name</td>
+        <td style="padding: 8px; border: 1px solid #ddd;">${orderData.job_number}</td>
+    </tr>
+    <tr>
+        <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Profile Name</td>
+        <td style="padding: 8px; border: 1px solid #ddd;">${orderData.profile_name}</td>
+    </tr>
+    <tr style="background-color: #f0f0f0;">
+        <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Customer</td>
+        <td style="padding: 8px; border: 1px solid #ddd;">${orderData.customer_name}</td>
+    </tr>
+    <tr>
+        <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Date Ordered</td>
+        <td style="padding: 8px; border: 1px solid #ddd;">${orderData.date_ordered}</td>
+    </tr>
+</table>
+
+<h3>🔧 Material Specifications</h3>
+<table style="width:100%; border-collapse: collapse; margin-bottom: 20px;">
+    <tr style="background-color: #f0f0f0;">
+        <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold; width: 30%;">Material Type</td>
+        <td style="padding: 8px; border: 1px solid #ddd;">${orderData.metal_type}</td>
+    </tr>
+    <tr>
+        <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Gauge</td>
+        <td style="padding: 8px; border: 1px solid #ddd;">${orderData.metal_gauge}</td>
+    </tr>
+    <tr style="background-color: #f0f0f0;">
+        <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Color</td>
+        <td style="padding: 8px; border: 1px solid #ddd;">${orderData.color} (${orderData.color_manufacturer})</td>
+    </tr>
+</table>
+
+<h3>📐 Dimensions & Quantity</h3>
+<table style="width:100%; border-collapse: collapse; margin-bottom: 20px;">
+    <tr style="background-color: #f0f0f0;">
+        <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold; width: 30%;">Quantity</td>
+        <td style="padding: 8px; border: 1px solid #ddd;">${orderData.quantity}</td>
+    </tr>
+    <tr>
+        <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Length</td>
+        <td style="padding: 8px; border: 1px solid #ddd;">${orderData.length} inches</td>
+    </tr>
+    <tr style="background-color: #f0f0f0;">
+        <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Material Usage</td>
+        <td style="padding: 8px; border: 1px solid #ddd;">${orderData.material_usage} inches</td>
+    </tr>
+    <tr>
+        <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Ribs</td>
+        <td style="padding: 8px; border: 1px solid #ddd;">${orderData.ribs}</td>
+    </tr>
+</table>
+
+${orderData.has_holes ? `
+<h3>🔩 Hole Specifications</h3>
+<table style="width:100%; border-collapse: collapse; margin-bottom: 20px;">
+    <tr style="background-color: #f0f0f0;">
+        <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold; width: 30%;">Hole Size</td>
+        <td style="padding: 8px; border: 1px solid #ddd;">${orderData.hole_size || 'Not specified'} inches</td>
+    </tr>
+    <tr>
+        <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Hole Spacing (OC)</td>
+        <td style="padding: 8px; border: 1px solid #ddd;">${orderData.hole_spacing || 'Not specified'} inches</td>
+    </tr>
+    <tr style="background-color: #f0f0f0;">
+        <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Start From End (OC)</td>
+        <td style="padding: 8px; border: 1px solid #ddd;">${orderData.start_from_end || 'Not specified'} inches</td>
+    </tr>
+    <tr>
+        <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Distance From Edge (OC)</td>
+        <td style="padding: 8px; border: 1px solid #ddd;">${orderData.distance_from_edge || 'Not specified'} inches</td>
+    </tr>
+</table>
+` : '<p><strong>Holes:</strong> No</p>'}
+
+<h3>⚙️ Production Details</h3>
+<table style="width:100%; border-collapse: collapse; margin-bottom: 20px;">
+    <tr style="background-color: #f0f0f0;">
+        <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold; width: 30%;">DXF Standards</td>
+        <td style="padding: 8px; border: 1px solid #ddd;">${orderData.dxf_standards}</td>
+    </tr>
+    <tr>
+        <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Task Priority</td>
+        <td style="padding: 8px; border: 1px solid #ddd;">${orderData.task_priority}</td>
+    </tr>
+</table>
+`,
             project_id: false,  // You may want to create a default project or ask user to select
             date_deadline: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]  // 1 week from now
         };
