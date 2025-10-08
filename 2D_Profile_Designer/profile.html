@@ -5963,7 +5963,7 @@ async function createManufacturingTask(orderData, imageBlob) {
     try {
         // Create the manufacturing task using existing Odoo session
         const taskData = {
-            name: `${orderData.profile_name} - ${orderData.customer_name}`,
+            name: `${orderData.profile_name} | ${orderData.customer_name}`,
             description: `
 <h3>📋 Order Information</h3>
 <table style="width:100%; border-collapse: collapse; margin-bottom: 20px;">
@@ -6055,7 +6055,7 @@ ${orderData.has_holes ? `
     </tr>
 </table>
 `,
-            project_id: false,  // You may want to create a default project or ask user to select
+            project_id: 6,  // Product Orders
             date_deadline: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]  // 1 week from now
         };
 
