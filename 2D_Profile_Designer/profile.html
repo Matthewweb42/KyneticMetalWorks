@@ -4526,7 +4526,7 @@ ORDERING:
             const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
             circle.setAttribute('cx', point.x);
             circle.setAttribute('cy', point.y);
-            circle.setAttribute('r', isEditMode ? 8 : 6); // Fixed size - no zoom scaling
+            circle.setAttribute('r', isEditMode ? 6 : 5); // Smaller vertices - reduced from 8/6 to 6/5
             circle.setAttribute('class', isEditMode ? 'point draggable' : 'point');
             circle.setAttribute('data-index', index);
             
@@ -4682,6 +4682,79 @@ ORDERING:
             snapGuides.forEach(guide => guide.remove());
         }
 
+        function calculateLabelPosition(start, end, lineIndex) {
+            // Base midpoint position
+            const baseMidX = (start.x + end.x) / 2;
+            const baseMidY = (start.y + end.y) / 2;
+
+            // Calculate perpendicular offset direction (always offset perpendicular to line)
+            const dx = end.x - start.x;
+            const dy = end.y - start.y;
+            const lineLength = Math.sqrt(dx * dx + dy * dy);
+
+            if (lineLength === 0) return { x: baseMidX, y: baseMidY - 24 };
+
+            // Normalized perpendicular vector (rotated 90 degrees)
+            const perpX = -dy / lineLength;
+            const perpY = dx / lineLength;
+
+            // Try different offset distances to find one that doesn't overlap vertices
+            const vertexRadius = 12; // Collision radius around vertices (slightly larger than visual radius)
+            const labelHeight = 16; // Approximate label height
+            const offsets = [24, 32, 40, 48, 56]; // Try progressively larger offsets
+
+            for (let offset of offsets) {
+                // Try both sides of the line
+                for (let side of [1, -1]) {
+                    const testX = baseMidX + perpX * offset * side;
+                    const testY = baseMidY + perpY * offset * side;
+
+                    // Check if this position collides with any vertex
+                    let hasCollision = false;
+                    for (let point of points) {
+                        const distX = testX - point.x;
+                        const distY = testY - point.y;
+                        const distance = Math.sqrt(distX * distX + distY * distY);
+
+                        if (distance < vertexRadius) {
+                            hasCollision = true;
+                            break;
+                        }
+                    }
+
+                    // If no collision, use this position
+                    if (!hasCollision) {
+                        return { x: testX, y: testY };
+                    }
+                }
+            }
+
+            // Fallback: if all positions collide, try along the line instead
+            // Try 1/3 and 2/3 positions along the line
+            const thirdX = start.x + dx * 0.33;
+            const thirdY = start.y + dy * 0.33;
+
+            let hasCollisionAtThird = false;
+            for (let point of points) {
+                const distX = thirdX - point.x;
+                const distY = thirdY - point.y;
+                const distance = Math.sqrt(distX * distX + distY * distY);
+                if (distance < vertexRadius) {
+                    hasCollisionAtThird = true;
+                    break;
+                }
+            }
+
+            if (!hasCollisionAtThird) {
+                return { x: thirdX, y: thirdY - 20 };
+            }
+
+            // Final fallback: use 2/3 position
+            const twoThirdX = start.x + dx * 0.67;
+            const twoThirdY = start.y + dy * 0.67;
+            return { x: twoThirdX, y: twoThirdY - 20 };
+        }
+
         function drawMeasurements() {
             labelsGroup.innerHTML = '';
             const lineCount = points.length - 1;
@@ -4689,30 +4762,29 @@ ORDERING:
                 // Get current and next points
                 const current = points[i];
                 const next = points[i + 1];
-                
+
                 // Special handling for hems
-                const isRegularHem = typeof window.hemVertexIndex !== 'undefined' && 
-                                   i === points.length - 2 && 
+                const isRegularHem = typeof window.hemVertexIndex !== 'undefined' &&
+                                   i === points.length - 2 &&
                                    window.hemVertexIndex === points.length - 2;
-                                   
+
                 const isFirstPointHem = points[0].isHem && i === 0;
-                
+
                 // Skip measurement for regular hems but not for first point hems with exactly 2 points
                 if (isRegularHem && !isFirstPointHem) {
                     continue;
                 }
-                
+
                 // Calculate length using DXF coordinates
                 const currentDxf = screenToDxf(current);
                 const nextDxf = screenToDxf(next);
                 const deltaX = nextDxf.x - currentDxf.x;
                 const deltaY = nextDxf.y - currentDxf.y;
                 const length = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
-                
-                // Move permanent label off the line, above it in white space
-                const midX = (current.x + next.x) / 2;
-                const midY = (current.y + next.y) / 2 - 24;
-                createClickableLabel(midX, midY, formatLength(length), 'measurement-label', 'length', i);
+
+                // Calculate optimal label position avoiding vertices
+                const labelPos = calculateLabelPosition(current, next, i);
+                createClickableLabel(labelPos.x, labelPos.y, formatLength(length), 'measurement-label', 'length', i);
             }
             
             // Draw angle measurements for interior vertices
@@ -6090,16 +6162,78 @@ function getOrderSheetData() {
     return data;
 }
 
-async function createManufacturingTask(orderData, imageBlob) {
+async function createManufacturingTask(orderData, profileImageBlob) {
     try {
-        console.log('=== STARTING PROFILE SUBMISSION ===');
+        console.log('=== STARTING PROFILE SUBMISSION VIA EMAIL ===');
         console.log('Order Data:', orderData);
 
-        // CONFIGURATION: Change this ID to your permanent "inbox" lead/opportunity
-        const INBOX_LEAD_ID = 13;
+        // CONFIGURATION: Set your email address where submissions should be sent
+        const SUBMISSION_EMAIL = 'matthew@webecke.com'; // Change this to your email
 
-        // Create the message body with all profile information
-        const messageBody = `
+        // Generate the order sheet image
+        console.log('Generating order sheet image...');
+        let orderSheetBlob = null;
+        try {
+            // Load html2canvas if not available
+            if (typeof html2canvas === 'undefined') {
+                console.log('Loading html2canvas library...');
+                await loadHtml2Canvas();
+            }
+
+            // Populate and show the print sheet
+            console.log('Populating print sheet...');
+            populatePrintSheetFromDesigner();
+
+            const printSheet = document.getElementById('printSheetSection');
+            console.log('Print sheet element found:', !!printSheet);
+
+            if (printSheet) {
+                // Make it visible but off-screen
+                printSheet.style.display = 'block';
+                printSheet.style.visibility = 'visible';
+                printSheet.style.position = 'fixed';
+                printSheet.style.top = '-10000px';
+                printSheet.style.left = '0';
+                printSheet.style.width = '8.5in';
+                printSheet.style.height = '11in';
+                printSheet.style.zIndex = '-1';
+
+                // Wait longer for rendering
+                console.log('Waiting for render...');
+                await new Promise(resolve => setTimeout(resolve, 1000));
+
+                // Capture it with html2canvas
+                console.log('Capturing with html2canvas...');
+                const canvas = await html2canvas(printSheet, {
+                    backgroundColor: '#ffffff',
+                    scale: 2,
+                    useCORS: true,
+                    allowTaint: true,
+                    logging: true,
+                    width: 816, // 8.5 inches * 96 DPI
+                    height: 1056 // 11 inches * 96 DPI
+                });
+
+                console.log('Canvas created:', canvas.width, 'x', canvas.height);
+
+                orderSheetBlob = await new Promise((resolve) => {
+                    canvas.toBlob(resolve, 'image/png', 1.0);
+                });
+
+                console.log('✓ Order sheet captured successfully! Size:', orderSheetBlob?.size, 'bytes');
+
+                // Hide it again
+                printSheet.style.display = 'none';
+            } else {
+                console.error('Print sheet element not found!');
+            }
+        } catch (sheetErr) {
+            console.error('Failed to capture order sheet:', sheetErr);
+            console.error('Error stack:', sheetErr.stack);
+        }
+
+        // Create a simple, clean email body
+        const emailBody = `
 <h2>🆕 New Profile Design Request</h2>
 <p><strong>Submitted by:</strong> ${orderData.customer_name}</p>
 <p><strong>Submission Time:</strong> ${new Date().toLocaleString()}</p>
@@ -6196,177 +6330,117 @@ ${orderData.has_holes ? `
 </table>
 `;
 
-        console.log('Message Body to Submit:', messageBody);
+        console.log('Email Body to Submit:', emailBody);
 
-        // First, post the message to the inbox lead
-        const messagePayload = {
-            jsonrpc: '2.0',
-            method: 'call',
-            params: {
-                model: 'crm.lead',
-                method: 'message_post',
-                args: [[INBOX_LEAD_ID]],
-                kwargs: {
-                    body: messageBody,
-                    message_type: 'comment',
-                    subtype_xmlid: 'mail.mt_comment'
-                }
-            },
-            id: Math.floor(Math.random() * 1000000)
-        };
+        // Send via FormSubmit.co (free email service)
+        // Create FormData to send email
+        const formData = new FormData();
+        formData.append('_subject', `New Profile Request: ${orderData.profile_name} | ${orderData.customer_name}`);
+        formData.append('_template', 'table'); // Use table template for better formatting
+        formData.append('_captcha', 'false'); // Disable captcha for seamless submission
 
-        console.log('API Payload:', messagePayload);
+        // Add all order data as individual fields for better email formatting
+        formData.append('Customer_Name', orderData.customer_name || 'Not provided');
+        formData.append('Customer_Email', orderData.customer_email || 'Not provided');
+        formData.append('Customer_Phone', orderData.customer_phone || 'Not provided');
+        formData.append('Job_Number', orderData.job_number || 'Not provided');
+        formData.append('Profile_Name', orderData.profile_name || 'Not provided');
+        formData.append('Date_Ordered', orderData.date_ordered || 'Not provided');
+        formData.append('Metal_Type', orderData.metal_type || 'Not provided');
+        formData.append('Metal_Gauge', orderData.metal_gauge || 'Not provided');
+        formData.append('Color', `${orderData.color} (${orderData.color_manufacturer})` || 'Not provided');
+        formData.append('Quantity', orderData.quantity || 'Not provided');
+        formData.append('Length', orderData.length + ' inches' || 'Not provided');
+        formData.append('Material_Usage', orderData.material_usage + ' inches' || 'Not provided');
+        formData.append('Ribs', orderData.ribs || '0');
+        formData.append('Has_Holes', orderData.has_holes ? 'Yes' : 'No');
 
-        const messageResponse = await fetch('/web/dataset/call_kw', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(messagePayload)
-        });
-
-        console.log('API Response Status:', messageResponse.status, messageResponse.statusText);
-
-        const messageResult = await messageResponse.json();
-        console.log('API Response Body:', messageResult);
-
-        if (messageResult.error) {
-            console.error('API Error Details:', messageResult.error);
-            throw new Error(messageResult.error.data.message || 'Error posting message');
+        if (orderData.has_holes) {
+            formData.append('Hole_Size', orderData.hole_size || 'Not specified');
+            formData.append('Hole_Spacing', orderData.hole_spacing || 'Not specified');
+            formData.append('Start_From_End', orderData.start_from_end || 'Not specified');
+            formData.append('Distance_From_Edge', orderData.distance_from_edge || 'Not specified');
         }
 
-        const messageId = messageResult.result;
-        console.log('Message Posted Successfully! Message ID:', messageId);
+        formData.append('DXF_Standards', orderData.dxf_standards || 'Not specified');
+        formData.append('Task_Priority', orderData.task_priority || 'Not specified');
 
-        const taskId = INBOX_LEAD_ID;
+        // Note: emailBody is not sent - all data is in individual fields above
+        // The images contain all visual information
 
-        // If we have an image, convert to base64 and post it to the task chatter via message_post
-        if (imageBlob && taskId) {
-            try {
-                console.log('Converting image to base64 for Odoo upload...');
-                const base64 = await new Promise((resolve, reject) => {
-                    const reader = new FileReader();
-                    reader.onload = () => {
-                        try {
-                            const result = reader.result.split(',')[1]; // Remove data URL prefix
-                            resolve(result);
-                        } catch (e) {
-                            reject(e);
-                        }
-                    };
-                    reader.onerror = () => reject(new Error('Failed to read image blob'));
-                    reader.readAsDataURL(imageBlob);
-                });
+        console.log('Sending email via FormSubmit...');
+        console.log('DEBUG: profileImageBlob =', profileImageBlob);
+        console.log('DEBUG: profileImageBlob type =', profileImageBlob?.type);
+        console.log('DEBUG: profileImageBlob size =', profileImageBlob?.size);
+        console.log('DEBUG: orderSheetBlob =', orderSheetBlob);
+        console.log('DEBUG: orderSheetBlob type =', orderSheetBlob?.type);
+        console.log('DEBUG: orderSheetBlob size =', orderSheetBlob?.size);
 
-                console.log('Base64 conversion successful, length:', base64.length);
-                console.log('First 100 chars of base64:', base64.substring(0, 100));
-                console.log('Last 100 chars of base64:', base64.substring(base64.length - 100));
+        // Add profile image if available
+        if (profileImageBlob && profileImageBlob.size > 0) {
+            const profileFilename = `Profile_${(orderData.profile_name || 'design').replace(/[^a-z0-9\-_.]/gi, '_')}_${Date.now()}.png`;
+            formData.append('attachment', profileImageBlob, profileFilename);
+            console.log('✓ Added profile image attachment:', profileFilename, profileImageBlob.size, 'bytes');
+        } else {
+            console.warn('⚠ No profile image blob to attach!');
+        }
 
-                const filename = `${(orderData.profile_name || 'profile').replace(/[^a-z0-9\-_.]/gi, '_')}_${Date.now()}.png`;
+        // Add order sheet image if available
+        if (orderSheetBlob && orderSheetBlob.size > 0) {
+            const sheetFilename = `OrderSheet_${(orderData.profile_name || 'order').replace(/[^a-z0-9\-_.]/gi, '_')}_${Date.now()}.png`;
+            formData.append('attachment', orderSheetBlob, sheetFilename);
+            console.log('✓ Added order sheet attachment:', sheetFilename, orderSheetBlob.size, 'bytes');
+        } else {
+            console.warn('⚠ No order sheet blob to attach!');
+        }
 
-                // Try creating ir.attachment first, then link it via message_post
-                console.log('Creating ir.attachment record...');
-                const attachResponse = await fetch('/web/dataset/call_kw', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        jsonrpc: '2.0',
-                        method: 'call',
-                        params: {
-                            model: 'ir.attachment',
-                            method: 'create',
-                            args: [{
-                                name: filename,
-                                datas: base64,
-                                res_model: 'crm.lead',
-                                res_id: INBOX_LEAD_ID,
-                                type: 'binary',
-                                mimetype: 'image/png'
-                            }],
-                            kwargs: {}
-                        },
-                        id: Math.floor(Math.random() * 1000000)
-                    })
-                });
-                
-                const attachResult = await attachResponse.json();
-                console.log('ir.attachment create response:', attachResult);
-                
-                if (attachResult.error) {
-                    console.error('Failed to create ir.attachment:', attachResult.error);
-                    // Fallback: try message_post with inline attachments
-                    console.log('Falling back to message_post with inline attachments...');
-                    const postResponse = await fetch('/web/dataset/call_kw', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            jsonrpc: '2.0',
-                            method: 'call',
-                            params: {
-                                model: 'crm.lead',
-                                method: 'message_post',
-                                args: [[INBOX_LEAD_ID]],
-                                kwargs: {
-                                    body: 'Profile Design Image',
-                                    attachments: [[filename, base64]]
-                                }
-                            },
-                            id: Math.floor(Math.random() * 1000000)
-                        })
-                    });
-
-                    const postResult = await postResponse.json();
-                    console.log('Fallback message_post response:', postResult);
-                } else {
-                    const attachmentId = attachResult.result;
-                    console.log('Successfully created attachment with ID:', attachmentId);
-                    
-                    // Now link the attachment to the task via message_post
-                    console.log('Linking attachment to task chatter...');
-                    const postResponse = await fetch('/web/dataset/call_kw', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            jsonrpc: '2.0',
-                            method: 'call',
-                            params: {
-                                model: 'crm.lead',
-                                method: 'message_post',
-                                args: [[INBOX_LEAD_ID]],
-                                kwargs: {
-                                    body: 'Profile Design Image',
-                                    attachment_ids: [attachmentId]
-                                }
-                            },
-                            id: Math.floor(Math.random() * 1000000)
-                        })
-                    });
-
-                    const postResult = await postResponse.json();
-                    console.log('message_post with attachment_ids response:', postResult);
-                    
-                    if (postResult.error) {
-                        console.error('Failed to link attachment via message_post:', postResult.error);
-                    } else {
-                        console.log('Successfully linked attachment to task chatter');
-                    }
-                }
-            } catch (attachErr) {
-                console.error('Failed to attach image to task:', attachErr);
+        // Debug: Log all FormData entries
+        console.log('DEBUG: FormData contents:');
+        for (let pair of formData.entries()) {
+            if (pair[1] instanceof Blob) {
+                console.log(`  ${pair[0]}: [Blob ${pair[1].size} bytes, type: ${pair[1].type}]`);
+            } else {
+                console.log(`  ${pair[0]}: ${pair[1]}`);
             }
-        } else if (!imageBlob) {
-            console.log('No image blob captured, task created without image');
         }
 
-        console.log('=== PROFILE SUBMISSION COMPLETE ===');
-        console.log('Posted to Inbox Lead ID:', INBOX_LEAD_ID);
-        console.log('Message ID:', messageId);
+        // Send the email via FormSubmit.co
+        // NOTE: The first time you use a new email, FormSubmit will send a confirmation email
+        const formSubmitURL = `https://formsubmit.co/${SUBMISSION_EMAIL}`;
 
-        return {
-            success: true,
-            inbox_lead_id: INBOX_LEAD_ID,
-            message_id: messageId
-        };
+        try {
+            console.log('Sending form to:', formSubmitURL);
+            console.log('FormData has', Array.from(formData.entries()).length, 'entries');
+
+            const emailResponse = await fetch(formSubmitURL, {
+                method: 'POST',
+                body: formData
+            });
+
+            console.log('Email Response Status:', emailResponse.status, emailResponse.statusText);
+            console.log('Email Response Headers:', Object.fromEntries(emailResponse.headers.entries()));
+
+            // Try to read response body for debugging
+            const responseText = await emailResponse.text();
+            console.log('Email Response Body (first 500 chars):', responseText.substring(0, 500));
+
+            if (!emailResponse.ok) {
+                throw new Error(`Failed to send email: ${emailResponse.status} ${emailResponse.statusText}\nResponse: ${responseText}`);
+            }
+
+            console.log('=== PROFILE SUBMISSION COMPLETE VIA EMAIL ===');
+            console.log('Email sent to:', SUBMISSION_EMAIL);
+
+            return {
+                success: true,
+                method: 'email',
+                sent_to: SUBMISSION_EMAIL
+            };
+
+        } catch (error) {
+            console.error('Failed to send email:', error);
+            throw error;
+        }
 
     } catch (error) {
         console.error('=== LEAD CREATION FAILED ===');
