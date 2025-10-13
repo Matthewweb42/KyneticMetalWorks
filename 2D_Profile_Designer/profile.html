@@ -37,10 +37,12 @@
 
         // Hole specifications
         data.has_holes = document.getElementById('hasHoles')?.checked || false;
-        data.hole_size = getHoleSizeValue().toString();
-        data.hole_spacing = getHoleSpacingValue().toString();
-        data.start_from_end = document.getElementById('startFromEnd')?.value || '';
-        data.distance_from_edge = document.getElementById('distanceFromEdge')?.value || '';
+        const holeUnit = document.querySelector('input[name="holeUnits"]:checked')?.value || 'inches';
+        data.hole_unit = holeUnit;
+        data.hole_size = getHoleSizeValue().toFixed(holeUnit === 'mm' ? 1 : 4);
+        data.hole_spacing = getHoleSpacingValue().toFixed(holeUnit === 'mm' ? 1 : 4);
+        data.start_from_end = getStartFromEndValue().toFixed(holeUnit === 'mm' ? 1 : 4);
+        data.distance_from_edge = getDistanceFromEdgeValue().toFixed(holeUnit === 'mm' ? 1 : 4);
 
         // Ribs specifications
         data.has_ribs = document.getElementById('hasRibs')?.checked || false;
@@ -426,7 +428,7 @@
         }
 
         .measurement-label {
-            fill: #3498db;
+            fill: #000000;
             font-size: 12px;
             font-weight: bold;
             font-family: 'Segoe UI', sans-serif;
@@ -1684,47 +1686,58 @@
                 <!-- Third Column: Hole Specifications -->
                 <div class="col">
                     <div id="holeFields" style="display: none; margin-top: 10px;">
+                        <!-- Unit Toggle -->
+                        <div class="field-group" style="margin-bottom: 12px; padding: 8px; background: #f8f9fa; border-radius: 4px;">
+                            <span class="field-label" style="margin-right: 10px;">Units:</span>
+                            <label style="margin-right: 15px; cursor: pointer;">
+                                <input type="radio" name="holeUnits" value="inches" checked onchange="updateHoleUnitLabels()"> Inches
+                            </label>
+                            <label style="cursor: pointer;">
+                                <input type="radio" name="holeUnits" value="mm" onchange="updateHoleUnitLabels()"> Millimeters
+                            </label>
+                        </div>
+
                         <div class="field-group">
-                            <span class="field-label">Hole Size (inches):</span>
+                            <span class="field-label"><span id="holeSizeLabel">Hole Size (inches):</span></span>
                             <div class="increment-input-container">
-                                <input type="number" id="holeSizeWhole" class="order-input" min="0" value="0" style="width: 50px;">
-                                <span class="increment-controls">
+                                <input type="number" id="holeSizeWhole" class="order-input" min="0" value="0" step="0.1" style="width: 70px;">
+                                <span class="increment-controls" id="holeSizeControls">
                                     <button type="button" onclick="adjustHoleSize('holeSize', 1)" style="font-size: 10px; width: 20px; height: 15px;">+</button>
                                     <span id="holeSizeFraction" class="fraction-display">1/4</span>
                                     <button type="button" onclick="adjustHoleSize('holeSize', -1)" style="font-size: 10px; width: 20px; height: 15px;">-</button>
                                 </span>
                             </div>
                         </div>
-                        
+
                         <div class="field-group">
-                            <span class="field-label">Hole Spacing (OC inches):</span>
+                            <span class="field-label"><span id="holeSpacingLabel">Spacing (OC inches):</span></span>
                             <div class="increment-input-container">
-                                <input type="number" id="holeSpacingWhole" class="order-input" min="0" value="12" style="width: 50px;">
-                                <span class="increment-controls">
+                                <input type="number" id="holeSpacingWhole" class="order-input" min="0" value="12" step="0.1" style="width: 70px;">
+                                <span class="increment-controls" id="holeSpacingControls">
                                     <button type="button" onclick="adjustHoleSize('holeSpacing', 1)" style="font-size: 10px; width: 20px; height: 15px;">+</button>
                                     <span id="holeSpacingFraction" class="fraction-display">0</span>
                                     <button type="button" onclick="adjustHoleSize('holeSpacing', -1)" style="font-size: 10px; width: 20px; height: 15px;">-</button>
                                 </span>
                             </div>
                         </div>
-                        
+
                         <div class="field-group">
-                            <span class="field-label">Start From End (OC inches):</span>
+                            <span class="field-label"><span id="startFromEndLabel">From End (OC inches):</span></span>
                             <div class="increment-input-container">
-                                <input type="number" id="startFromEndWhole" class="order-input" min="0" value="6" style="width: 50px;">
-                                <span class="increment-controls">
+                                <input type="number" id="startFromEndWhole" class="order-input" min="0" value="6" step="0.1" style="width: 70px;">
+                                <span class="increment-controls" id="startFromEndControls">
                                     <button type="button" onclick="adjustHoleSize('startFromEnd', 1)" style="font-size: 10px; width: 20px; height: 15px;">+</button>
                                     <span id="startFromEndFraction" class="fraction-display">0</span>
                                     <button type="button" onclick="adjustHoleSize('startFromEnd', -1)" style="font-size: 10px; width: 20px; height: 15px;">-</button>
                                 </span>
                             </div>
                         </div>
-                        
+
                         <div class="field-group">
-                            <span class="field-label">Distance From Edge (OC inches):</span>
+                            <span class="field-label"><span id="distanceFromEdgeLabel">From Edge (OC inches):</span></span>
                             <div class="increment-input-container">
-                                <input type="number" id="distanceFromEdgeWhole" class="order-input" min="0" value="1" style="width: 50px;">
-                                <span class="increment-controls">
+                                <input type="number" id="distanceFromEdgeWhole" class="order-input" min="0" value="1" step="0.1" style="width: 70px;">
+                                <span class="increment-controls" id="distanceFromEdgeControls">
                                     <button type="button" onclick="adjustHoleSize('distanceFromEdge', 1)" style="font-size: 10px; width: 20px; height: 15px;">+</button>
                                     <span id="distanceFromEdgeFraction" class="fraction-display">0</span>
                                     <button type="button" onclick="adjustHoleSize('distanceFromEdge', -1)" style="font-size: 10px; width: 20px; height: 15px;">-</button>
@@ -2981,86 +2994,177 @@ ORDERING:
         let currentDistanceFromEdgeSixteenths = 0; // Default 1 inch = 0 sixteenths
 
         function adjustHoleSize(fieldType, direction) {
-            let currentSixteenths;
-            let displayElement;
-            let wholeElement;
-            
-            switch(fieldType) {
-                case 'holeSize':
-                    currentHoleSizeSixteenths = Math.max(1, Math.min(16, currentHoleSizeSixteenths + direction));
-                    currentSixteenths = currentHoleSizeSixteenths;
-                    displayElement = document.getElementById('holeSizeFraction');
-                    wholeElement = document.getElementById('holeSizeWhole');
-                    break;
-                case 'holeSpacing':
-                    currentHoleSpacingSixteenths = Math.max(0, Math.min(16, currentHoleSpacingSixteenths + direction));
-                    currentSixteenths = currentHoleSpacingSixteenths;
-                    displayElement = document.getElementById('holeSpacingFraction');
-                    wholeElement = document.getElementById('holeSpacingWhole');
-                    break;
-                case 'startFromEnd':
-                    currentStartFromEndSixteenths = Math.max(0, Math.min(16, currentStartFromEndSixteenths + direction));
-                    currentSixteenths = currentStartFromEndSixteenths;
-                    displayElement = document.getElementById('startFromEndFraction');
-                    wholeElement = document.getElementById('startFromEndWhole');
-                    break;
-                case 'distanceFromEdge':
-                    currentDistanceFromEdgeSixteenths = Math.max(0, Math.min(16, currentDistanceFromEdgeSixteenths + direction));
-                    currentSixteenths = currentDistanceFromEdgeSixteenths;
-                    displayElement = document.getElementById('distanceFromEdgeFraction');
-                    wholeElement = document.getElementById('distanceFromEdgeWhole');
-                    break;
-            }
-            
-            // Handle rollover to next whole inch
-            if (currentSixteenths > 16) {
-                currentSixteenths = 1;
-                wholeElement.value = parseInt(wholeElement.value) + 1;
-                switch(fieldType) {
-                    case 'holeSize': currentHoleSizeSixteenths = 1; break;
-                    case 'holeSpacing': currentHoleSpacingSixteenths = 1; break;
-                    case 'startFromEnd': currentStartFromEndSixteenths = 1; break;
-                    case 'distanceFromEdge': currentDistanceFromEdgeSixteenths = 1; break;
-                }
-            }
-            // Handle rollunder to previous whole inch
-            else if (currentSixteenths < 0 && parseInt(wholeElement.value) > 0) {
-                currentSixteenths = 16;
-                wholeElement.value = parseInt(wholeElement.value) - 1;
-                switch(fieldType) {
-                    case 'holeSize': currentHoleSizeSixteenths = 16; break;
-                    case 'holeSpacing': currentHoleSpacingSixteenths = 16; break;
-                    case 'startFromEnd': currentStartFromEndSixteenths = 16; break;
-                    case 'distanceFromEdge': currentDistanceFromEdgeSixteenths = 16; break;
-                }
-            }
-            
-            if (currentSixteenths === 0) {
-                displayElement.textContent = '0';
+            const isMetric = document.querySelector('input[name="holeUnits"]:checked').value === 'mm';
+            let wholeElement = document.getElementById(fieldType + 'Whole');
+
+            if (isMetric) {
+                // Metric mode: increment by 0.1 mm
+                let currentValue = parseFloat(wholeElement.value) || 0;
+                currentValue += direction * 0.1;
+                currentValue = Math.max(0, Math.round(currentValue * 10) / 10); // Round to 1 decimal
+                wholeElement.value = currentValue.toFixed(1);
             } else {
-                displayElement.textContent = simplifyFraction(currentSixteenths);
+                // Imperial mode: increment by 1/16 inch, max 15/16
+                let currentSixteenths;
+                let displayElement;
+
+                switch(fieldType) {
+                    case 'holeSize':
+                        currentHoleSizeSixteenths = Math.max(1, Math.min(15, currentHoleSizeSixteenths + direction));
+                        currentSixteenths = currentHoleSizeSixteenths;
+                        displayElement = document.getElementById('holeSizeFraction');
+                        break;
+                    case 'holeSpacing':
+                        currentHoleSpacingSixteenths = Math.max(0, Math.min(15, currentHoleSpacingSixteenths + direction));
+                        currentSixteenths = currentHoleSpacingSixteenths;
+                        displayElement = document.getElementById('holeSpacingFraction');
+                        break;
+                    case 'startFromEnd':
+                        currentStartFromEndSixteenths = Math.max(0, Math.min(15, currentStartFromEndSixteenths + direction));
+                        currentSixteenths = currentStartFromEndSixteenths;
+                        displayElement = document.getElementById('startFromEndFraction');
+                        break;
+                    case 'distanceFromEdge':
+                        currentDistanceFromEdgeSixteenths = Math.max(0, Math.min(15, currentDistanceFromEdgeSixteenths + direction));
+                        currentSixteenths = currentDistanceFromEdgeSixteenths;
+                        displayElement = document.getElementById('distanceFromEdgeFraction');
+                        break;
+                }
+
+                // Handle rollover to next whole inch (when reaching 16/16)
+                if (currentSixteenths > 15) {
+                    currentSixteenths = 0;
+                    wholeElement.value = parseInt(wholeElement.value) + 1;
+                    switch(fieldType) {
+                        case 'holeSize': currentHoleSizeSixteenths = 0; break;
+                        case 'holeSpacing': currentHoleSpacingSixteenths = 0; break;
+                        case 'startFromEnd': currentStartFromEndSixteenths = 0; break;
+                        case 'distanceFromEdge': currentDistanceFromEdgeSixteenths = 0; break;
+                    }
+                }
+                // Handle rollunder to previous whole inch
+                else if (currentSixteenths < 0 && parseInt(wholeElement.value) > 0) {
+                    currentSixteenths = 15;
+                    wholeElement.value = parseInt(wholeElement.value) - 1;
+                    switch(fieldType) {
+                        case 'holeSize': currentHoleSizeSixteenths = 15; break;
+                        case 'holeSpacing': currentHoleSpacingSixteenths = 15; break;
+                        case 'startFromEnd': currentStartFromEndSixteenths = 15; break;
+                        case 'distanceFromEdge': currentDistanceFromEdgeSixteenths = 15; break;
+                    }
+                }
+
+                if (currentSixteenths === 0) {
+                    displayElement.textContent = '0';
+                } else {
+                    displayElement.textContent = simplifyFraction(currentSixteenths);
+                }
             }
         }
 
         // Helper functions to get hole values in decimal format for compatibility
         function getHoleSizeValue() {
-            const whole = parseInt(document.getElementById('holeSizeWhole').value) || 0;
-            return whole + (currentHoleSizeSixteenths / 16);
+            const isMetric = document.querySelector('input[name="holeUnits"]:checked').value === 'mm';
+            const value = parseFloat(document.getElementById('holeSizeWhole').value) || 0;
+
+            if (isMetric) {
+                // Return mm value as-is
+                return value;
+            } else {
+                // Return inches (whole + fraction)
+                return value + (currentHoleSizeSixteenths / 16);
+            }
         }
 
         function getHoleSpacingValue() {
-            const whole = parseInt(document.getElementById('holeSpacingWhole').value) || 0;
-            return whole + (currentHoleSpacingSixteenths / 16);
+            const isMetric = document.querySelector('input[name="holeUnits"]:checked').value === 'mm';
+            const value = parseFloat(document.getElementById('holeSpacingWhole').value) || 0;
+
+            if (isMetric) {
+                return value;
+            } else {
+                return value + (currentHoleSpacingSixteenths / 16);
+            }
         }
 
         function getStartFromEndValue() {
-            const whole = parseInt(document.getElementById('startFromEndWhole').value) || 0;
-            return whole + (currentStartFromEndSixteenths / 16);
+            const isMetric = document.querySelector('input[name="holeUnits"]:checked').value === 'mm';
+            const value = parseFloat(document.getElementById('startFromEndWhole').value) || 0;
+
+            if (isMetric) {
+                return value;
+            } else {
+                return value + (currentStartFromEndSixteenths / 16);
+            }
         }
 
         function getDistanceFromEdgeValue() {
-            const whole = parseInt(document.getElementById('distanceFromEdgeWhole').value) || 0;
-            return whole + (currentDistanceFromEdgeSixteenths / 16);
+            const isMetric = document.querySelector('input[name="holeUnits"]:checked').value === 'mm';
+            const value = parseFloat(document.getElementById('distanceFromEdgeWhole').value) || 0;
+
+            if (isMetric) {
+                return value;
+            } else {
+                return value + (currentDistanceFromEdgeSixteenths / 16);
+            }
+        }
+
+        // Update hole measurement unit labels
+        function updateHoleUnitLabels() {
+            const isMetric = document.querySelector('input[name="holeUnits"]:checked').value === 'mm';
+            const unit = isMetric ? 'mm' : 'inches';
+
+            // Update labels
+            document.getElementById('holeSizeLabel').textContent = `Hole Size (${unit}):`;
+            document.getElementById('holeSpacingLabel').textContent = `Spacing (OC ${unit}):`;
+            document.getElementById('startFromEndLabel').textContent = `From End (OC ${unit}):`;
+            document.getElementById('distanceFromEdgeLabel').textContent = `From Edge (OC ${unit}):`;
+
+            // Show/hide fraction displays and update values
+            const fractionDisplays = ['holeSize', 'holeSpacing', 'startFromEnd', 'distanceFromEdge'];
+
+            fractionDisplays.forEach(field => {
+                const controls = document.getElementById(field + 'Controls');
+                const wholeInput = document.getElementById(field + 'Whole');
+
+                if (isMetric) {
+                    // Hide fraction controls in metric mode
+                    controls.style.display = 'none';
+                    // Convert current value to mm (1 inch = 25.4 mm)
+                    const currentInches = parseFloat(wholeInput.value) || 0;
+                    const currentMm = currentInches * 25.4;
+                    wholeInput.value = currentMm.toFixed(1);
+                } else {
+                    // Show fraction controls in imperial mode
+                    controls.style.display = 'inline-flex';
+                    // Convert current value to inches (1 mm = 0.0393701 inches)
+                    const currentMm = parseFloat(wholeInput.value) || 0;
+                    const currentInches = currentMm / 25.4;
+                    const wholeInches = Math.floor(currentInches);
+                    const fractionInches = currentInches - wholeInches;
+                    const sixteenths = Math.round(fractionInches * 16);
+
+                    wholeInput.value = wholeInches;
+
+                    // Update the sixteenths variables and display
+                    const fractionDisplay = document.getElementById(field + 'Fraction');
+                    switch(field) {
+                        case 'holeSize':
+                            currentHoleSizeSixteenths = sixteenths;
+                            break;
+                        case 'holeSpacing':
+                            currentHoleSpacingSixteenths = sixteenths;
+                            break;
+                        case 'startFromEnd':
+                            currentStartFromEndSixteenths = sixteenths;
+                            break;
+                        case 'distanceFromEdge':
+                            currentDistanceFromEdgeSixteenths = sixteenths;
+                            break;
+                    }
+                    fractionDisplay.textContent = sixteenths === 0 ? '0' : simplifyFraction(sixteenths);
+                }
+            });
         }
 
         // Helper functions to set hole values from decimal format
@@ -5054,10 +5158,12 @@ ORDERING:
 
         function updateStats() {
             let totalLength = 0;
+
+            // Calculate line segments length
             for (let i = 0; i < points.length - 1; i++) {
                 const current = points[i];
                 const next = points[i + 1];
-                
+
                 // Calculate length using DXF coordinates
                 const currentDxf = screenToDxf(current);
                 const nextDxf = screenToDxf(next);
@@ -5065,7 +5171,18 @@ ORDERING:
                 const deltaY = nextDxf.y - currentDxf.y;
                 totalLength += Math.sqrt(deltaX * deltaX + deltaY * deltaY);
             }
-            
+
+            // Add hem lengths to total material usage
+            points.forEach(point => {
+                if (point.isHem && point.hemData && point.hemData.length) {
+                    // Hem length is already in inches
+                    const hemLength = typeof point.hemData.length === 'number'
+                        ? point.hemData.length
+                        : parseFloat(point.hemData.length) || 0;
+                    totalLength += hemLength;
+                }
+            });
+
             document.getElementById('totalLength').textContent = formatLength(totalLength);
         }
 
@@ -5524,7 +5641,7 @@ function submitProfileRequest() {
 }
 
 function createTaskData() {
-    // Calculate total length
+    // Calculate total length (line segments)
     let totalLength = 0;
     for (let i = 0; i < points.length - 1; i++) {
         const current = points[i];
@@ -5535,7 +5652,17 @@ function createTaskData() {
         const deltaY = nextDxf.y - currentDxf.y;
         totalLength += Math.sqrt(deltaX * deltaX + deltaY * deltaY);
     }
-    
+
+    // Add hem lengths to total material usage
+    points.forEach(point => {
+        if (point.isHem && point.hemData && point.hemData.length) {
+            const hemLength = typeof point.hemData.length === 'number'
+                ? point.hemData.length
+                : parseFloat(point.hemData.length) || 0;
+            totalLength += hemLength;
+        }
+    });
+
     // Collect hem information
     const hemData = points.filter(p => p.isHem && p.hemData).map(p => p.hemData);
     
@@ -5906,10 +6033,12 @@ async function sendToKynetic() {
 
         // Send to Odoo (include imageBlob when available)
         const result = await createManufacturingTask(orderData, imageBlob);
-        
+
         if (result.success) {
-            alert('Successfully sent to Kynetic Manufacturing System!\nTask ID: ' + result.task_id);
+            console.log('SUCCESS! Result:', result);
+            alert('✓ Profile Design Submitted Successfully!\n\nYour profile request has been sent to Kynetic Metal Works.\n\nProfile: ' + orderData.profile_name + '\nCustomer: ' + orderData.customer_name + '\n\nOur team will review your submission and contact you shortly.');
         } else {
+            console.error('FAILED! Result:', result);
             alert('Error sending to Kynetic: ' + (result.error || 'Unknown error'));
         }
 
@@ -5947,10 +6076,12 @@ function getOrderSheetData() {
 
     // Hole specifications
     data.has_holes = document.getElementById('hasHoles')?.checked || false;
-    data.hole_size = document.getElementById('holeSize')?.value || '';
-    data.hole_spacing = document.getElementById('holeSpacing')?.value || '';
-    data.start_from_end = document.getElementById('startFromEnd')?.value || '';
-    data.distance_from_edge = document.getElementById('distanceFromEdge')?.value || '';
+    const holeUnit = document.querySelector('input[name="holeUnits"]:checked')?.value || 'inches';
+    data.hole_unit = holeUnit;
+    data.hole_size = getHoleSizeValue().toFixed(holeUnit === 'mm' ? 1 : 4) + ' ' + holeUnit;
+    data.hole_spacing = getHoleSpacingValue().toFixed(holeUnit === 'mm' ? 1 : 4) + ' ' + holeUnit;
+    data.start_from_end = getStartFromEndValue().toFixed(holeUnit === 'mm' ? 1 : 4) + ' ' + holeUnit;
+    data.distance_from_edge = getDistanceFromEdgeValue().toFixed(holeUnit === 'mm' ? 1 : 4) + ' ' + holeUnit;
 
     // DXF and task specifications
     data.dxf_standards = document.getElementById('dxfStandards')?.value || '';
@@ -5961,10 +6092,19 @@ function getOrderSheetData() {
 
 async function createManufacturingTask(orderData, imageBlob) {
     try {
-        // Create the manufacturing task using existing Odoo session
-        const taskData = {
-            name: `${orderData.profile_name} | ${orderData.customer_name}`,
-            description: `
+        console.log('=== STARTING PROFILE SUBMISSION ===');
+        console.log('Order Data:', orderData);
+
+        // CONFIGURATION: Change this ID to your permanent "inbox" lead/opportunity
+        const INBOX_LEAD_ID = 13;
+
+        // Create the message body with all profile information
+        const messageBody = `
+<h2>🆕 New Profile Design Request</h2>
+<p><strong>Submitted by:</strong> ${orderData.customer_name}</p>
+<p><strong>Submission Time:</strong> ${new Date().toLocaleString()}</p>
+<hr/>
+
 <h3>📋 Order Information</h3>
 <table style="width:100%; border-collapse: collapse; margin-bottom: 20px;">
     <tr style="background-color: #f0f0f0;">
@@ -6026,19 +6166,19 @@ ${orderData.has_holes ? `
 <table style="width:100%; border-collapse: collapse; margin-bottom: 20px;">
     <tr style="background-color: #f0f0f0;">
         <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold; width: 30%;">Hole Size</td>
-        <td style="padding: 8px; border: 1px solid #ddd;">${orderData.hole_size || 'Not specified'} inches</td>
+        <td style="padding: 8px; border: 1px solid #ddd;">${orderData.hole_size || 'Not specified'}</td>
     </tr>
     <tr>
         <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Hole Spacing (OC)</td>
-        <td style="padding: 8px; border: 1px solid #ddd;">${orderData.hole_spacing || 'Not specified'} inches</td>
+        <td style="padding: 8px; border: 1px solid #ddd;">${orderData.hole_spacing || 'Not specified'}</td>
     </tr>
     <tr style="background-color: #f0f0f0;">
         <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Start From End (OC)</td>
-        <td style="padding: 8px; border: 1px solid #ddd;">${orderData.start_from_end || 'Not specified'} inches</td>
+        <td style="padding: 8px; border: 1px solid #ddd;">${orderData.start_from_end || 'Not specified'}</td>
     </tr>
     <tr>
         <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Distance From Edge (OC)</td>
-        <td style="padding: 8px; border: 1px solid #ddd;">${orderData.distance_from_edge || 'Not specified'} inches</td>
+        <td style="padding: 8px; border: 1px solid #ddd;">${orderData.distance_from_edge || 'Not specified'}</td>
     </tr>
 </table>
 ` : '<p><strong>Holes:</strong> No</p>'}
@@ -6054,36 +6194,51 @@ ${orderData.has_holes ? `
         <td style="padding: 8px; border: 1px solid #ddd;">${orderData.task_priority}</td>
     </tr>
 </table>
-`,
-            project_id: 6,  // Product Orders
-            date_deadline: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]  // 1 week from now
+`;
+
+        console.log('Message Body to Submit:', messageBody);
+
+        // First, post the message to the inbox lead
+        const messagePayload = {
+            jsonrpc: '2.0',
+            method: 'call',
+            params: {
+                model: 'crm.lead',
+                method: 'message_post',
+                args: [[INBOX_LEAD_ID]],
+                kwargs: {
+                    body: messageBody,
+                    message_type: 'comment',
+                    subtype_xmlid: 'mail.mt_comment'
+                }
+            },
+            id: Math.floor(Math.random() * 1000000)
         };
 
-        const createResponse = await fetch('/web/dataset/call_kw', {
+        console.log('API Payload:', messagePayload);
+
+        const messageResponse = await fetch('/web/dataset/call_kw', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({
-                jsonrpc: '2.0',
-                method: 'call',
-                params: {
-                    model: 'project.task',
-                    method: 'create',
-                    args: [taskData],
-                    kwargs: {}
-                },
-                id: Math.floor(Math.random() * 1000000)
-            })
+            body: JSON.stringify(messagePayload)
         });
 
-        const createResult = await createResponse.json();
-        
-        if (createResult.error) {
-            throw new Error(createResult.error.data.message || 'Error creating task');
+        console.log('API Response Status:', messageResponse.status, messageResponse.statusText);
+
+        const messageResult = await messageResponse.json();
+        console.log('API Response Body:', messageResult);
+
+        if (messageResult.error) {
+            console.error('API Error Details:', messageResult.error);
+            throw new Error(messageResult.error.data.message || 'Error posting message');
         }
 
-        const taskId = createResult.result;
+        const messageId = messageResult.result;
+        console.log('Message Posted Successfully! Message ID:', messageId);
+
+        const taskId = INBOX_LEAD_ID;
 
         // If we have an image, convert to base64 and post it to the task chatter via message_post
         if (imageBlob && taskId) {
@@ -6123,8 +6278,8 @@ ${orderData.has_holes ? `
                             args: [{
                                 name: filename,
                                 datas: base64,
-                                res_model: 'project.task',
-                                res_id: taskId,
+                                res_model: 'crm.lead',
+                                res_id: INBOX_LEAD_ID,
                                 type: 'binary',
                                 mimetype: 'image/png'
                             }],
@@ -6148,9 +6303,9 @@ ${orderData.has_holes ? `
                             jsonrpc: '2.0',
                             method: 'call',
                             params: {
-                                model: 'project.task',
+                                model: 'crm.lead',
                                 method: 'message_post',
-                                args: [[taskId]],
+                                args: [[INBOX_LEAD_ID]],
                                 kwargs: {
                                     body: 'Profile Design Image',
                                     attachments: [[filename, base64]]
@@ -6175,9 +6330,9 @@ ${orderData.has_holes ? `
                             jsonrpc: '2.0',
                             method: 'call',
                             params: {
-                                model: 'project.task',
+                                model: 'crm.lead',
                                 method: 'message_post',
-                                args: [[taskId]],
+                                args: [[INBOX_LEAD_ID]],
                                 kwargs: {
                                     body: 'Profile Design Image',
                                     attachment_ids: [attachmentId]
@@ -6203,13 +6358,20 @@ ${orderData.has_holes ? `
             console.log('No image blob captured, task created without image');
         }
 
+        console.log('=== PROFILE SUBMISSION COMPLETE ===');
+        console.log('Posted to Inbox Lead ID:', INBOX_LEAD_ID);
+        console.log('Message ID:', messageId);
+
         return {
             success: true,
-            task_id: taskId
+            inbox_lead_id: INBOX_LEAD_ID,
+            message_id: messageId
         };
 
     } catch (error) {
-        console.error('Odoo integration error:', error);
+        console.error('=== LEAD CREATION FAILED ===');
+        console.error('Error Details:', error);
+        console.error('Error Stack:', error.stack);
         return {
             success: false,
             error: error.message
