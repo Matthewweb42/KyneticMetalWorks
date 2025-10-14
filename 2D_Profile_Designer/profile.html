@@ -5,7 +5,7 @@
         // Gather data from designer fields
         const data = {};
         data.customer_name = document.getElementById('customerName')?.value || '';
-        data.job_number = document.getElementById('jobName')?.value || '';
+        data.job_name = document.getElementById('jobName')?.value || '';
         data.profile_name = document.getElementById('profileName')?.value || '';
         data.color = document.getElementById('color')?.value || '';
         data.color_manufacturer = document.getElementById('colorManufacturer')?.value || '';
@@ -88,15 +88,6 @@
             // Clone and add the SVG
             const svgClone = originalSvg.cloneNode(true);
             
-            // Center the SVG within the drawing area
-            svgClone.style.width = '95%';
-            svgClone.style.height = '95%';
-            svgClone.style.position = 'absolute';
-            svgClone.style.top = '50%';
-            svgClone.style.left = '50%';
-            svgClone.style.transform = 'translate(-50%, -50%)';
-            svgClone.style.border = '1px solid #ccc';
-            
             // Scale the viewBox to fit content properly
             const bbox = originalSvg.getBBox ? originalSvg.getBBox() : null;
             if (bbox && bbox.width > 0 && bbox.height > 0) {
@@ -104,6 +95,13 @@
                 svgClone.setAttribute('viewBox', `${bbox.x - padding} ${bbox.y - padding} ${bbox.width + padding * 2} ${bbox.height + padding * 2}`);
                 svgClone.setAttribute('preserveAspectRatio', 'xMidYMid meet');
             }
+            
+            // Center the SVG within the drawing area
+            svgClone.style.width = '95%';
+            svgClone.style.height = '95%';
+            svgClone.style.display = 'block';
+            svgClone.style.margin = '2.5% auto';
+            svgClone.style.border = '1px solid #ccc';
             
             drawingArea.appendChild(svgClone);
         }
@@ -6008,8 +6006,8 @@ async function sendToKynetic() {
         const orderData = getOrderSheetData();
         
         // Validate required fields
-        if (!orderData.customer_name || !orderData.job_number || !orderData.profile_name) {
-            alert('Please fill in Customer Name, Job Number, and Profile Name before sending to Kynetic.');
+        if (!orderData.customer_name || !orderData.job_name || !orderData.profile_name) {
+            alert('Please fill in Customer Name, Job Name, and Profile Name before sending to Kynetic.');
             return;
         }
 
@@ -6020,37 +6018,46 @@ async function sendToKynetic() {
         // Capture complete profile using the same logic as populatePrintSheetFromDesigner
         let imageBlob = null;
         try {
-            console.log('Capturing complete profile image for Odoo upload...');
+            console.log('=== STARTING PROFILE IMAGE CAPTURE ===');
+            console.log('Step 1: Looking for canvas element...');
             const originalSvg = document.getElementById('canvas');
             
             if (!originalSvg) {
-                console.warn('SVG canvas not found for image capture');
+                console.error('❌ SVG canvas not found for image capture!');
+                console.log('Available elements with id:', Array.from(document.querySelectorAll('[id]')).map(el => el.id));
             } else {
-                // Use the same logic as the print sheet to get the complete profile view
+                console.log('✓ Canvas element found:', originalSvg);
+                console.log('Step 2: Cloning SVG...');
                 const svgClone = originalSvg.cloneNode(true);
+                console.log('✓ SVG cloned');
                 
                 // Get the bounding box of the actual content (same as print logic)
+                console.log('Step 3: Getting bounding box...');
                 const bbox = originalSvg.getBBox ? originalSvg.getBBox() : null;
+                console.log('BBox result:', bbox);
                 
                 if (bbox && bbox.width > 0 && bbox.height > 0) {
-                    console.log('Profile bbox:', bbox);
+                    console.log('✓ Using content bbox:', bbox);
                     
                     // Use the same padding as the print logic
                     const padding = 50;
                     svgClone.setAttribute('viewBox', `${bbox.x - padding} ${bbox.y - padding} ${bbox.width + padding * 2} ${bbox.height + padding * 2}`);
                     svgClone.setAttribute('preserveAspectRatio', 'xMidYMid meet');
                 } else {
-                    console.log('Using fallback viewBox');
+                    console.log('⚠ Using fallback viewBox (bbox not available)');
                     svgClone.setAttribute('viewBox', '0 0 800 600');
                     svgClone.setAttribute('preserveAspectRatio', 'xMidYMid meet');
                 }
                 
+                console.log('Step 4: Styling SVG clone...');
                 // Set up the SVG for capture (similar to print sheet styling)
                 svgClone.style.width = '800px';
                 svgClone.style.height = '600px';
                 svgClone.style.background = 'white';
                 svgClone.id = 'temp-capture-svg';
+                console.log('✓ SVG styled');
                 
+                console.log('Step 5: Creating temporary container...');
                 // Create a temporary container (like the print drawing area)
                 const tempContainer = document.createElement('div');
                 tempContainer.style.position = 'absolute';
@@ -6064,44 +6071,66 @@ async function sendToKynetic() {
                 tempContainer.style.justifyContent = 'center';
                 tempContainer.appendChild(svgClone);
                 document.body.appendChild(tempContainer);
+                console.log('✓ Temporary container created and added to DOM');
                 
                 try {
+                    console.log('Step 6: Loading html2canvas...');
                     // Load html2canvas if not available
                     if (typeof html2canvas === 'undefined') {
+                        console.log('html2canvas not loaded, loading now...');
                         await loadHtml2Canvas();
+                        console.log('✓ html2canvas loaded');
+                    } else {
+                        console.log('✓ html2canvas already available');
                     }
                     
+                    console.log('Step 7: Waiting for render (100ms)...');
+                    // Small delay to ensure container is fully rendered
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                    console.log('✓ Wait complete');
+                    
+                    console.log('Step 8: Capturing with html2canvas...');
                     // Capture the temporary container (same approach as print)
                     const canvas = await html2canvas(tempContainer, {
                         backgroundColor: 'white',
                         scale: 2,
                         useCORS: true,
                         allowTaint: true,
-                        logging: false,
+                        logging: true,
                         width: 800,
                         height: 600,
                         scrollX: 0,
                         scrollY: 0
                     });
+                    console.log('✓ Canvas created:', canvas.width, 'x', canvas.height);
                     
+                    console.log('Step 9: Converting canvas to blob...');
                     imageBlob = await new Promise((resolve) => {
                         canvas.toBlob(resolve, 'image/png', 1.0);
                     });
+                    console.log('✓ Blob created:', imageBlob);
                     
                 } finally {
+                    console.log('Step 10: Cleaning up temporary container...');
                     // Clean up temporary elements
                     document.body.removeChild(tempContainer);
+                    console.log('✓ Cleanup complete');
                 }
                 
-                if (imageBlob) {
-                    console.log('Successfully captured complete profile image using print logic, size:', imageBlob.size, 'bytes');
+                if (imageBlob && imageBlob.size > 0) {
+                    console.log('✅ SUCCESS! Profile image captured, size:', imageBlob.size, 'bytes');
                 } else {
-                    console.warn('Failed to create image blob from canvas');
+                    console.error('❌ FAILED! Image blob is null or empty:', imageBlob);
                 }
             }
         } catch (captureErr) {
-            console.warn('Image capture failed, continuing without image:', captureErr);
+            console.error('❌ EXCEPTION during image capture:', captureErr);
+            console.error('Error stack:', captureErr.stack);
         }
+        
+        console.log('=== PROFILE IMAGE CAPTURE COMPLETE ===');
+        console.log('Final imageBlob:', imageBlob);
+        console.log('imageBlob size:', imageBlob?.size || 'N/A');
 
         // Send to Odoo (include imageBlob when available)
         const result = await createManufacturingTask(orderData, imageBlob);
@@ -6128,7 +6157,7 @@ function getOrderSheetData() {
     // Use the same data collection logic as the print sheet
     const data = {};
     data.customer_name = document.getElementById('customerName')?.value || '';
-    data.job_number = document.getElementById('jobName')?.value || '';
+    data.job_name = document.getElementById('jobName')?.value || '';
     data.profile_name = document.getElementById('profileName')?.value || '';
     data.color = document.getElementById('color')?.value || '';
     data.color_manufacturer = document.getElementById('colorManufacturer')?.value || '';
@@ -6198,9 +6227,9 @@ async function createManufacturingTask(orderData, profileImageBlob) {
                 printSheet.style.height = '11in';
                 printSheet.style.zIndex = '-1';
 
-                // Wait longer for rendering
+                // Wait longer for rendering (especially for SVG to settle)
                 console.log('Waiting for render...');
-                await new Promise(resolve => setTimeout(resolve, 1000));
+                await new Promise(resolve => setTimeout(resolve, 1500));
 
                 // Capture it with html2canvas
                 console.log('Capturing with html2canvas...');
@@ -6243,7 +6272,7 @@ async function createManufacturingTask(orderData, profileImageBlob) {
 <table style="width:100%; border-collapse: collapse; margin-bottom: 20px;">
     <tr style="background-color: #f0f0f0;">
         <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold; width: 30%;">Job Name</td>
-        <td style="padding: 8px; border: 1px solid #ddd;">${orderData.job_number}</td>
+        <td style="padding: 8px; border: 1px solid #ddd;">${orderData.job_name}</td>
     </tr>
     <tr>
         <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Profile Name</td>
@@ -6341,9 +6370,9 @@ ${orderData.has_holes ? `
 
         // Add all order data as individual fields for better email formatting
         formData.append('Customer_Name', orderData.customer_name || 'Not provided');
-        formData.append('Customer_Email', orderData.customer_email || 'Not provided');
-        formData.append('Customer_Phone', orderData.customer_phone || 'Not provided');
-        formData.append('Job_Number', orderData.job_number || 'Not provided');
+        // formData.append('Customer_Email', orderData.customer_email || 'Not provided');
+        // formData.append('Customer_Phone', orderData.customer_phone || 'Not provided');
+        formData.append('Job_Name', orderData.job_name || 'Not provided');
         formData.append('Profile_Name', orderData.profile_name || 'Not provided');
         formData.append('Date_Ordered', orderData.date_ordered || 'Not provided');
         formData.append('Metal_Type', orderData.metal_type || 'Not provided');
@@ -6376,19 +6405,19 @@ ${orderData.has_holes ? `
         console.log('DEBUG: orderSheetBlob type =', orderSheetBlob?.type);
         console.log('DEBUG: orderSheetBlob size =', orderSheetBlob?.size);
 
-        // Add profile image if available
+        // Add profile image if available (use unique field name)
         if (profileImageBlob && profileImageBlob.size > 0) {
             const profileFilename = `Profile_${(orderData.profile_name || 'design').replace(/[^a-z0-9\-_.]/gi, '_')}_${Date.now()}.png`;
-            formData.append('attachment', profileImageBlob, profileFilename);
+            formData.append('Profile_Image', profileImageBlob, profileFilename);
             console.log('✓ Added profile image attachment:', profileFilename, profileImageBlob.size, 'bytes');
         } else {
             console.warn('⚠ No profile image blob to attach!');
         }
 
-        // Add order sheet image if available
+        // Add order sheet image if available (use unique field name)
         if (orderSheetBlob && orderSheetBlob.size > 0) {
             const sheetFilename = `OrderSheet_${(orderData.profile_name || 'order').replace(/[^a-z0-9\-_.]/gi, '_')}_${Date.now()}.png`;
-            formData.append('attachment', orderSheetBlob, sheetFilename);
+            formData.append('Order_Sheet', orderSheetBlob, sheetFilename);
             console.log('✓ Added order sheet attachment:', sheetFilename, orderSheetBlob.size, 'bytes');
         } else {
             console.warn('⚠ No order sheet blob to attach!');
@@ -6504,7 +6533,7 @@ ${orderData.has_holes ? `
                 <div class="col">
                     <div class="field-group">
                         <span class="field-label inline">Job:</span>
-                        <span class="data-field wide" data-field="job_number" data-placeholder="Job Name"></span>
+                        <span class="data-field wide" data-field="job_name" data-placeholder="Job Name"></span>
                     </div>
                 </div>
             </div>
