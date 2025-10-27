@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2D Profile Designer - Kynetic Metal Works</title>
+    <link rel="stylesheet" href="styles/main.css">
+</head>
+<body>
+    <div id="app">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="logo-section">
+                <h1>2D Profile Designer</h1>
+            </div>
+            <div class="header-actions">
+                <button id="btn-new" class="btn btn-primary" title="New Profile (Ctrl+N)">New</button>
+                <button id="btn-open" class="btn btn-secondary" title="Open Profile (Ctrl+O)">Open</button>
+                <button id="btn-save" class="btn btn-secondary" title="Save Profile (Ctrl+S)">Save</button>
+                <button id="btn-export-dxf" class="btn btn-secondary" title="Export to DXF">Export DXF</button>
+                <button id="btn-export-svg" class="btn btn-secondary" title="Export to SVG">Export SVG</button>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <div class="app-content">
+            <!-- Tool Palette -->
+            <aside class="tool-palette">
+                <h3>Tools</h3>
+                <div class="tool-group">
+                    <button id="tool-select" class="tool-btn active" data-tool="select" title="Select Tool (V)">
+                        <span class="tool-icon">⊙</span>
+                        <span class="tool-label">Select</span>
+                    </button>
+                    <button id="tool-line" class="tool-btn" data-tool="line" title="Line Tool (L)">
+                        <span class="tool-icon">╱</span>
+                        <span class="tool-label">Line</span>
+                    </button>
+                    <button id="tool-hem" class="tool-btn" data-tool="hem" title="Hem Tool (H)">
+                        <span class="tool-icon">⊙</span>
+                        <span class="tool-label">Hem</span>
+                    </button>
+                </div>
+
+                <h3>View</h3>
+                <div class="tool-group">
+                    <button id="view-zoom-in" class="tool-btn" title="Zoom In (+)">
+                        <span class="tool-icon">+</span>
+                        <span class="tool-label">Zoom In</span>
+                    </button>
+                    <button id="view-zoom-out" class="tool-btn" title="Zoom Out (-)">
+                        <span class="tool-icon">−</span>
+                        <span class="tool-label">Zoom Out</span>
+                    </button>
+                    <button id="view-fit" class="tool-btn" title="Fit to View (F)">
+                        <span class="tool-icon">⛶</span>
+                        <span class="tool-label">Fit View</span>
+                    </button>
+                    <button id="view-grid" class="tool-btn active" data-toggle="grid" title="Toggle Grid (G)">
+                        <span class="tool-icon">#</span>
+                        <span class="tool-label">Grid</span>
+                    </button>
+                    <button id="view-snap" class="tool-btn active" data-toggle="snap" title="Toggle Snap (Shift+G)">
+                        <span class="tool-icon">⊞</span>
+                        <span class="tool-label">Snap</span>
+                    </button>
+                </div>
+
+                <h3>Edit</h3>
+                <div class="tool-group">
+                    <button id="edit-undo" class="tool-btn" title="Undo (Ctrl+Z)">
+                        <span class="tool-icon">↶</span>
+                        <span class="tool-label">Undo</span>
+                    </button>
+                    <button id="edit-redo" class="tool-btn" title="Redo (Ctrl+Y)">
+                        <span class="tool-icon">↷</span>
+                        <span class="tool-label">Redo</span>
+                    </button>
+                    <button id="edit-delete" class="tool-btn" title="Delete (Del)">
+                        <span class="tool-icon">✕</span>
+                        <span class="tool-label">Delete</span>
+                    </button>
+                </div>
+            </aside>
+
+            <!-- Canvas Area -->
+            <main class="canvas-container">
+                <div id="canvas-wrapper" class="canvas-wrapper">
+                    <!-- Canvas will be created here by JavaScript -->
+                </div>
+                <div class="status-bar">
+                    <span id="status-coords">X: 0.00, Y: 0.00</span>
+                    <span id="status-zoom">Zoom: 100%</span>
+                    <span id="status-tool">Tool: Select</span>
+                    <span id="status-snap">Snap: ON</span>
+                </div>
+            </main>
+
+            <!-- Properties Panel -->
+            <aside class="properties-panel">
+                <h3>Properties</h3>
+                <div id="properties-content" class="properties-content">
+                    <div class="property-section">
+                        <h4>Grid Settings</h4>
+                        <div class="property-field">
+                            <label for="grid-spacing">Spacing:</label>
+                            <input type="number" id="grid-spacing" value="10" min="1" step="1">
+                            <span class="unit">mm</span>
+                        </div>
+                        <div class="property-field">
+                            <label for="grid-subdivisions">Subdivisions:</label>
+                            <input type="number" id="grid-subdivisions" value="5" min="1" max="10" step="1">
+                        </div>
+                    </div>
+
+                    <div class="property-section">
+                        <h4>Material</h4>
+                        <div class="property-field">
+                            <label for="material-thickness">Thickness:</label>
+                            <input type="number" id="material-thickness" value="1.5" min="0.1" step="0.1">
+                            <span class="unit">mm</span>
+                        </div>
+                        <div class="property-field">
+                            <label for="material-kfactor">K-Factor:</label>
+                            <input type="number" id="material-kfactor" value="0.44" min="0" max="1" step="0.01">
+                        </div>
+                        <div class="property-field">
+                            <label for="bend-radius">Bend Radius:</label>
+                            <input type="number" id="bend-radius" value="3" min="0" step="0.1">
+                            <span class="unit">mm</span>
+                        </div>
+                    </div>
+
+                    <div class="property-section">
+                        <h4>Hem Settings</h4>
+                        <div class="property-field">
+                            <label for="hem-length">Hem Length:</label>
+                            <input type="number" id="hem-length" value="5" min="1" step="0.5">
+                            <span class="unit">mm</span>
+                        </div>
+                        <div class="property-field">
+                            <label>Type:</label>
+                            <span>180° Fold Back</span>
+                        </div>
+                    </div>
+
+                    <div class="property-section">
+                        <h4>Units</h4>
+                        <div class="property-field">
+                            <label for="units">Display Units:</label>
+                            <select id="units">
+                                <option value="mm" selected>Millimeters (mm)</option>
+                                <option value="in">Inches (in)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="property-section" id="selection-properties" style="display: none;">
+                        <h4>Selection</h4>
+                        <div id="selection-properties-content">
+                            <!-- Dynamic content based on selection -->
+                        </div>
+                    </div>
+                </div>
+            </aside>
+        </div>
+    </div>
+
+    <!-- Load JavaScript modules -->
+    <script type="module" src="js/main.js"></script>
+</body>
+</html>
