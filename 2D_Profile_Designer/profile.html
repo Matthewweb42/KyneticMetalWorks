@@ -621,14 +621,14 @@
         }
 
         .point {
-            fill: #3498db;
+            fill: #ff6b35;
             stroke: white;
             stroke-width: 2;
             cursor: pointer;
         }
 
         .point:hover {
-            fill: #2980b9;
+            fill: #e85a2d;
             stroke-width: 3;
         }
 
@@ -4122,26 +4122,26 @@ ORDERING:
             boxGroup.setAttribute('id', `hem-info-box-${hemInfo.index}`);
             boxGroup.setAttribute('data-hem-index', hemInfo.index);
             
-            // Background box - dark professional styling
+            // Background box - light cream styling
             const box = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
             box.setAttribute('x', bestPos.x);
             box.setAttribute('y', bestPos.y);
             box.setAttribute('width', boxWidth);
             box.setAttribute('height', boxHeight);
-            box.setAttribute('fill', '#2c2c2c'); // Dark charcoal background
+            box.setAttribute('fill', '#fff5e6'); // Light cream background (consistent)
             box.setAttribute('stroke', '#ff6b35'); // Orange border
-            box.setAttribute('stroke-width', 1 / zoomLevel); // Thinner border (1px instead of 2px)
+            box.setAttribute('stroke-width', 1 / zoomLevel); // Thin border (1px)
             box.setAttribute('stroke-opacity', '0.6'); // Subtle orange border
-            box.setAttribute('rx', 3 / zoomLevel); // Smaller rounded corners (3px instead of 5px)
-            box.setAttribute('opacity', '0.85'); // Slightly transparent for low-key appearance
+            box.setAttribute('rx', 3 / zoomLevel); // Smaller rounded corners (3px)
+            box.setAttribute('opacity', '0.85'); // Slightly transparent
             boxGroup.appendChild(box);
 
-            // Add text lines with professional dark theme colors
+            // Add text lines with colors for light background
             lines.forEach((line, index) => {
                 const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
                 text.setAttribute('x', bestPos.x + padding/2);
                 text.setAttribute('y', bestPos.y + (index + 1) * lineHeight);
-                text.setAttribute('fill', index === 0 ? '#ff8c5a' : '#e0e0e0'); // Softer orange and light gray
+                text.setAttribute('fill', index === 0 ? '#ff6b35' : '#2c3e50'); // Orange and dark text
                 text.setAttribute('font-size', fontSize);
                 text.setAttribute('font-weight', index === 0 ? 'bold' : 'normal');
                 text.textContent = line;
@@ -4186,18 +4186,18 @@ ORDERING:
             // Make the box draggable by its edges
             boxGroup.style.cursor = 'move';
             
-            // Add hover effects
+            // Add hover effects - keep consistent light cream color
             boxGroup.addEventListener('mouseenter', function() {
                 const currentBox = boxGroup.querySelector('rect');
-                currentBox.setAttribute('stroke-width', (3 / zoomLevel));
-                currentBox.setAttribute('fill', '#fff5e6');
+                currentBox.setAttribute('stroke-width', (2 / zoomLevel)); // Slightly thicker on hover
+                // Keep fill as #fff5e6 (no change)
             });
-            
+
             boxGroup.addEventListener('mouseleave', function() {
                 if (!isDragging) {
                     const currentBox = boxGroup.querySelector('rect');
-                    currentBox.setAttribute('stroke-width', (2 / zoomLevel));
-                    currentBox.setAttribute('fill', '#fffbe6');
+                    currentBox.setAttribute('stroke-width', (1 / zoomLevel)); // Back to normal
+                    currentBox.setAttribute('fill', '#fff5e6'); // Ensure consistent color
                 }
             });
             
@@ -4642,7 +4642,7 @@ ORDERING:
 
             // Arrow parameters
             const arrowSize = 12; // 12px wide chevron
-            const arrowOffset = 10; // Distance from line
+            const arrowOffset = 3; // Distance from line (reduced from 10px to prevent label overlap)
             const arrowDepth = 6; // How far the chevron point extends
 
             // Direction to offset arrow (based on coated side)
@@ -4912,10 +4912,8 @@ ORDERING:
                 // Calculate optimal label position avoiding vertices and other labels
                 const labelPos = calculateLabelPosition(current, next, i, labelText);
 
-                // Draw leader line if needed
-                if (labelPos.needsLeader) {
-                    createLeaderLine(labelPos.x, labelPos.y, labelPos.targetX, labelPos.targetY);
-                }
+                // Always draw leader line to show connection to segment
+                createLeaderLine(labelPos.x, labelPos.y, labelPos.targetX, labelPos.targetY);
 
                 // Create the label
                 createClickableLabel(labelPos.x, labelPos.y, labelText, 'measurement-label', 'length', i);
@@ -4943,8 +4941,12 @@ ORDERING:
                     labelText = `${Math.round(angle)}°`;
                 }
 
-                // Calculate position for supplementary angle label (on exterior side)
-                const exteriorLabelPos = calculateExteriorLabelPosition(prev, current, next);
+                // Calculate position for supplementary angle label with collision detection
+                const exteriorLabelPos = calculateExteriorLabelPosition(prev, current, next, labelText, placedLabels);
+
+                // Always draw leader line to show connection to vertex
+                createLeaderLine(exteriorLabelPos.x, exteriorLabelPos.y, exteriorLabelPos.targetX, exteriorLabelPos.targetY);
+
                 createClickableLabel(exteriorLabelPos.x, exteriorLabelPos.y, labelText, 'angle-label', 'angle', i - 1);
 
                 // Track angle label position for collision detection
@@ -5192,42 +5194,89 @@ ORDERING:
             return supplementaryAngle;
         }
 
-        function calculateExteriorLabelPosition(prev, current, next) {
+        function calculateExteriorLabelPosition(prev, current, next, labelText, placedLabels) {
             // Calculate vectors from current vertex to adjacent vertices
             const vec1 = { x: prev.x - current.x, y: prev.y - current.y };
             const vec2 = { x: next.x - current.x, y: next.y - current.y };
-            
+
             // Normalize vectors
             const mag1 = Math.sqrt(vec1.x * vec1.x + vec1.y * vec1.y);
             const mag2 = Math.sqrt(vec2.x * vec2.x + vec2.y * vec2.y);
-            
+
             const norm1 = { x: vec1.x / mag1, y: vec1.y / mag1 };
             const norm2 = { x: vec2.x / mag2, y: vec2.y / mag2 };
-            
+
             // Calculate bisector direction (average of normalized vectors)
             let bisector = { x: norm1.x + norm2.x, y: norm1.y + norm2.y };
             const bisectorMag = Math.sqrt(bisector.x * bisector.x + bisector.y * bisector.y);
-            
+
             if (bisectorMag > 0) {
                 bisector.x /= bisectorMag;
                 bisector.y /= bisectorMag;
             }
-            
+
             // Determine if we need to flip the bisector to point to exterior
-            // Cross product to determine turn direction
             const cross = vec1.x * vec2.y - vec1.y * vec2.x;
-            
+
             // If cross product is positive, interior is to the left, so flip bisector
             if (cross > 0) {
                 bisector.x = -bisector.x;
                 bisector.y = -bisector.y;
             }
-            
-            // Position label 40 pixels away from vertex along exterior bisector
-            const labelDistance = 40;
+
+            // Calculate label dimensions
+            const textWidth = labelText ? labelText.length * 8 : 40;
+            const labelWidth = textWidth + 8;
+            const labelHeight = 16;
+
+            // Try multiple distances to avoid collisions (similar to line measurements)
+            const distances = [40, 50, 60, 70, 80, 90, 100, 110, 120];
+            const vertexRadius = 12; // Collision radius around vertices
+
+            for (let distance of distances) {
+                const testX = current.x + bisector.x * distance;
+                const testY = current.y + bisector.y * distance;
+
+                // Check vertex collisions
+                let hasVertexCollision = false;
+                for (let point of points) {
+                    const distX = testX - point.x;
+                    const distY = testY - point.y;
+                    const dist = Math.sqrt(distX * distX + distY * distY);
+                    if (dist < vertexRadius) {
+                        hasVertexCollision = true;
+                        break;
+                    }
+                }
+
+                // Check label-to-label collisions
+                const labelX = testX - labelWidth / 2;
+                const labelY = testY - labelHeight / 2;
+                const hasLabelCollision = checkLabelCollisions(labelX, labelY, labelWidth, labelHeight, placedLabels);
+
+                // If no collision, use this position
+                if (!hasVertexCollision && !hasLabelCollision) {
+                    return {
+                        x: testX,
+                        y: testY,
+                        needsLeader: distance > 80, // Use leader line if far away
+                        targetX: current.x,
+                        targetY: current.y
+                    };
+                }
+            }
+
+            // Fallback: place far away with leader line
+            const farDistance = 140;
+            const testX = current.x + bisector.x * farDistance;
+            const testY = current.y + bisector.y * farDistance;
+
             return {
-                x: current.x + bisector.x * labelDistance,
-                y: current.y + bisector.y * labelDistance
+                x: testX,
+                y: testY,
+                needsLeader: true,
+                targetX: current.x,
+                targetY: current.y
             };
         }
 
