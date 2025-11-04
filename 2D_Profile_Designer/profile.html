@@ -496,7 +496,7 @@
         .angle-arc {
             stroke: #f39c12;
             stroke-width: 1;
-            fill: none;
+            fill: rgba(243, 156, 18, 0.4);
             stroke-dasharray: 3,3;
             opacity: 0.8;
         }
@@ -683,6 +683,14 @@
             stroke-width: 1;
             stroke-linecap: round;
             opacity: 0.8;
+        }
+
+        .coating-arrow {
+            stroke: #b0b4b9;
+            stroke-width: 2;
+            fill: none;
+            stroke-linejoin: miter;
+            opacity: 0.9;
         }
 
         .status {
@@ -1822,7 +1830,7 @@
                             </div>
                         </div>
                     </label>
-                    <div id="hashSideInfo" class="hash-info">Hash side = Color side</div>
+                    <div id="hashSideInfo" class="hash-info">Arrow = Color side</div>
                 </div>
                 
                 <div class="mode-controls">
@@ -2216,36 +2224,23 @@ function loadHtml2Canvas() {
             // Remove existing snap guides
             const existingGuides = document.querySelectorAll('.snap-guide');
             existingGuides.forEach(guide => guide.remove());
-            
+
             if (isSnapped) {
-                // Create a visual guide line to show snapping
+                // Create a visual guide line to show snapping (orange dotted line)
                 const guide = document.createElementNS('http://www.w3.org/2000/svg', 'line');
                 guide.classList.add('snap-guide');
                 guide.setAttribute('x1', fromPoint.x);
                 guide.setAttribute('y1', fromPoint.y);
                 guide.setAttribute('x2', toPoint.x);
                 guide.setAttribute('y2', toPoint.y);
-                guide.setAttribute('stroke', '#00ff00'); // Bright green for snap
+                guide.setAttribute('stroke', '#ff6b35'); // Orange to match theme
                 guide.setAttribute('stroke-width', '3');
-                guide.setAttribute('stroke-dasharray', '5,5');
+                guide.setAttribute('stroke-dasharray', '5,5'); // Dotted pattern
                 guide.setAttribute('opacity', '0.8');
                 guide.style.pointerEvents = 'none';
-                
+
                 // Add to lines group so it appears under other elements
                 linesGroup.appendChild(guide);
-                
-                // Add a small "SNAP" indicator near the cursor
-                const snapText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-                snapText.classList.add('snap-guide');
-                snapText.setAttribute('x', toPoint.x + 15);
-                snapText.setAttribute('y', toPoint.y - 10);
-                snapText.setAttribute('fill', '#00ff00');
-                snapText.setAttribute('font-size', '12');
-                snapText.setAttribute('font-weight', 'bold');
-                snapText.textContent = 'SNAP';
-                snapText.style.pointerEvents = 'none';
-                
-                labelsGroup.appendChild(snapText);
             }
         }
 
@@ -2502,6 +2497,68 @@ function loadHtml2Canvas() {
             const screenX = dxfPoint.x * baseScale + offset.x;
             const screenY = canvas.clientHeight - (dxfPoint.y * baseScale + offset.y);
             return { x: screenX, y: screenY };
+        }
+
+        // Snapping system for precise 1/16" grid-based placement
+        let isShiftPressed = false; // Global flag for shift key (future: disable snapping)
+
+        function snapToGrid(x, y) {
+            // Snap coordinates to nearest 1/16 inch in DXF space
+            const dxfCoords = screenToDxf({ x, y });
+
+            // Round to nearest 1/16" (0.0625")
+            const snapIncrement = 1 / 16; // 1/16 inch
+            const snappedDxfX = Math.round(dxfCoords.x / snapIncrement) * snapIncrement;
+            const snappedDxfY = Math.round(dxfCoords.y / snapIncrement) * snapIncrement;
+
+            // Convert back to screen coordinates
+            const snappedScreen = dxfToScreen({ x: snappedDxfX, y: snappedDxfY });
+            return snappedScreen;
+        }
+
+        function applySnapping(x, y, enableGrid = true, enableDirection = true) {
+            // Combined snapping: grid + directional (horizontal/vertical)
+            let snappedX = x;
+            let snappedY = y;
+
+            // Step 1: Apply grid snapping (1/16" increments)
+            if (enableGrid) {
+                const gridSnapped = snapToGrid(x, y);
+                snappedX = gridSnapped.x;
+                snappedY = gridSnapped.y;
+            }
+
+            // Step 2: Apply directional snapping (horizontal/vertical alignment)
+            if (enableDirection && points.length > 0) {
+                const last = points[points.length - 1];
+                const dx = snappedX - last.x;
+                const dy = snappedY - last.y;
+                const angle = Math.atan2(dy, dx) * 180 / Math.PI;
+
+                // Normalize angle to 0-360 range
+                let normAngle = angle;
+                while (normAngle < 0) normAngle += 360;
+                while (normAngle >= 360) normAngle -= 360;
+
+                const threshold = 8; // 8 degree snap threshold for tighter precision
+
+                // Snap to horizontal (0° or 180°)
+                const isHorizontal = (Math.abs(normAngle) < threshold) ||
+                                   (Math.abs(normAngle - 180) < threshold) ||
+                                   (Math.abs(normAngle - 360) < threshold) ||
+                                   (Math.abs(angle - 180) < threshold) ||
+                                   (Math.abs(angle + 180) < threshold);
+
+                if (isHorizontal) {
+                    snappedY = last.y; // Snap to same Y coordinate
+                }
+                // Snap to vertical (90° or 270°)
+                else if ((Math.abs(normAngle - 90) < threshold) || (Math.abs(normAngle - 270) < threshold)) {
+                    snappedX = last.x; // Snap to same X coordinate
+                }
+            }
+
+            return { x: snappedX, y: snappedY, isSnapped: enableDirection };
         }
 
         // Undo system functions
@@ -3258,12 +3315,19 @@ ORDERING:
             const rect = canvas.getBoundingClientRect();
             const screenX = e.clientX - rect.left;
             const screenY = e.clientY - rect.top;
-            
+
             // Transform screen coordinates to account for zoom and pan
             const transformed = screenToTransformedCoordinates(screenX, screenY);
-            
-            // Convert to DXF coordinates for display
-            const dxfCoords = screenToDxf({ x: transformed.x, y: transformed.y });
+
+            // Apply snapping when drawing (but not when dragging)
+            let displayCoords = { x: transformed.x, y: transformed.y };
+            if (isDrawing && !isDragging) {
+                const snapped = applySnapping(transformed.x, transformed.y, true, true);
+                displayCoords = { x: snapped.x, y: snapped.y };
+            }
+
+            // Convert to DXF coordinates for display (show snapped coordinates)
+            const dxfCoords = screenToDxf(displayCoords);
             const coordsElement = document.getElementById('coordinates');
             if (coordsElement) {
                 coordsElement.textContent = `Mouse: (${formatLength(dxfCoords.x).replace('"', '')}, ${formatLength(dxfCoords.y).replace('"', '')})`;
@@ -3403,40 +3467,16 @@ ORDERING:
         }
 
         function addPoint(x, y) {
-            let snapX = x, snapY = y;
-            // Snap to vertical/horizontal if close enough (in screen coordinates)
-            if (points.length > 0) {
-                const last = points[points.length - 1];
-                const dx = x - last.x;
-                const dy = y - last.y;
-                const angle = Math.atan2(dy, dx) * 180 / Math.PI;
-                // Normalize angle to [0, 360)
-                let normAngle = angle;
-                if (normAngle < 0) normAngle += 360;
-                // Snap thresholds (degrees) - increased for more pronounced snapping
-                const threshold = 15;
-                let isSnapped = false;
-                
-                // Snap to horizontal (0 or 180) - handle both positive and negative angles
-                const isHorizontal = (Math.abs(normAngle) < threshold) || 
-                                   (Math.abs(normAngle - 180) < threshold) || 
-                                   (Math.abs(normAngle - 360) < threshold) ||
-                                   (Math.abs(angle - 180) < threshold) ||
-                                   (Math.abs(angle + 180) < threshold);
-                
-                if (isHorizontal) {
-                    snapY = last.y;
-                    isSnapped = true;
-                }
-                // Snap to vertical (90 or 270)
-                else if ((Math.abs(normAngle - 90) < threshold) || (Math.abs(normAngle - 270) < threshold)) {
-                    snapX = last.x;
-                    isSnapped = true;
-                }
-                
-                // Show visual snap feedback
-                showSnapGuides(last, { x: snapX, y: snapY }, isSnapped);
+            // Apply combined snapping: 1/16" grid + directional (horizontal/vertical)
+            const snapped = applySnapping(x, y, true, true);
+            const snapX = snapped.x;
+            const snapY = snapped.y;
+
+            // Show visual snap feedback if directional snapping occurred
+            if (snapped.isSnapped && points.length > 0) {
+                showSnapGuides(points[points.length - 1], { x: snapX, y: snapY }, true);
             }
+
             const point = { x: snapX, y: snapY };
             // Prevent line crossing
             if (points.length > 1) {
@@ -3958,13 +3998,13 @@ ORDERING:
             const oldBox = document.getElementById(`hem-info-box-${hemInfo.index}`);
             if (oldBox) oldBox.remove();
             
-            // Info text in single line
-            const padding = 10; // Minimum distance from canvas edges
+            // Info text in single line - smaller, professional styling
+            const padding = 6; // Reduced padding for more compact appearance
             const lengthText = formatLength(hemInfo.length);
             const typeText = hemInfo.type === 'open' ? 'Open' : 'Closed';
             const lines = [`HEM ${lengthText} ${typeText}`];
-            const fontSize = 13;
-            const lineHeight = fontSize + 5;
+            const fontSize = 10; // Reduced from 13px to 10px
+            const lineHeight = fontSize + 4; // Reduced line height for compactness
             const boxHeight = lines.length * lineHeight + padding;
             const maxLineLength = Math.max(...lines.map(l => l.length));
             const boxWidth = maxLineLength * 8 + padding;
@@ -4082,38 +4122,40 @@ ORDERING:
             boxGroup.setAttribute('id', `hem-info-box-${hemInfo.index}`);
             boxGroup.setAttribute('data-hem-index', hemInfo.index);
             
-            // Background box
+            // Background box - dark professional styling
             const box = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
             box.setAttribute('x', bestPos.x);
             box.setAttribute('y', bestPos.y);
             box.setAttribute('width', boxWidth);
             box.setAttribute('height', boxHeight);
-            box.setAttribute('fill', '#fffbe6');
-            box.setAttribute('stroke', '#ff6b35');
-            box.setAttribute('stroke-width', 2 / zoomLevel); // Scale inversely with zoom
-            box.setAttribute('rx', 5 / zoomLevel); // Scale corner radius too
+            box.setAttribute('fill', '#2c2c2c'); // Dark charcoal background
+            box.setAttribute('stroke', '#ff6b35'); // Orange border
+            box.setAttribute('stroke-width', 1 / zoomLevel); // Thinner border (1px instead of 2px)
+            box.setAttribute('stroke-opacity', '0.6'); // Subtle orange border
+            box.setAttribute('rx', 3 / zoomLevel); // Smaller rounded corners (3px instead of 5px)
+            box.setAttribute('opacity', '0.85'); // Slightly transparent for low-key appearance
             boxGroup.appendChild(box);
 
-            // Add text lines
+            // Add text lines with professional dark theme colors
             lines.forEach((line, index) => {
                 const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
                 text.setAttribute('x', bestPos.x + padding/2);
                 text.setAttribute('y', bestPos.y + (index + 1) * lineHeight);
-                text.setAttribute('fill', index === 0 ? '#ff6b35' : '#2c3e50');
+                text.setAttribute('fill', index === 0 ? '#ff8c5a' : '#e0e0e0'); // Softer orange and light gray
                 text.setAttribute('font-size', fontSize);
                 text.setAttribute('font-weight', index === 0 ? 'bold' : 'normal');
                 text.textContent = line;
                 boxGroup.appendChild(text);
             });
             
-            // Add edit button - always show for hems since they should be editable
+            // Add edit button - smaller, orange, professional
             let editBtn = null;
             if (hemInfo.index >= 0) {
                 editBtn = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-                editBtn.setAttribute('x', bestPos.x + boxWidth + 5);
-                editBtn.setAttribute('y', bestPos.y + 15);
-                editBtn.setAttribute('font-size', '15');
-                editBtn.setAttribute('fill', '#3498db');
+                editBtn.setAttribute('x', bestPos.x + boxWidth + 4);
+                editBtn.setAttribute('y', bestPos.y + 12);
+                editBtn.setAttribute('font-size', '12'); // Reduced from 15px to 12px
+                editBtn.setAttribute('fill', '#ff6b35'); // Changed from blue to orange
                 editBtn.setAttribute('cursor', 'pointer');
                 editBtn.setAttribute('text-anchor', 'start');
                 editBtn.textContent = '\u270E'; // Pencil icon
@@ -4572,57 +4614,76 @@ ORDERING:
             line.setAttribute('class', 'line');
             line.setAttribute('data-index', index);
             linesGroup.appendChild(line);
-            
-            // Add coating hash marks
-            drawCoatingHashes(start, end);
+
+            // Add coating direction arrow
+            drawCoatingArrow(start, end);
         }
 
-        function drawCoatingHashes(start, end) {
+        function drawCoatingArrow(start, end) {
+            // Draw a single chevron arrow at the midpoint of the line
             const dx = end.x - start.x;
             const dy = end.y - start.y;
             const length = Math.sqrt(dx * dx + dy * dy);
-            
+
+            // Skip very short lines
             if (length < 20) return;
-            
+
+            // Line direction unit vector
             const dirX = dx / length;
             const dirY = dy / length;
-            
+
+            // Perpendicular unit vector (rotated 90 degrees)
             const perpX = -dirY;
             const perpY = dirX;
-            
-            const hashOffset = coatedSideRight ? 8 : -8;
-            const offsetX = perpX * hashOffset;
-            const offsetY = perpY * hashOffset;
-            
-            const hashSpacing = 15;
-            const hashLength = 6;
-            const numHashes = Math.floor(length / hashSpacing);
-            
-            for (let i = 1; i < numHashes; i++) {
-                const t = i / numHashes;
-                const lineX = start.x + dx * t;
-                const lineY = start.y + dy * t;
-                
-                const hash1X = lineX + offsetX - perpX * hashLength/2;
-                const hash1Y = lineY + offsetY - perpY * hashLength/2;
-                const hash2X = lineX + offsetX + perpX * hashLength/2;
-                const hash2Y = lineY + offsetY + perpY * hashLength/2;
-                
-                const hash = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-                hash.setAttribute('x1', hash1X);
-                hash.setAttribute('y1', hash1Y);
-                hash.setAttribute('x2', hash2X);
-                hash.setAttribute('y2', hash2Y);
-                hash.setAttribute('class', 'coating-hash');
-                linesGroup.appendChild(hash);
-            }
+
+            // Midpoint of the line
+            const midX = start.x + dx / 2;
+            const midY = start.y + dy / 2;
+
+            // Arrow parameters
+            const arrowSize = 12; // 12px wide chevron
+            const arrowOffset = 10; // Distance from line
+            const arrowDepth = 6; // How far the chevron point extends
+
+            // Direction to offset arrow (based on coated side)
+            const direction = coatedSideRight ? 1 : -1;
+            const offsetX = perpX * arrowOffset * direction;
+            const offsetY = perpY * arrowOffset * direction;
+
+            // Arrow tip position (points away from line on coated side)
+            const tipX = midX + offsetX + perpX * arrowDepth * direction;
+            const tipY = midY + offsetY + perpY * arrowDepth * direction;
+
+            // Arrow base positions (two ends of the chevron)
+            const base1X = midX + offsetX - dirX * arrowSize / 2;
+            const base1Y = midY + offsetY - dirY * arrowSize / 2;
+            const base2X = midX + offsetX + dirX * arrowSize / 2;
+            const base2Y = midY + offsetY + dirY * arrowSize / 2;
+
+            // Create chevron path: base1 -> tip -> base2
+            const arrow = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            const pathData = `M ${base1X} ${base1Y} L ${tipX} ${tipY} L ${base2X} ${base2Y}`;
+            arrow.setAttribute('d', pathData);
+            arrow.setAttribute('class', 'coating-arrow');
+            linesGroup.appendChild(arrow);
         }
 
         function showPreviewLine(mouseX, mouseY) {
             clearPreviewLine();
             if (points.length === 0) return;
             const lastPoint = points[points.length - 1];
-            // Draw preview (phantom) line
+
+            // Apply snapping to preview line coordinates
+            const snapped = applySnapping(mouseX, mouseY, true, true);
+            const snappedX = snapped.x;
+            const snappedY = snapped.y;
+
+            // Show visual snap feedback if snapped
+            if (snapped.isSnapped) {
+                showSnapGuides(lastPoint, { x: snappedX, y: snappedY }, true);
+            }
+
+            // Draw preview (phantom) line with snapped coordinates
             let previewLine = document.getElementById('preview');
             if (!previewLine) {
                 previewLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
@@ -4632,19 +4693,19 @@ ORDERING:
             }
             previewLine.setAttribute('x1', lastPoint.x);
             previewLine.setAttribute('y1', lastPoint.y);
-            previewLine.setAttribute('x2', mouseX);
-            previewLine.setAttribute('y2', mouseY);
+            previewLine.setAttribute('x2', snappedX);
+            previewLine.setAttribute('y2', snappedY);
 
-            // Calculate preview length using DXF coordinates
+            // Calculate preview length using DXF coordinates with snapped position
             const lastDxf = screenToDxf(lastPoint);
-            const mouseDxf = screenToDxf({ x: mouseX, y: mouseY });
+            const mouseDxf = screenToDxf({ x: snappedX, y: snappedY });
             const deltaX = mouseDxf.x - lastDxf.x;
             const deltaY = mouseDxf.y - lastDxf.y;
             const length = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
-            
-            // Move label off the line, above it in white space
-            const midX = (lastPoint.x + mouseX) / 2;
-            const midY = (lastPoint.y + mouseY) / 2 - 24;
+
+            // Move label off the line, above it in white space (using snapped coordinates)
+            const midX = (lastPoint.x + snappedX) / 2;
+            const midY = (lastPoint.y + snappedY) / 2 - 24;
 
             // Add or update preview length label
             let lengthLabel = document.getElementById('preview-length-label');
@@ -4660,11 +4721,11 @@ ORDERING:
             lengthLabel.setAttribute('y', midY);
             lengthLabel.textContent = formatLength(length);
 
-            // Calculate preview angle
+            // Calculate preview angle using snapped coordinates
             if (points.length > 1) {
                 const prev = points[points.length - 2];
                 const last = points[points.length - 1];
-                const mousePt = { x: mouseX, y: mouseY };
+                const mousePt = { x: snappedX, y: snappedY }; // Use snapped position
                 const vec1 = { x: prev.x - last.x, y: prev.y - last.y };
                 const vec2 = { x: mousePt.x - last.x, y: mousePt.y - last.y };
                 const dot = vec1.x * vec2.x + vec1.y * vec2.y;
@@ -5094,20 +5155,21 @@ ORDERING:
             }
             
             const radius = 20;
-            
+
             const startX = centerPoint.x + radius * Math.cos(startAngle);
             const startY = centerPoint.y + radius * Math.sin(startAngle);
             const endX = centerPoint.x + radius * Math.cos(endAngle);
             const endY = centerPoint.y + radius * Math.sin(endAngle);
-            
+
             const largeArcFlag = Math.abs(angleDiff) > Math.PI ? 1 : 0;
             const sweepFlag = angleDiff > 0 ? 1 : 0;
-            
+
+            // Create filled wedge shape (pie slice) from vertex to arc
             const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-            const pathData = `M ${startX} ${startY} A ${radius} ${radius} 0 ${largeArcFlag} ${sweepFlag} ${endX} ${endY}`;
+            const pathData = `M ${centerPoint.x} ${centerPoint.y} L ${startX} ${startY} A ${radius} ${radius} 0 ${largeArcFlag} ${sweepFlag} ${endX} ${endY} L ${centerPoint.x} ${centerPoint.y} Z`;
             path.setAttribute('d', pathData);
             path.setAttribute('class', 'angle-arc');
-            
+
             labelsGroup.appendChild(path);
         }
 
