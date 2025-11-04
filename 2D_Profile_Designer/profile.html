@@ -634,8 +634,8 @@
 
         .point.draggable {
             cursor: grab;
-            stroke-width: 3;
-            r: 8;
+            stroke-width: 2;
+            r: 3;
         }
 
         .point.dragging {
@@ -662,11 +662,20 @@
 
 
         .hem-parallel {
-            stroke: #ff6b35;
-            stroke-width: 2;
+            stroke: #b0b4b9;
+            stroke-width: 3;
             fill: none;
-            stroke-dasharray: 3,3;
-            opacity: 0.8;
+            stroke-linecap: round;
+            opacity: 1;
+        }
+
+        .leader-line {
+            stroke: #666666;
+            stroke-width: 1;
+            fill: none;
+            stroke-dasharray: 2,2;
+            opacity: 0.6;
+            pointer-events: none;
         }
 
         .coating-hash {
@@ -4468,15 +4477,15 @@ ORDERING:
             const endX = hem.x + perpendicular.x * radius * 2;
             const endY = hem.y + perpendicular.y * radius * 2;
             
-            // Draw the hem curve (180-degree semicircle)
+            // Draw the hem curve (180-degree semicircle) - seamless with profile
             const hemCurve = document.createElementNS('http://www.w3.org/2000/svg', 'path');
             const pathData = `M ${startX} ${startY} A ${radius} ${radius} 0 0 ${foldDirection > 0 ? 1 : 0} ${endX} ${endY}`;
-            
+
             hemCurve.setAttribute('d', pathData);
-            hemCurve.setAttribute('stroke', '#e67e22');
-            hemCurve.setAttribute('stroke-width', 3 / zoomLevel); // Scale inversely with zoom
+            hemCurve.setAttribute('stroke', '#b0b4b9'); // Match profile line color
+            hemCurve.setAttribute('stroke-width', 3 / zoomLevel); // Match profile line width, scale inversely with zoom
             hemCurve.setAttribute('fill', 'none');
-            hemCurve.setAttribute('stroke-linecap', 'round');
+            hemCurve.setAttribute('stroke-linecap', 'round'); // Match profile line cap
             
             linesGroup.appendChild(hemCurve);
             
@@ -4502,9 +4511,10 @@ ORDERING:
             foldedEdge.setAttribute('y1', foldedEdgeStart.y);
             foldedEdge.setAttribute('x2', foldedEdgeEnd.x);
             foldedEdge.setAttribute('y2', foldedEdgeEnd.y);
-            foldedEdge.setAttribute('stroke', '#d35400');
-            foldedEdge.setAttribute('stroke-width', 2 / zoomLevel); // Scale inversely with zoom
-            foldedEdge.setAttribute('opacity', '0.8');
+            foldedEdge.setAttribute('stroke', '#b0b4b9'); // Match profile line color for seamless appearance
+            foldedEdge.setAttribute('stroke-width', 3 / zoomLevel); // Match profile line width, scale inversely with zoom
+            foldedEdge.setAttribute('stroke-linecap', 'round'); // Match profile line cap
+            foldedEdge.setAttribute('opacity', '1'); // Full opacity for seamless look
             
             linesGroup.appendChild(foldedEdge);
             
@@ -4530,19 +4540,26 @@ ORDERING:
         }
 
         function drawPoint(point, index) {
-            // Draw all vertices as circles, including HEMs
+            // Only draw profile endpoints (first and last points)
+            // Hide middle vertices, corner vertices, and hem vertices for seamless appearance
+            const isEndpoint = (index === 0 || index === points.length - 1);
+            const isHem = point.isHem === true;
+
+            // Skip rendering for:
+            // - Middle/corner vertices (not endpoints)
+            // - Hem vertices (should be invisible for seamless hem rendering)
+            if (!isEndpoint || isHem) {
+                return;
+            }
+
+            // Draw only visible endpoints as small circles
             const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
             circle.setAttribute('cx', point.x);
             circle.setAttribute('cy', point.y);
-            circle.setAttribute('r', isEditMode ? 6 : 5); // Smaller vertices - reduced from 8/6 to 6/5
+            circle.setAttribute('r', 3); // Small 3px radius for endpoints
             circle.setAttribute('class', isEditMode ? 'point draggable' : 'point');
             circle.setAttribute('data-index', index);
-            
-            // Add hem data type if this is a hem point
-            if (point.isHem) {
-                circle.setAttribute('data-type', 'hem');
-            }
-            
+
             pointsGroup.appendChild(circle);
         }
 
@@ -4690,7 +4707,36 @@ ORDERING:
             snapGuides.forEach(guide => guide.remove());
         }
 
-        function calculateLabelPosition(start, end, lineIndex) {
+        // Track all placed labels for collision detection
+        let placedLabels = [];
+
+        // Helper function to check if label collides with other labels
+        function checkLabelCollisions(x, y, width, height, existingLabels) {
+            const padding = 4; // Extra padding between labels
+            for (let label of existingLabels) {
+                // Check rectangle overlap with padding
+                if (!(x + width + padding < label.x ||
+                      x - padding > label.x + label.width ||
+                      y + height + padding < label.y ||
+                      y - padding > label.y + label.height)) {
+                    return true; // Collision detected
+                }
+            }
+            return false; // No collision
+        }
+
+        // Helper function to create leader line from label to target point
+        function createLeaderLine(labelX, labelY, targetX, targetY) {
+            const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            line.setAttribute('x1', labelX);
+            line.setAttribute('y1', labelY);
+            line.setAttribute('x2', targetX);
+            line.setAttribute('y2', targetY);
+            line.setAttribute('class', 'leader-line');
+            labelsGroup.appendChild(line);
+        }
+
+        function calculateLabelPosition(start, end, lineIndex, text) {
             // Base midpoint position
             const baseMidX = (start.x + end.x) / 2;
             const baseMidY = (start.y + end.y) / 2;
@@ -4700,72 +4746,78 @@ ORDERING:
             const dy = end.y - start.y;
             const lineLength = Math.sqrt(dx * dx + dy * dy);
 
-            if (lineLength === 0) return { x: baseMidX, y: baseMidY - 24 };
+            if (lineLength === 0) return { x: baseMidX, y: baseMidY - 24, needsLeader: false, targetX: baseMidX, targetY: baseMidY };
 
             // Normalized perpendicular vector (rotated 90 degrees)
             const perpX = -dy / lineLength;
             const perpY = dx / lineLength;
 
-            // Try different offset distances to find one that doesn't overlap vertices
-            const vertexRadius = 12; // Collision radius around vertices (slightly larger than visual radius)
-            const labelHeight = 16; // Approximate label height
-            const offsets = [24, 32, 40, 48, 56]; // Try progressively larger offsets
+            // Calculate label dimensions
+            const textWidth = text ? text.length * 8 : 40; // Estimate if text not provided
+            const labelWidth = textWidth + 8;
+            const labelHeight = 16;
 
-            for (let offset of offsets) {
+            // Try different offset distances with zoom-aware scaling
+            const baseOffsets = [24, 32, 40, 48, 56, 64, 72, 80, 96, 112, 128]; // Extended range
+            const vertexRadius = 12; // Collision radius around vertices
+
+            for (let offset of baseOffsets) {
                 // Try both sides of the line
                 for (let side of [1, -1]) {
                     const testX = baseMidX + perpX * offset * side;
                     const testY = baseMidY + perpY * offset * side;
 
                     // Check if this position collides with any vertex
-                    let hasCollision = false;
+                    let hasVertexCollision = false;
                     for (let point of points) {
                         const distX = testX - point.x;
                         const distY = testY - point.y;
                         const distance = Math.sqrt(distX * distX + distY * distY);
 
                         if (distance < vertexRadius) {
-                            hasCollision = true;
+                            hasVertexCollision = true;
                             break;
                         }
                     }
 
+                    // Check label-to-label collisions
+                    const labelX = testX - labelWidth / 2;
+                    const labelY = testY - labelHeight / 2;
+                    const hasLabelCollision = checkLabelCollisions(labelX, labelY, labelWidth, labelHeight, placedLabels);
+
                     // If no collision, use this position
-                    if (!hasCollision) {
-                        return { x: testX, y: testY };
+                    if (!hasVertexCollision && !hasLabelCollision) {
+                        return {
+                            x: testX,
+                            y: testY,
+                            needsLeader: offset > 56, // Use leader line if offset is large
+                            targetX: baseMidX,
+                            targetY: baseMidY
+                        };
                     }
                 }
             }
 
-            // Fallback: if all positions collide, try along the line instead
-            // Try 1/3 and 2/3 positions along the line
-            const thirdX = start.x + dx * 0.33;
-            const thirdY = start.y + dy * 0.33;
+            // Fallback: if all positions collide, place it far away and use leader line
+            // Try progressively farther positions in a spiral pattern
+            const farOffset = 140;
+            const testX = baseMidX + perpX * farOffset;
+            const testY = baseMidY + perpY * farOffset;
 
-            let hasCollisionAtThird = false;
-            for (let point of points) {
-                const distX = thirdX - point.x;
-                const distY = thirdY - point.y;
-                const distance = Math.sqrt(distX * distX + distY * distY);
-                if (distance < vertexRadius) {
-                    hasCollisionAtThird = true;
-                    break;
-                }
-            }
-
-            if (!hasCollisionAtThird) {
-                return { x: thirdX, y: thirdY - 20 };
-            }
-
-            // Final fallback: use 2/3 position
-            const twoThirdX = start.x + dx * 0.67;
-            const twoThirdY = start.y + dy * 0.67;
-            return { x: twoThirdX, y: twoThirdY - 20 };
+            return {
+                x: testX,
+                y: testY,
+                needsLeader: true,
+                targetX: baseMidX,
+                targetY: baseMidY
+            };
         }
 
         function drawMeasurements() {
             labelsGroup.innerHTML = '';
+            placedLabels = []; // Reset placed labels tracking
             const lineCount = points.length - 1;
+
             for (let i = 0; i < lineCount; i++) {
                 // Get current and next points
                 const current = points[i];
@@ -4790,9 +4842,30 @@ ORDERING:
                 const deltaY = nextDxf.y - currentDxf.y;
                 const length = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
 
-                // Calculate optimal label position avoiding vertices
-                const labelPos = calculateLabelPosition(current, next, i);
-                createClickableLabel(labelPos.x, labelPos.y, formatLength(length), 'measurement-label', 'length', i);
+                // Format label text
+                const labelText = formatLength(length);
+                const textWidth = labelText.length * 8;
+                const labelWidth = textWidth + 8;
+                const labelHeight = 16;
+
+                // Calculate optimal label position avoiding vertices and other labels
+                const labelPos = calculateLabelPosition(current, next, i, labelText);
+
+                // Draw leader line if needed
+                if (labelPos.needsLeader) {
+                    createLeaderLine(labelPos.x, labelPos.y, labelPos.targetX, labelPos.targetY);
+                }
+
+                // Create the label
+                createClickableLabel(labelPos.x, labelPos.y, labelText, 'measurement-label', 'length', i);
+
+                // Track this label's position for collision detection
+                placedLabels.push({
+                    x: labelPos.x - labelWidth / 2,
+                    y: labelPos.y - labelHeight / 2,
+                    width: labelWidth,
+                    height: labelHeight
+                });
             }
             
             // Draw angle measurements for interior vertices
@@ -4808,10 +4881,22 @@ ORDERING:
                     const angle = calculateVertexAngle(i);
                     labelText = `${Math.round(angle)}°`;
                 }
-                
+
                 // Calculate position for supplementary angle label (on exterior side)
                 const exteriorLabelPos = calculateExteriorLabelPosition(prev, current, next);
                 createClickableLabel(exteriorLabelPos.x, exteriorLabelPos.y, labelText, 'angle-label', 'angle', i - 1);
+
+                // Track angle label position for collision detection
+                const textWidth = labelText.length * 8;
+                const labelWidth = textWidth + 8;
+                const labelHeight = 16;
+                placedLabels.push({
+                    x: exteriorLabelPos.x - labelWidth / 2,
+                    y: exteriorLabelPos.y - labelHeight / 2,
+                    width: labelWidth,
+                    height: labelHeight
+                });
+
                 // Draw arc for angle (optional, keep as before)
                 if (labelText !== 'HEM') {
                     const angle = calculateVertexAngle(i);
@@ -5196,12 +5281,11 @@ ORDERING:
                 drawLine(points[i], points[i + 1], i);
             }
 
-            // Draw only the HEM info box, orange vertex, and curve at the correct vertex
+            // Draw only the HEM info box and curve at the correct vertex
+            // Hem vertices are now invisible for seamless appearance
             points.forEach((point, index) => {
                 if (point.isHem && point.hemData) {
-                    // Draw orange vertex
-                    drawPoint(point, index);
-                    // Draw curve at the correct vertex
+                    // Draw curve at the correct vertex (seamless with profile)
                     addHemArcAtVertex(index);
                     // Draw editable info box
                     showHemInfoBox(point.hemData);
