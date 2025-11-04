@@ -4736,8 +4736,9 @@ ORDERING:
                     const interiorAngle = Math.acos(dot / (mag1 * mag2)) * 180 / Math.PI;
                     angle = 180 - interiorAngle; // Show supplementary angle
                 }
-                // Calculate exterior position for angle label
-                const labelPos = calculateExteriorLabelPosition(prev, last, mousePt);
+                // Calculate exterior position for angle label (preview mode - use empty placedLabels)
+                const previewAngleText = `${Math.round(angle)}°`;
+                const labelPos = calculateExteriorLabelPosition(prev, last, mousePt, previewAngleText, []);
                 
                 let angleLabel = document.getElementById('preview-angle-label');
                 if (!angleLabel) {
