@@ -1,0 +1,240 @@
+<t t-name="web.basic_layout">
+    <t t-call="web.html_container">
+        <t t-if="not o" t-set="o" t-value="doc"/>
+        <div class="article" style="margin: 0 !important; padding: 0 !important; page-break-inside: avoid !important;" t-att-data-oe-model="o and o._name" t-att-data-oe-id="o and o.id" t-att-data-oe-lang="o and o.env.context.get('lang')">
+            
+            <style>
+                body { margin: 0 !important; padding: 0 !important; }
+                .article { margin: 0 !important; padding: 0 !important; }
+                * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+            </style>
+            
+            <div style="width: 100%; max-width: 8.5in; margin: 0 !important; padding: 0 !important; font-family: Arial, sans-serif; font-size: 12px; line-height: 1.2;">
+                
+                <!-- Header -->
+                <table style="width: 100%; border-bottom: 2px solid black; margin: 0 0 5px 0 !important; border-collapse: collapse;">
+                    <tr>
+                        <td style="width: 120px; vertical-align: middle; padding: 8px 15px;">
+                            <div style="width: 100px; height: 65px; background-color: #2c5f5f; color: white; text-align: center; padding-top: 10px; font-weight: bold;">
+                                <div style="font-size: 16px; margin-bottom: 2px;">KYNETIC</div>
+                                <div style="margin-bottom: 2px;">
+                                    <span style="display: inline-block; width: 6px; height: 6px; background-color: white; border-radius: 50%; margin: 0 1px;"></span>
+                                    <span style="display: inline-block; width: 6px; height: 6px; background-color: white; border-radius: 50%; margin: 0 1px;"></span>
+                                    <span style="display: inline-block; width: 6px; height: 6px; background-color: white; border-radius: 50%; margin: 0 1px;"></span>
+                                    <span style="display: inline-block; width: 6px; height: 6px; background-color: white; border-radius: 50%; margin: 0 1px;"></span>
+                                    <span style="display: inline-block; width: 6px; height: 6px; background-color: white; border-radius: 50%; margin: 0 1px;"></span>
+                                    <span style="display: inline-block; width: 6px; height: 6px; background-color: white; border-radius: 50%; margin: 0 1px;"></span>
+                                </div>
+                                <div style="font-size: 10px; letter-spacing: 1px;">metalworks</div>
+                            </div>
+                        </td>
+                        <td style="text-align: center; vertical-align: middle; padding: 8px;">
+                            <div style="font-size: 28px; font-weight: bold;">ORDER SHEET</div>
+                        </td>
+                        <td style="width: 240px; vertical-align: middle; padding: 8px 15px;">
+                            <div style="margin-bottom: 5px;">
+                                <span style="font-size: 12px; font-weight: bold; display: inline-block; width: 90px;">Date Ordered:</span>
+                                <span style="display: inline-block; width: 120px; padding: 2px 6px; border-bottom: 1px solid #333;">_______________</span>
+                            </div>
+                            <div style="margin-bottom: 5px;">
+                                <span style="font-size: 12px; font-weight: bold; display: inline-block; width: 90px;">Completed By:</span>
+                                <span style="display: inline-block; width: 120px; padding: 2px 6px; border-bottom: 1px solid #333;">_______________</span>
+                            </div>
+                            <div style="margin-bottom: 5px;">
+                                <span style="font-size: 12px; font-weight: bold; display: inline-block; width: 90px;">Date Finished:</span>
+                                <span style="display: inline-block; width: 120px; padding: 2px 6px; border-bottom: 1px solid #333;">_______________</span>
+                            </div>
+                        </td>
+                    </tr>
+                </table>
+                
+                <!-- Customer and Job Info -->
+                <table style="width: 100%; border-bottom: 1px solid #333; margin: 0 0 2px 0; border-collapse: collapse;">
+                    <tr>
+                        <td style="width: 50%; padding: 3px 15px;">
+                            <span style="font-size: 13px; font-weight: bold; margin-right: 8px;">Customer:</span>
+                            <span style="display: inline-block; min-width: 150px; padding: 2px 6px; border-bottom: 1px solid #333;">_______________</span>
+                        </td>
+                        <td style="width: 50%; padding: 3px 15px;">
+                            <span style="font-size: 13px; font-weight: bold; margin-right: 8px;">Job:</span>
+                            <span style="display: inline-block; min-width: 250px; padding: 2px 6px; border-bottom: 1px solid #333;"><t t-esc="o.bom_id.x_studio_job_name or '_______________'"/></span>
+                        </td>
+                    </tr>
+                </table>
+                
+                <!-- Material Specifications -->
+                <t t-set="metal_type_attr" t-value="False"/>
+                <t t-set="gauge_attr" t-value="False"/>
+                <t t-foreach="o.product_id.product_template_attribute_value_ids" t-as="attr">
+                    <t t-if="attr.attribute_id.name == 'Metal Type'">
+                        <t t-set="metal_type_attr" t-value="attr.name"/>
+                    </t>
+                    <t t-if="attr.attribute_id.name == 'Gauge'">
+                        <t t-set="gauge_attr" t-value="attr.name"/>
+                    </t>
+                </t>
+                
+                <table style="width: 100%; border-bottom: 1px solid #333; margin: 0 0 2px 0; border-collapse: collapse;">
+                    <tr>
+                        <td style="width: 45%; padding: 3px 15px; vertical-align: top;">
+                            <!-- Steel Options -->
+                            <div style="margin-bottom: 8px;">
+                                <span style="font-size: 14px; font-weight: bold; display: inline-block; width: 40px;">Steel</span>
+                                <span style="display: inline-block;">
+                                    <span style="width: 14px; height: 14px; border: 2px solid #333; display: inline-block; margin-right: 3px;"></span>
+                                    <span style="font-size: 12px; font-weight: bold; margin-right: 8px;">22</span>
+                                    <span style="width: 14px; height: 14px; border: 2px solid #333; display: inline-block; margin-right: 3px;"></span>
+                                    <span style="font-size: 12px; font-weight: bold; margin-right: 8px;">24</span>
+                                    <span style="width: 14px; height: 14px; border: 2px solid #333; display: inline-block; margin-right: 3px;"></span>
+                                    <span style="font-size: 12px; font-weight: bold; margin-right: 8px;">26</span>
+                                    <span style="width: 14px; height: 14px; border: 2px solid #333; display: inline-block; margin-right: 3px;"></span>
+                                    <span style="font-size: 12px; font-weight: bold; margin-right: 8px;">28</span>
+                                    <span style="width: 14px; height: 14px; border: 2px solid #333; display: inline-block; margin-right: 3px;"></span>
+                                    <span style="font-size: 12px; font-weight: bold;">30</span>
+                                </span>
+                            </div>
+                            
+                            <!-- Aluminum Options -->
+                            <div style="margin-bottom: 8px;">
+                                <span style="font-size: 14px; font-weight: bold; display: inline-block; width: 40px;">Al</span>
+                                <span style="display: inline-block;">
+                                    <span style="width: 14px; height: 14px; border: 2px solid #333; display: inline-block; margin-right: 3px;"></span>
+                                    <span style="font-size: 12px; font-weight: bold; margin-right: 8px;">.019</span>
+                                    <span style="width: 14px; height: 14px; border: 2px solid #333; display: inline-block; margin-right: 3px;"></span>
+                                    <span style="font-size: 12px; font-weight: bold; margin-right: 8px;">.027</span>
+                                    <span style="width: 14px; height: 14px; border: 2px solid #333; display: inline-block; margin-right: 3px;"></span>
+                                    <span style="font-size: 12px; font-weight: bold; margin-right: 8px;">.032</span>
+                                    <span style="width: 14px; height: 14px; border: 2px solid #333; display: inline-block; margin-right: 3px;"></span>
+                                    <span style="font-size: 12px; font-weight: bold; margin-right: 8px;">.040</span>
+                                    <span style="width: 14px; height: 14px; border: 2px solid #333; display: inline-block; margin-right: 3px;"></span>
+                                    <span style="font-size: 12px; font-weight: bold;">.050</span>
+                                </span>
+                            </div>
+                            
+                            <!-- Color -->
+                            <div style="margin-bottom: 6px;">
+                                <span style="font-size: 13px; font-weight: bold;">Color:</span>
+                                <span style="display: inline-block; min-width: 120px; padding: 2px 6px; border-bottom: 1px solid #333;">
+                                    <t t-foreach="o.product_id.product_template_attribute_value_ids" t-as="attr">
+                                        <t t-if="attr.attribute_id.name == 'Color'">
+                                            <t t-esc="attr.name"/>
+                                        </t>
+                                    </t>
+                                </span>
+                            </div>
+                            
+                            <!-- Color Manufacturer -->
+                            <div style="margin-bottom: 6px;">
+                                <span style="font-size: 13px; font-weight: bold;">Color Manufacturer:</span>
+                                <span style="display: inline-block; min-width: 120px; padding: 2px 6px; border-bottom: 1px solid #333;">CMG</span>
+                            </div>
+                        </td>
+                        <td style="width: 30%; padding: 5px 15px; vertical-align: top;">
+                            <div style="margin-bottom: 6px;">
+                                <div style="font-size: 13px; font-weight: bold;">Quantity:</div>
+                                <span style="display: inline-block; min-width: 120px; padding: 2px 6px; border-bottom: 1px solid #333;"><t t-esc="o.product_qty or 0"/></span>
+                            </div>
+                            <div style="margin-bottom: 6px;">
+                                <div style="font-size: 13px; font-weight: bold;">Length (inches):</div>
+                                <span style="display: inline-block; min-width: 120px; padding: 2px 6px; border-bottom: 1px solid #333;"><t t-esc="o.bom_id.x_studio_length_in or '0.00'"/></span>
+                            </div>
+                            <div style="margin-bottom: 6px;">
+                                <div style="font-size: 13px; font-weight: bold;">Total Material Usage (inches):</div>
+                                <span style="display: inline-block; min-width: 120px; padding: 2px 6px; border-bottom: 1px solid #333;"><t t-esc="o.bom_id.x_studio_total_material_usage or '0.00'"/></span>
+                            </div>
+                            <div style="margin-bottom: 6px;">
+                                <span style="width: 14px; height: 14px; border: 2px solid #333; display: inline-block;"></span>
+                                <span style="font-size: 13px; font-weight: bold; margin-left: 4px;">Include Ribs</span>
+                            </div>
+                            <div style="margin-bottom: 6px;">
+                                <span style="width: 14px; height: 14px; border: 2px solid #333; display: inline-block;"></span>
+                                <span style="font-size: 13px; font-weight: bold; margin-left: 4px;">Holes</span>
+                            </div>
+                        </td>
+                        <td style="width: 25%; padding: 5px 15px; vertical-align: top;">
+                            <div style="margin-bottom: 6px;">
+                                <div style="font-size: 13px; font-weight: bold;">Hole Size (inches):</div>
+                                <span style="display: inline-block; min-width: 100px; padding: 2px 6px; border-bottom: 1px solid #333;"><t t-esc="o.bom_id.x_studio_hole_size or 'N/A'"/></span>
+                            </div>
+                            <div style="margin-bottom: 6px;">
+                                <div style="font-size: 13px; font-weight: bold;">Hole Spacing (OC):</div>
+                                <span style="display: inline-block; min-width: 100px; padding: 2px 6px; border-bottom: 1px solid #333;"><t t-esc="o.bom_id.x_studio_hole_spacing or 'N/A'"/></span>
+                            </div>
+                            <div style="margin-bottom: 6px;">
+                                <div style="font-size: 13px; font-weight: bold;">Start From End (OC):</div>
+                                <span style="display: inline-block; min-width: 100px; padding: 2px 6px; border-bottom: 1px solid #333;"><t t-esc="o.bom_id.x_studio_start_from_end or 'N/A'"/></span>
+                            </div>
+                            <div style="margin-bottom: 6px;">
+                                <div style="font-size: 13px; font-weight: bold;">Distance From Edge (OC):</div>
+                                <span style="display: inline-block; min-width: 100px; padding: 2px 6px; border-bottom: 1px solid #333;"><t t-esc="o.bom_id.x_studio_distance_from_edge or 'N/A'"/></span>
+                            </div>
+                        </td>
+                    </tr>
+                </table>
+                
+                <!-- Profile Section -->
+                <div style="padding: 0 15px; margin-top: 2px;">
+                    <div style="text-align: center; margin-bottom: 3px;">
+                        <span style="font-size: 13px; font-weight: bold; margin-right: 8px;">Profile Name:</span>
+                        <span style="display: inline-block; width: 500px; padding: 2px 6px; border-bottom: 1px solid #333;"><t t-esc="o.product_id.name or 'Profile Description'"/></span>
+                    </div>
+                    
+                    <div style="height: 700px; background-image: radial-gradient(circle, #666666 1px, transparent 1px); background-size: 24px 24px; border: 1px solid #ddd; margin: 0; text-align: center;">
+                        <t t-if="o.product_id.image_1920">
+                            <img t-att-src="image_data_uri(o.product_id.image_1920)" style="max-width: 98%; max-height: 98%; margin-top: 5px;"/>
+                        </t>
+                    </div>
+                </div>
+                
+                <!-- Process Tracking -->
+                <table style="width: 100%; margin: 2px 0 0 0; padding: 0 15px; border-collapse: collapse;">
+                    <tr style="text-align: center;">
+                        <td style="width: 16.66%; padding: 2px;">
+                            <div style="font-size: 8px; font-weight: bold;">Slit</div>
+                            <div style="width: 18px; height: 14px; border: 1px solid #333; display: inline-block; margin-top: 2px;"></div>
+                        </td>
+                        <td style="width: 16.66%; padding: 2px;">
+                            <div style="font-size: 8px; font-weight: bold;">Punched</div>
+                            <div style="width: 18px; height: 14px; border: 1px solid #333; display: inline-block; margin-top: 2px;"></div>
+                        </td>
+                        <td style="width: 16.66%; padding: 2px;">
+                            <div style="font-size: 8px; font-weight: bold;">Bent</div>
+                            <div style="width: 18px; height: 14px; border: 1px solid #333; display: inline-block; margin-top: 2px;"></div>
+                        </td>
+                        <td style="width: 16.66%; padding: 2px;">
+                            <div style="font-size: 8px; font-weight: bold;">Packaged</div>
+                            <div style="width: 18px; height: 14px; border: 1px solid #333; display: inline-block; margin-top: 2px;"></div>
+                        </td>
+                        <td style="width: 16.66%; padding: 2px;">
+                            <div style="font-size: 8px; font-weight: bold;">Shipped</div>
+                            <div style="width: 18px; height: 14px; border: 1px solid #333; display: inline-block; margin-top: 2px;"></div>
+                        </td>
+                        <td style="width: 16.66%; padding: 2px;">
+                            <div style="font-size: 8px; font-weight: bold;">Invoiced</div>
+                            <div style="width: 18px; height: 14px; border: 1px solid #333; display: inline-block; margin-top: 2px;"></div>
+                        </td>
+                    </tr>
+                </table>
+                
+                <!-- Bottom Section -->
+                <table style="width: 100%; margin: 2px 0 0 0; padding: 0 15px; border-collapse: collapse;">
+                    <tr>
+                        <td style="width: 33.33%; padding: 2px;">
+                            <div style="font-size: 9px; font-weight: bold; margin-bottom: 1px;">Shipping Weight:</div>
+                            <div style="padding: 2px 6px; border-bottom: 1px solid #333;">_______________</div>
+                        </td>
+                        <td style="width: 33.33%; padding: 2px;">
+                            <div style="font-size: 9px; font-weight: bold; margin-bottom: 1px;">Dimensions:</div>
+                            <div style="padding: 2px 6px; border-bottom: 1px solid #333;">_______________</div>
+                        </td>
+                        <td style="width: 33.33%; padding: 2px;">
+                            <div style="font-size: 9px; font-weight: bold; margin-bottom: 1px;">Signature:</div>
+                            <div style="padding: 2px 6px; border-bottom: 1px solid #333;">_______________</div>
+                        </td>
+                    </tr>
+                </table>
+                
+            </div>
+        </div>
+    </t>
+</t>

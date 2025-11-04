@@ -1,0 +1,227 @@
+<t t-name="web.basic_layout">
+    <t t-call="web.html_container">
+        <t t-if="not o" t-set="o" t-value="doc"/>
+        <div class="article">
+        <t t-set="metal_type_attr" t-value="False"/>
+        <t t-set="gauge_attr" t-value="False"/>
+        <t t-set="color_attr" t-value="False"/>
+    <t t-foreach="o.product_id.product_template_attribute_value_ids" t-as="attr">
+        <t t-if="attr.attribute_id.name == 'Metal Type'">
+            <t t-set="metal_type_attr" t-value="attr.name"/>
+        </t>
+        <t t-if="attr.attribute_id.name == 'Gauge'">
+            <t t-set="gauge_attr" t-value="attr.name"/>
+        </t>
+        <t t-if="attr.attribute_id.name == 'Color'">
+            <t t-set="color_attr" t-value="attr.name"/>
+        </t>
+    </t>
+    
+    <div style="width: 100%; max-width: 8.5in; margin: 0 auto; padding: 15px; font-family: Arial, sans-serif; font-size: 12px; line-height: 1.3; -webkit-print-color-adjust: exact; print-color-adjust: exact;">
+        
+        <!-- Header -->
+        <div style="width: 100%; margin: 0 0 5px 0; text-align: center;">
+            <div style="width: 33%; display: inline-block; vertical-align: middle; padding: 10px 5px; text-align: left;">
+                <div style="width: 100px; height: 65px; background-color: #2c5f5f; color: white; text-align: center; padding-top: 10px; font-weight: bold; margin: 0 auto;">
+                    <div style="font-size: 16px; margin-bottom: 2px;">KYNETIC</div>
+                    <div style="margin-bottom: 2px;">
+                        <span style="display: inline-block; width: 6px; height: 6px; background-color: white; border-radius: 50%; margin: 0 1px;"/>
+                        <span style="display: inline-block; width: 6px; height: 6px; background-color: white; border-radius: 50%; margin: 0 1px;"/>
+                        <span style="display: inline-block; width: 6px; height: 6px; background-color: white; border-radius: 50%; margin: 0 1px;"/>
+                        <span style="display: inline-block; width: 6px; height: 6px; background-color: white; border-radius: 50%; margin: 0 1px;"/>
+                        <span style="display: inline-block; width: 6px; height: 6px; background-color: white; border-radius: 50%; margin: 0 1px;"/>
+                        <span style="display: inline-block; width: 6px; height: 6px; background-color: white; border-radius: 50%; margin: 0 1px;"/>
+                    </div>
+                    <div style="font-size: 10px; letter-spacing: 1px;">metalworks</div>
+                </div>
+            </div>
+            <div style="width: 33%; display: inline-block; vertical-align: middle; text-align: center; padding: 10px 5px;">
+                <div style="font-size: 28px; font-weight: bold; margin-top: 15px;">ORDER SHEET</div>
+            </div>
+            <div style="width: 32%; display: inline-block; vertical-align: middle; padding: 10px 5px; text-align: right;">
+                <div style="margin-bottom: 6px;">
+                    <span style="font-size: 13px; font-weight: bold; margin-right: 6px;">Date Ordered:</span>
+                    <span style="font-size: 12px; padding-bottom: 2px;">_______________</span>
+                </div>
+                <div style="margin-bottom: 6px;">
+                    <span style="font-size: 13px; font-weight: bold; margin-right: 6px;">Completed By:</span>
+                    <span style="font-size: 12px; padding-bottom: 2px;">_______________</span>
+                </div>
+                <div style="margin-bottom: 6px;">
+                    <span style="font-size: 13px; font-weight: bold; margin-right: 6px;">Date Finished:</span>
+                    <span style="font-size: 12px; padding-bottom: 2px;">_______________</span>
+                </div>
+            </div>
+        </div>
+        
+        <hr style="border: none; border-top: 2px solid black; margin: 0 0 5px 0;"/>
+        
+        <!-- Customer and Job Info -->
+        <div style="width: 100%; margin: 0 0 5px 0;">
+            <div style="width: 50%; display: inline-block; padding: 5px 5px; vertical-align: top;">
+                <span style="font-size: 14px; font-weight: bold; margin-right: 8px;">Customer:</span>
+                <span style="font-size: 13px; padding-bottom: 2px;">_______________</span>
+            </div>
+            <div style="width: 49%; display: inline-block; padding: 5px 5px; vertical-align: top;">
+                <span style="font-size: 14px; font-weight: bold; margin-right: 8px;">Job:</span>
+                <span style="font-size: 13px; padding-bottom: 2px;"><t t-esc="o.bom_id.x_studio_job_name or '_______________'"/></span>
+            </div>
+        </div>
+        
+        <hr style="border: none; border-top: 1px solid #333; margin: 0 0 5px 0;"/>
+        
+        <!-- Material Specifications -->
+        <div style="width: 100%; margin: 0 0 5px 0;">
+            <div style="width: 45%; display: inline-block; padding: 7px 5px; vertical-align: top;">
+                <!-- Steel Options -->
+                <div style="margin-bottom: 10px;">
+                    <span style="font-size: 14px; font-weight: bold; display: inline-block; width: 50px;">Steel</span>
+                    <span style="display: inline-block;">
+                        <span style="width: 14px; height: 14px; border: 2px solid #333; display: inline-block; margin-right: 3px; vertical-align: middle;"/>
+                        <span style="font-size: 12px; font-weight: bold; margin-right: 8px;">22</span>
+                        <span style="width: 14px; height: 14px; border: 2px solid #333; display: inline-block; margin-right: 3px; vertical-align: middle;"/>
+                        <span style="font-size: 12px; font-weight: bold; margin-right: 8px;">24</span>
+                        <span style="width: 14px; height: 14px; border: 2px solid #333; display: inline-block; margin-right: 3px; vertical-align: middle;"/>
+                        <span style="font-size: 12px; font-weight: bold; margin-right: 8px;">26</span>
+                        <span style="width: 14px; height: 14px; border: 2px solid #333; display: inline-block; margin-right: 3px; vertical-align: middle;"/>
+                        <span style="font-size: 12px; font-weight: bold; margin-right: 8px;">28</span>
+                        <span style="width: 14px; height: 14px; border: 2px solid #333; display: inline-block; margin-right: 3px; vertical-align: middle;"/>
+                        <span style="font-size: 12px; font-weight: bold;">30</span>
+                    </span>
+                </div>
+                
+                <!-- Aluminum Options -->
+                <div style="margin-bottom: 12px;">
+                    <span style="font-size: 14px; font-weight: bold; display: inline-block; width: 50px;">Al</span>
+                    <span style="display: inline-block;">
+                        <span style="width: 14px; height: 14px; border: 2px solid #333; display: inline-block; margin-right: 3px; vertical-align: middle;"/>
+                        <span style="font-size: 12px; font-weight: bold; margin-right: 8px;">.019</span>
+                        <span style="width: 14px; height: 14px; border: 2px solid #333; display: inline-block; margin-right: 3px; vertical-align: middle;"/>
+                        <span style="font-size: 12px; font-weight: bold; margin-right: 8px;">.027</span>
+                        <span style="width: 14px; height: 14px; border: 2px solid #333; display: inline-block; margin-right: 3px; vertical-align: middle;"/>
+                        <span style="font-size: 12px; font-weight: bold; margin-right: 8px;">.032</span>
+                        <span style="width: 14px; height: 14px; border: 2px solid #333; display: inline-block; margin-right: 3px; vertical-align: middle;"/>
+                        <span style="font-size: 12px; font-weight: bold; margin-right: 8px;">.040</span>
+                        <span style="width: 14px; height: 14px; border: 2px solid #333; display: inline-block; margin-right: 3px; vertical-align: middle;"/>
+                        <span style="font-size: 12px; font-weight: bold;">.050</span>
+                    </span>
+                </div>
+                
+                <!-- Color -->
+                <div style="margin-bottom: 10px;">
+                    <span style="font-size: 13px; font-weight: bold;">Color:</span>
+                    <span style="display: inline-block; min-width: 120px; padding: 2px 6px; border-bottom: 1px solid #333;"><t t-esc="color_attr or ''"/></span>
+                </div>
+                
+                <!-- Color Manufacturer -->
+                <div style="margin-bottom: 10px;">
+                    <span style="font-size: 13px; font-weight: bold;">Color Manufacturer:</span>
+                    <span style="display: inline-block; min-width: 120px; padding: 2px 6px; border-bottom: 1px solid #333;">CMG</span>
+                </div>
+            </div>
+            <div style="width: 29%; display: inline-block; padding: 7px 5px; vertical-align: top;">
+                <div style="margin-bottom: 9px;">
+                    <div style="font-size: 13px; font-weight: bold;">Quantity:</div>
+                    <span style="display: inline-block; min-width: 120px; padding: 2px 6px; border-bottom: 1px solid #333;"><t t-esc="o.product_qty or 0"/></span>
+                </div>
+                <div style="margin-bottom: 9px;">
+                    <div style="font-size: 13px; font-weight: bold;">Length (inches):</div>
+                    <span style="display: inline-block; min-width: 120px; padding: 2px 6px; border-bottom: 1px solid #333;"><t t-esc="o.bom_id.x_studio_length_in or '0.00'"/></span>
+                </div>
+                <div style="margin-bottom: 9px;">
+                    <div style="font-size: 13px; font-weight: bold;">Total Material Usage (inches):</div>
+                    <span style="display: inline-block; min-width: 120px; padding: 2px 6px; border-bottom: 1px solid #333;"><t t-esc="o.bom_id.x_studio_total_material_usage or '0.00'"/></span>
+                </div>
+                <div style="margin-bottom: 9px;">
+                    <span style="width: 14px; height: 14px; border: 2px solid #333; display: inline-block; vertical-align: middle;"/>
+                    <span style="font-size: 13px; font-weight: bold; margin-left: 4px;">Include Ribs</span>
+                </div>
+                <div style="margin-bottom: 9px;">
+                    <span style="width: 14px; height: 14px; border: 2px solid #333; display: inline-block; vertical-align: middle;"/>
+                    <span style="font-size: 13px; font-weight: bold; margin-left: 4px;">Holes</span>
+                </div>
+            </div>
+            <div style="width: 24%; display: inline-block; padding: 7px 5px; vertical-align: top;">
+                <div style="margin-bottom: 9px;">
+                    <div style="font-size: 13px; font-weight: bold;">Hole Size (inches):</div>
+                    <span style="display: inline-block; min-width: 100px; padding: 2px 6px; border-bottom: 1px solid #333;"><t t-esc="o.bom_id.x_studio_hole_size or 'N/A'"/></span>
+                </div>
+                <div style="margin-bottom: 9px;">
+                    <div style="font-size: 13px; font-weight: bold;">Hole Spacing (OC):</div>
+                    <span style="display: inline-block; min-width: 100px; padding: 2px 6px; border-bottom: 1px solid #333;"><t t-esc="o.bom_id.x_studio_hole_spacing or 'N/A'"/></span>
+                </div>
+                <div style="margin-bottom: 9px;">
+                    <div style="font-size: 13px; font-weight: bold;">Start From End (OC):</div>
+                    <span style="display: inline-block; min-width: 100px; padding: 2px 6px; border-bottom: 1px solid #333;"><t t-esc="o.bom_id.x_studio_start_from_end or 'N/A'"/></span>
+                </div>
+                <div style="margin-bottom: 9px;">
+                    <div style="font-size: 13px; font-weight: bold;">Distance From Edge (OC):</div>
+                    <span style="display: inline-block; min-width: 100px; padding: 2px 6px; border-bottom: 1px solid #333;"><t t-esc="o.bom_id.x_studio_distance_from_edge or 'N/A'"/></span>
+                </div>
+            </div>
+        </div>
+        
+        <hr style="border: none; border-top: 1px solid #333; margin: 0 0 5px 0;"/>
+        
+        <!-- Profile Section -->
+        <div style="padding: 5px 0; margin-top: 0;">
+            <div style="text-align: center; margin-bottom: 5px;">
+                <span style="font-size: 14px; font-weight: bold; margin-right: 8px;">Profile Name:</span>
+                <span style="border-bottom: 1px solid #333; font-size: 13px; padding-bottom: 2px;"><t t-esc="o.product_id.name or 'Profile Description'"/></span>
+            </div>
+            
+            <div style="height: 750px; width: 100%; border: 1px solid #ddd; margin: 0; text-align: center; position: relative; background-image: radial-gradient(circle, #999999 1px, transparent 1px); background-size: 20px 20px; background-position: 0 0; display: flex; align-items: center; justify-content: center;">
+                <t t-if="o.product_id.image_1920">
+                    <img t-att-src="image_data_uri(o.product_id.image_1920)" style="width: 95%; height: 95%; object-fit: contain;"/>
+                </t>
+            </div>
+        </div>
+        
+        <!-- Process Tracking -->
+        <div style="width: 100%; margin: 5px 0 0 0; text-align: center; white-space: nowrap;">
+            <div style="width: 16.5%; display: inline-block; padding: 5px 1px; vertical-align: top;">
+                <div style="font-size: 10px; font-weight: bold; margin-bottom: 4px;">Slit</div>
+                <div style="width: 18px; height: 14px; border: 1px solid #333; display: inline-block;"/>
+            </div>
+            <div style="width: 16.5%; display: inline-block; padding: 5px 1px; vertical-align: top;">
+                <div style="font-size: 10px; font-weight: bold; margin-bottom: 4px;">Punched</div>
+                <div style="width: 18px; height: 14px; border: 1px solid #333; display: inline-block;"/>
+            </div>
+            <div style="width: 16.5%; display: inline-block; padding: 5px 1px; vertical-align: top;">
+                <div style="font-size: 10px; font-weight: bold; margin-bottom: 4px;">Bent</div>
+                <div style="width: 18px; height: 14px; border: 1px solid #333; display: inline-block;"/>
+            </div>
+            <div style="width: 16.5%; display: inline-block; padding: 5px 1px; vertical-align: top;">
+                <div style="font-size: 10px; font-weight: bold; margin-bottom: 4px;">Packaged</div>
+                <div style="width: 18px; height: 14px; border: 1px solid #333; display: inline-block;"/>
+            </div>
+            <div style="width: 16.5%; display: inline-block; padding: 5px 1px; vertical-align: top;">
+                <div style="font-size: 10px; font-weight: bold; margin-bottom: 4px;">Shipped</div>
+                <div style="width: 18px; height: 14px; border: 1px solid #333; display: inline-block;"/>
+            </div>
+            <div style="width: 16.5%; display: inline-block; padding: 5px 1px; vertical-align: top;">
+                <div style="font-size: 10px; font-weight: bold; margin-bottom: 4px;">Invoiced</div>
+                <div style="width: 18px; height: 14px; border: 1px solid #333; display: inline-block;"/>
+            </div>
+        </div>
+        
+        <!-- Bottom Section -->
+        <div style="width: 100%; margin: 5px 0 0 0;">
+            <div style="width: 33.33%; display: inline-block; padding: 5px 5px; vertical-align: top;">
+                <span style="font-size: 13px; font-weight: bold; margin-right: 8px;">Shipping Weight:</span>
+                <span style="font-size: 12px; padding-bottom: 2px;">_______________</span>
+            </div>
+            <div style="width: 33.33%; display: inline-block; padding: 5px 5px; vertical-align: top;">
+                <span style="font-size: 13px; font-weight: bold; margin-right: 8px;">Dimensions:</span>
+                <span style="font-size: 12px; padding-bottom: 2px;">_______________</span>
+            </div>
+            <div style="width: 32%; display: inline-block; padding: 5px 5px; vertical-align: top;">
+                <span style="font-size: 13px; font-weight: bold; margin-right: 8px;">Signature:</span>
+                <span style="font-size: 12px; padding-bottom: 2px;">_______________</span>
+            </div>
+        </div>
+        
+    </div>
+        </div>
+    </t>
+</t>

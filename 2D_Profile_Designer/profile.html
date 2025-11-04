@@ -74,6 +74,16 @@
                 }
             }
         }
+        
+        // Show or hide hole details column based on has_holes
+        const holeDetailsColumn = document.getElementById('holeDetailsColumn');
+        if (holeDetailsColumn) {
+            if (data.has_holes) {
+                holeDetailsColumn.style.display = 'block';
+            } else {
+                holeDetailsColumn.style.display = 'none';
+            }
+        }
 
         // Copy the profile SVG to the drawing area
         const originalSvg = document.getElementById('canvas');
@@ -6197,7 +6207,7 @@ async function createManufacturingTask(orderData, profileImageBlob) {
         console.log('Order Data:', orderData);
 
         // CONFIGURATION: Set your email address where submissions should be sent
-        const SUBMISSION_EMAIL = 'matthew@webecke.com'; // Change this to your email
+        const SUBMISSION_EMAIL = 'webeckematthew@gmail.com'; // Change this to your email
 
         // Generate the order sheet image
         console.log('Generating order sheet image...');
@@ -6629,7 +6639,7 @@ ${orderData.has_holes ? `
                     </div>
                 </div>
                 
-                <div class="col narrow">
+                <div class="col narrow" id="holeDetailsColumn">
                     <div class="field-group">
                         <span class="field-label">Hole Size (inches):</span>
                         <span class="data-field compact" data-field="hole_size" data-placeholder="N/A"></span>

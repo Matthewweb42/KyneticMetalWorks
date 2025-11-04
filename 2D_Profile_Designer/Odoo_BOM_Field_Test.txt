@@ -1,0 +1,32 @@
+<t t-name="web.basic_layout">
+    <t t-call="web.html_container">
+        <t t-if="not o" t-set="o" t-value="doc"/>
+        <div class="article">
+            <h1>BoM Field Test</h1>
+            <h2>MO Fields:</h2>
+            <p>o.name: <t t-esc="o.name"/></p>
+            <p>o.product_qty: <t t-esc="o.product_qty"/></p>
+            <p>o.product_id.name: <t t-esc="o.product_id.name"/></p>
+            <h2>BoM Check:</h2>
+            <p>o.bom_id exists: <t t-esc="bool(o.bom_id)"/></p>
+            <p>o.bom_id: <t t-esc="o.bom_id"/></p>
+            <h2>BoM Custom Fields:</h2>
+            <p>o.bom_id.x_studio_job_name: <t t-esc="o.bom_id.x_studio_job_name"/></p>
+            <p>o.bom_id.x_studio_length: <t t-esc="o.bom_id.x_studio_length"/></p>
+            <p>o.bom_id.x_studio_total_material_usage: <t t-esc="o.bom_id.x_studio_total_material_usage"/></p>
+            <p>o.bom_id.x_studio_hole_size: <t t-esc="o.bom_id.x_studio_hole_size"/></p>
+            <p>o.bom_id.x_studio_hole_spacing: <t t-esc="o.bom_id.x_studio_hole_spacing"/></p>
+            <p>o.bom_id.x_studio_start_from_end: <t t-esc="o.bom_id.x_studio_start_from_end"/></p>
+            <p>o.bom_id.x_studio_distance_from_edge: <t t-esc="o.bom_id.x_studio_distance_from_edge"/></p>
+            <h2>Product Attributes:</h2>
+            <t t-foreach="o.product_id.product_template_attribute_value_ids" t-as="attr">
+                <p><t t-esc="attr.attribute_id.name"/>: <t t-esc="attr.name"/></p>
+            </t>
+            <h2>Product Image:</h2>
+            <p>o.product_id.image_1920 exists: <t t-esc="bool(o.product_id.image_1920)"/></p>
+            <t t-if="o.product_id.image_1920">
+                <img t-att-src="image_data_uri(o.product_id.image_1920)"/>
+            </t>
+        </div>
+    </t>
+</t>
