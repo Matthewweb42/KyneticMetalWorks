@@ -453,6 +453,9 @@
             pointer-events: none;
             user-select: none;
             transition: all 0.3s ease;
+            stroke: white;
+            stroke-width: 3px;
+            paint-order: stroke fill;
         }
 
         .edit-mode .measurement-label,
@@ -4942,21 +4945,38 @@ ORDERING:
                     labelText = `${Math.round(angle)}°`;
                 }
 
-                // Calculate position for supplementary angle label with collision detection
-                const exteriorLabelPos = calculateExteriorLabelPosition(prev, current, next, labelText, placedLabels);
+                // Get the actual angle value for threshold check
+                const angleValue = (labelText === 'HEM') ? 0 : calculateVertexAngle(i);
 
-                // Always draw leader line to show connection to vertex
-                createLeaderLine(exteriorLabelPos.x, exteriorLabelPos.y, exteriorLabelPos.targetX, exteriorLabelPos.targetY);
+                // Threshold for interior vs exterior label positioning
+                const INTERIOR_ANGLE_THRESHOLD = 45;
 
-                createClickableLabel(exteriorLabelPos.x, exteriorLabelPos.y, labelText, 'angle-label', 'angle', i - 1);
+                let labelPos;
+
+                // For angles >= 45 degrees, position label inside the wedge
+                // For smaller angles or HEM, use exterior positioning with leader line
+                if (labelText !== 'HEM' && angleValue >= INTERIOR_ANGLE_THRESHOLD) {
+                    // Position label inside the wedge (no leader line needed)
+                    labelPos = calculateInteriorLabelPosition(prev, current, next, angleValue);
+                } else {
+                    // Position label outside with collision detection
+                    labelPos = calculateExteriorLabelPosition(prev, current, next, labelText, placedLabels);
+                }
+
+                // Draw leader line only if needed (exterior positioning or far placement)
+                if (labelPos.needsLeader) {
+                    createLeaderLine(labelPos.x, labelPos.y, labelPos.targetX, labelPos.targetY);
+                }
+
+                createClickableLabel(labelPos.x, labelPos.y, labelText, 'angle-label', 'angle', i - 1);
 
                 // Track angle label position for collision detection
                 const textWidth = labelText.length * 8;
                 const labelWidth = textWidth + 8;
                 const labelHeight = 16;
                 placedLabels.push({
-                    x: exteriorLabelPos.x - labelWidth / 2,
-                    y: exteriorLabelPos.y - labelHeight / 2,
+                    x: labelPos.x - labelWidth / 2,
+                    y: labelPos.y - labelHeight / 2,
                     width: labelWidth,
                     height: labelHeight
                 });
@@ -5133,41 +5153,41 @@ ORDERING:
         function drawAngleArc(prevPoint, centerPoint, nextPoint, angle) {
             const vec1 = { x: prevPoint.x - centerPoint.x, y: prevPoint.y - centerPoint.y };
             const vec2 = { x: nextPoint.x - centerPoint.x, y: nextPoint.y - centerPoint.y };
-            
-            const angle1 = Math.atan2(vec1.y, vec1.x);
-            const angle2 = Math.atan2(vec2.y, vec2.x);
-            
-            let startAngle = angle1;
-            let endAngle = angle2;
-            
-            let angleDiff = endAngle - startAngle;
-            if (angleDiff > Math.PI) {
-                angleDiff -= 2 * Math.PI;
-            } else if (angleDiff < -Math.PI) {
-                angleDiff += 2 * Math.PI;
-            }
-            
-            if (Math.abs(angleDiff) > Math.PI) {
-                [startAngle, endAngle] = [endAngle, startAngle];
-                angleDiff = endAngle - startAngle;
-                if (angleDiff > Math.PI) {
-                    angleDiff -= 2 * Math.PI;
-                } else if (angleDiff < -Math.PI) {
-                    angleDiff += 2 * Math.PI;
-                }
-            }
-            
-            const radius = 20;
 
-            const startX = centerPoint.x + radius * Math.cos(startAngle);
-            const startY = centerPoint.y + radius * Math.sin(startAngle);
-            const endX = centerPoint.x + radius * Math.cos(endAngle);
-            const endY = centerPoint.y + radius * Math.sin(endAngle);
+            // Calculate angles for both lines from the vertex
+            const angle1 = Math.atan2(vec1.y, vec1.x);  // Line 1 direction (to prevPoint)
+            const angle2 = Math.atan2(vec2.y, vec2.x);  // Line 2 direction (to nextPoint)
 
+            // Calculate the FORWARD extension of Line 1 (opposite direction from prevPoint)
+            // This represents where Line 1 would continue if it kept going straight
+            const forwardAngle1 = angle1 + Math.PI;  // Add 180 degrees to get forward direction
+
+            const radius = 35;
+
+            // Start point: on the FORWARD EXTENSION of Line 1 at radius distance from vertex
+            const startX = centerPoint.x + radius * Math.cos(forwardAngle1);
+            const startY = centerPoint.y + radius * Math.sin(forwardAngle1);
+
+            // End point: on Line 2 itself at radius distance
+            const endX = centerPoint.x + radius * Math.cos(angle2);
+            const endY = centerPoint.y + radius * Math.sin(angle2);
+
+            // Calculate the angle to sweep from forward Line 1 extension to Line 2
+            // This represents the physical bend angle
+            let angleDiff = angle2 - forwardAngle1;
+
+            // Normalize angle difference to [-PI, PI] range
+            while (angleDiff > Math.PI) angleDiff -= 2 * Math.PI;
+            while (angleDiff < -Math.PI) angleDiff += 2 * Math.PI;
+
+            // Arc flags for SVG path
+            // largeArcFlag: 1 if we're sweeping more than 180 degrees, 0 otherwise
             const largeArcFlag = Math.abs(angleDiff) > Math.PI ? 1 : 0;
+            // sweepFlag: 1 if positive (counterclockwise), 0 if negative (clockwise)
             const sweepFlag = angleDiff > 0 ? 1 : 0;
 
-            // Create filled wedge shape (pie slice) from vertex to arc
+            // Create filled wedge shape from forward extension of Line 1 to Line 2
+            // This accurately represents the physical bend angle
             const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
             const pathData = `M ${centerPoint.x} ${centerPoint.y} L ${startX} ${startY} A ${radius} ${radius} 0 ${largeArcFlag} ${sweepFlag} ${endX} ${endY} L ${centerPoint.x} ${centerPoint.y} Z`;
             path.setAttribute('d', pathData);
@@ -5195,12 +5215,71 @@ ORDERING:
             return supplementaryAngle;
         }
 
+        function calculateInteriorLabelPosition(prev, current, next, angle) {
+            // Calculate vectors from current vertex to adjacent vertices
+            const vec1 = { x: prev.x - current.x, y: prev.y - current.y };
+            const vec2 = { x: next.x - current.x, y: next.y - current.y };
+
+            // Calculate angles for both lines from the vertex
+            const angle1 = Math.atan2(vec1.y, vec1.x);  // Line 1 direction (to prevPoint)
+            const angle2 = Math.atan2(vec2.y, vec2.x);  // Line 2 direction (to nextPoint)
+
+            // Calculate the FORWARD extension of Line 1
+            const forwardAngle1 = angle1 + Math.PI;
+
+            // Calculate the angle difference from forward extension to Line 2
+            let angleDiff = angle2 - forwardAngle1;
+
+            // Normalize angle difference to [-PI, PI] range
+            while (angleDiff > Math.PI) angleDiff -= 2 * Math.PI;
+            while (angleDiff < -Math.PI) angleDiff += 2 * Math.PI;
+
+            // Calculate the bisector by adding half the normalized angle difference
+            // This correctly handles angle wrapping and matches the wedge arc direction
+            let bisectorAngle = forwardAngle1 + angleDiff / 2;
+
+            // Position label at ~65% of the wedge radius (20px out of 35px)
+            const labelDistance = 20;
+            const labelX = current.x + labelDistance * Math.cos(bisectorAngle);
+            const labelY = current.y + labelDistance * Math.sin(bisectorAngle);
+
+            return {
+                x: labelX,
+                y: labelY,
+                needsLeader: false,
+                targetX: current.x,
+                targetY: current.y
+            };
+        }
+
         function calculateExteriorLabelPosition(prev, current, next, labelText, placedLabels) {
             // Calculate vectors from current vertex to adjacent vertices
             const vec1 = { x: prev.x - current.x, y: prev.y - current.y };
             const vec2 = { x: next.x - current.x, y: next.y - current.y };
 
-            // Normalize vectors
+            // Calculate angles for both lines from the vertex
+            const angle1 = Math.atan2(vec1.y, vec1.x);  // Line 1 direction (to prevPoint)
+            const angle2 = Math.atan2(vec2.y, vec2.x);  // Line 2 direction (to nextPoint)
+
+            // Calculate the FORWARD extension of Line 1
+            const forwardAngle1 = angle1 + Math.PI;
+
+            // Calculate the angle difference from forward extension to Line 2
+            let angleDiff = angle2 - forwardAngle1;
+
+            // Normalize angle difference to [-PI, PI] range
+            while (angleDiff > Math.PI) angleDiff -= 2 * Math.PI;
+            while (angleDiff < -Math.PI) angleDiff += 2 * Math.PI;
+
+            // Calculate the bisector angle - center of the wedge
+            let bisectorAngle = forwardAngle1 + angleDiff / 2;
+
+            // Calculate wedge center point (where leader line should point to)
+            const wedgeRadius = 20; // Point to middle of the wedge arc
+            const wedgeCenterX = current.x + wedgeRadius * Math.cos(bisectorAngle);
+            const wedgeCenterY = current.y + wedgeRadius * Math.sin(bisectorAngle);
+
+            // Normalize vectors for positioning labels along exterior bisector
             const mag1 = Math.sqrt(vec1.x * vec1.x + vec1.y * vec1.y);
             const mag2 = Math.sqrt(vec2.x * vec2.x + vec2.y * vec2.y);
 
@@ -5230,8 +5309,8 @@ ORDERING:
             const labelWidth = textWidth + 8;
             const labelHeight = 16;
 
-            // Try multiple distances to avoid collisions (similar to line measurements)
-            const distances = [40, 50, 60, 70, 80, 90, 100, 110, 120];
+            // Start closer for small angles, progressively try further distances only if needed
+            const distances = [45, 50, 55, 60, 65, 70, 80, 90, 100, 110, 120];
             const vertexRadius = 12; // Collision radius around vertices
 
             for (let distance of distances) {
@@ -5260,9 +5339,9 @@ ORDERING:
                     return {
                         x: testX,
                         y: testY,
-                        needsLeader: distance > 80, // Use leader line if far away
-                        targetX: current.x,
-                        targetY: current.y
+                        needsLeader: true, // Always show leader line for exterior labels
+                        targetX: wedgeCenterX,
+                        targetY: wedgeCenterY
                     };
                 }
             }
@@ -5270,14 +5349,14 @@ ORDERING:
             // Fallback: place far away with leader line
             const farDistance = 140;
             const testX = current.x + bisector.x * farDistance;
-            const testY = current.y + bisector.y * farDistance;
+            const testY = current.y + farDistance;
 
             return {
                 x: testX,
                 y: testY,
                 needsLeader: true,
-                targetX: current.x,
-                targetY: current.y
+                targetX: wedgeCenterX,
+                targetY: wedgeCenterY
             };
         }
 
@@ -5515,10 +5594,10 @@ ORDERING:
             const deltaY = nextPoint.y - currentPoint.y;
             const lineLength = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
 
-            // Convert the displayed supplementary angle to the interior angle for calculation
-            // newAngle is the supplementary angle the user entered (what they see)
-            // We need the interior angle for the geometry calculation
-            const interiorAngle = 180 - newAngle;
+            // User entered the angle value they want
+            // Use it directly as the interior angle for geometry calculation
+            // (No conversion needed - user input is the interior angle)
+            const interiorAngle = newAngle;
             
             // Calculate both rotation options and choose the one that keeps
             // the next point on the same side of the current line
