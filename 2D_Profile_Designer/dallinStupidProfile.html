@@ -1745,6 +1745,7 @@
                         <g id="lines"></g>
                         <g id="points"></g>
                         <g id="labels"></g>
+                        <g id="pieceLabels"></g>
                     </svg>
                     <div id="mode" class="mode-display">Click on the canvas to start drawing your profile</div>
                 </div>
@@ -2178,6 +2179,7 @@ function loadHtml2Canvas() {
         const pointsGroup = document.getElementById('points');
         const linesGroup = document.getElementById('lines');
         const labelsGroup = document.getElementById('labels');
+        const pieceLabelsGroup = document.getElementById('pieceLabels');
 
         // Visual snap guide function
         function showSnapGuides(fromPoint, toPoint, isSnapped) {
@@ -3352,6 +3354,12 @@ ORDERING:
             const screenX = e.clientX - rect.left;
             const screenY = e.clientY - rect.top;
 
+            // Handle piece label dragging
+            if (isDraggingPieceLabel) {
+                updatePieceLabelDrag(screenX, screenY);
+                return;
+            }
+
             // Handle label dragging
             if (isDraggingLabel) {
                 updateLabelDrag(screenX, screenY);
@@ -3479,6 +3487,12 @@ ORDERING:
         }
 
         function handleMouseUp(e) {
+            // Handle piece label drag ending
+            if (isDraggingPieceLabel) {
+                endPieceLabelDrag();
+                return;
+            }
+
             // Handle label drag ending
             if (isDraggingLabel) {
                 endLabelDrag();
@@ -4866,9 +4880,12 @@ ORDERING:
 
         // Label dragging state
         let labelCustomPositions = {};
+        let pieceLabelCustomPositions = {}; // For piece labels
         let isDraggingLabel = false;
         let draggedLabelElement = null;
         let draggedLabelLeaderLine = null;
+        let isDraggingPieceLabel = false;
+        let draggedPieceLabelElement = null;
         let dragOffset = { x: 0, y: 0 };
         let dragStartPos = { x: 0, y: 0 };
 
@@ -4967,6 +4984,65 @@ ORDERING:
             isDraggingLabel = false;
             draggedLabelElement = null;
             draggedLabelLeaderLine = null;
+            canvas.style.cursor = isEditMode ? 'crosshair' : 'crosshair';
+        }
+
+        // Piece label drag functions
+        function startPieceLabelDrag(labelBg, labelText, mouseX, mouseY, pieceIndex) {
+            isDraggingPieceLabel = true;
+            draggedPieceLabelElement = { bg: labelBg, text: labelText, pieceIndex: pieceIndex };
+            const labelX = parseFloat(labelBg.getAttribute('x'));
+            const labelY = parseFloat(labelBg.getAttribute('y'));
+            dragOffset.x = mouseX - labelX;
+            dragOffset.y = mouseY - labelY;
+            dragStartPos.x = mouseX;
+            dragStartPos.y = mouseY;
+            labelBg.style.cursor = 'grabbing';
+            canvas.style.cursor = 'grabbing';
+        }
+
+        function updatePieceLabelDrag(mouseX, mouseY) {
+            if (!isDraggingPieceLabel || !draggedPieceLabelElement) return;
+
+            const newX = mouseX - dragOffset.x;
+            const newY = mouseY - dragOffset.y;
+
+            draggedPieceLabelElement.bg.setAttribute('x', newX);
+            draggedPieceLabelElement.bg.setAttribute('y', newY);
+
+            const textWidth = parseFloat(draggedPieceLabelElement.bg.getAttribute('width'));
+            const textHeight = parseFloat(draggedPieceLabelElement.bg.getAttribute('height'));
+
+            draggedPieceLabelElement.text.setAttribute('x', newX + textWidth / 2);
+            draggedPieceLabelElement.text.setAttribute('y', newY + textHeight / 2);
+        }
+
+        function endPieceLabelDrag() {
+            if (!isDraggingPieceLabel) return;
+
+            const dragDistance = Math.sqrt(
+                Math.pow(dragStartPos.x - event.clientX, 2) +
+                Math.pow(dragStartPos.y - event.clientY, 2)
+            );
+
+            if (dragDistance > 5 && draggedPieceLabelElement) {
+                const pieceIndex = draggedPieceLabelElement.pieceIndex;
+                const labelX = parseFloat(draggedPieceLabelElement.bg.getAttribute('x'));
+                const labelY = parseFloat(draggedPieceLabelElement.bg.getAttribute('y'));
+                const labelWidth = parseFloat(draggedPieceLabelElement.bg.getAttribute('width'));
+                const labelHeight = parseFloat(draggedPieceLabelElement.bg.getAttribute('height'));
+
+                // Save custom position for this piece label
+                const positionKey = `piece-${pieceIndex}`;
+                pieceLabelCustomPositions[positionKey] = {
+                    x: labelX + labelWidth / 2,
+                    y: labelY + labelHeight / 2
+                };
+            }
+
+            isDraggingPieceLabel = false;
+            draggedPieceLabelElement.bg.style.cursor = 'grab';
+            draggedPieceLabelElement = null;
             canvas.style.cursor = isEditMode ? 'crosshair' : 'crosshair';
         }
 
@@ -6066,6 +6142,7 @@ ORDERING:
             pointsGroup.innerHTML = '';
             linesGroup.innerHTML = '';
             labelsGroup.innerHTML = '';
+            pieceLabelsGroup.innerHTML = '';
 
             // Draw all completed pieces
             pieces.forEach((piece, pieceIndex) => {
@@ -6103,6 +6180,85 @@ ORDERING:
                     showHemInfoBox(point.hemData);
                 }
             });
+
+            // Add piece label - find the topmost, leftmost point for label placement
+            if (piecePoints.length > 0) {
+                let minY = Infinity;
+                let minX = Infinity;
+                piecePoints.forEach(point => {
+                    if (point.y < minY || (point.y === minY && point.x < minX)) {
+                        minY = point.y;
+                        minX = point.x;
+                    }
+                });
+
+                // Create piece label above and to the left of the piece
+                const labelText = `Piece ${pieceIndex + 1}`;
+
+                // Check for custom position or use default
+                const customPosKey = `piece-${pieceIndex}`;
+                let labelX, labelY;
+                if (pieceLabelCustomPositions[customPosKey]) {
+                    labelX = pieceLabelCustomPositions[customPosKey].x;
+                    labelY = pieceLabelCustomPositions[customPosKey].y;
+                } else {
+                    labelX = minX - 40;
+                    labelY = minY - 20;
+                }
+
+                // Create background for piece label
+                const labelBg = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+                labelBg.setAttribute('x', labelX - 35);
+                labelBg.setAttribute('y', labelY - 12);
+                labelBg.setAttribute('width', 70);
+                labelBg.setAttribute('height', 20);
+                labelBg.setAttribute('fill', '#FF9800');
+                labelBg.setAttribute('stroke', '#F57C00');
+                labelBg.setAttribute('stroke-width', '2');
+                labelBg.setAttribute('rx', '4');
+                labelBg.setAttribute('data-piece-index', pieceIndex);
+                labelBg.style.cursor = 'grab';
+
+                // Create piece label text
+                const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                label.setAttribute('x', labelX);
+                label.setAttribute('y', labelY);
+                label.setAttribute('text-anchor', 'middle');
+                label.setAttribute('dominant-baseline', 'central');
+                label.setAttribute('fill', 'white');
+                label.setAttribute('font-weight', 'bold');
+                label.setAttribute('font-size', '14');
+                label.setAttribute('data-piece-index', pieceIndex);
+                label.textContent = labelText;
+                label.style.cursor = 'grab';
+                label.style.pointerEvents = 'none'; // Let the background handle events
+
+                // Add drag handlers
+                const mousedownHandler = function(e) {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    const rect = canvas.getBoundingClientRect();
+                    const mouseX = e.clientX - rect.left;
+                    const mouseY = e.clientY - rect.top;
+                    startPieceLabelDrag(labelBg, label, mouseX, mouseY, pieceIndex);
+                };
+                labelBg.addEventListener('mousedown', mousedownHandler);
+
+                // Show grab cursor on hover
+                labelBg.addEventListener('mouseenter', () => {
+                    if (!isDraggingPieceLabel) {
+                        labelBg.style.cursor = 'grab';
+                    }
+                });
+                labelBg.addEventListener('mouseleave', () => {
+                    if (!isDraggingPieceLabel) {
+                        labelBg.style.cursor = 'grab';
+                    }
+                });
+
+                pieceLabelsGroup.appendChild(labelBg);
+                pieceLabelsGroup.appendChild(label);
+            }
         }
 
         function clearCanvas() {
@@ -6113,6 +6269,7 @@ ORDERING:
             pointsGroup.innerHTML = '';
             linesGroup.innerHTML = '';
             labelsGroup.innerHTML = '';
+            pieceLabelsGroup.innerHTML = '';
             isDrawing = true;
             isEditMode = false;
             isDragging = false;
@@ -7220,28 +7377,28 @@ function loadJsPDF() {
 
         
         <div class="section" style="border: 1px solid black; padding: 8px; margin-bottom: 5px;">
-            <h3 style="margin: 0 0 5px 0; border-bottom: 1px solid black; padding-bottom: 2px; font-size: 15px;">Specifications</h3>
+            <h3 style="margin: 0 0 5px 0; border-bottom: 1px solid black; padding-bottom: 2px; font-size: 16px;">Specifications</h3>
 
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 5px;">
                 <div>
                     <div class="field-group" style="margin-bottom: 3px;">
-                        <span class="field-label" style="font-weight: bold; display: inline-block; width: 150px;">Length (inches):</span>
-                        <span class="data-field" data-field="length"></span>
+                        <span class="field-label" style="font-weight: bold; display: inline-block; width: 150px; font-size: 14px;">Length (inches):</span>
+                        <span class="data-field" data-field="length" style="font-size: 14px;"></span>
                     </div>
                     <div class="field-group" style="margin-bottom: 3px;">
-                        <span class="field-label" style="font-weight: bold; display: inline-block; width: 150px;">Unbent Width (inches):</span>
-                        <span class="data-field" data-field="material_usage"></span>
+                        <span class="field-label" style="font-weight: bold; display: inline-block; width: 150px; font-size: 14px;">Unbent Width (inches):</span>
+                        <span class="data-field" data-field="material_usage" style="font-size: 14px;"></span>
                     </div>
                 </div>
 
                 <div>
                     <div class="field-group" style="margin-bottom: 3px;">
                         <span class="checkbox" data-field="has_ribs" style="margin-right: 8px;"></span>
-                        <span class="field-label inline" style="font-weight: bold;">Include Ribs</span>
+                        <span class="field-label inline" style="font-weight: bold; font-size: 14px;">Include Ribs</span>
                     </div>
                     <div class="field-group" style="margin-bottom: 3px;">
                         <span class="checkbox" data-field="has_holes" style="margin-right: 8px;"></span>
-                        <span class="field-label inline" style="font-weight: bold;">Include Holes</span>
+                        <span class="field-label inline" style="font-weight: bold; font-size: 14px;">Include Holes</span>
                     </div>
                 </div>
             </div>
