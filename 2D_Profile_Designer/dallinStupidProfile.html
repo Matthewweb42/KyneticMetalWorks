@@ -1615,7 +1615,7 @@
                         </div>
 
                         <div class="field-group checkbox-field" style="margin-bottom: 0;">
-                            <input type="checkbox" id="hasHoles" onchange="document.getElementById('holeFields').style.display = this.checked ? 'block' : 'none';">
+                            <input type="checkbox" id="hasHoles" onchange="toggleHoleSelection(this.checked);">
                             <label for="hasHoles">Include Holes</label>
                         </div>
                     </div>
@@ -4723,6 +4723,8 @@ ORDERING:
 
             // Add coating direction arrow
             drawCoatingArrow(start, end);
+
+            return line; // Return line element for event handlers
         }
 
         function drawCoatingArrow(start, end) {
@@ -4888,6 +4890,10 @@ ORDERING:
         let draggedPieceLabelElement = null;
         let dragOffset = { x: 0, y: 0 };
         let dragStartPos = { x: 0, y: 0 };
+
+        // Hole location indicator
+        let holeLocationInfo = null; // { pieceIndex: 0, lineIndex: 2 }
+        let isSelectingHoleLocation = false;
 
         // Custom text labels (for non-numeric values like "X", "Y", "VARIES")
         let customLabels = {};
@@ -6039,12 +6045,74 @@ ORDERING:
             };
         }
 
+        function toggleHoleSelection(checked) {
+            // Show/hide hole fields
+            document.getElementById('holeFields').style.display = checked ? 'block' : 'none';
+
+            if (checked) {
+                // Enter hole location selection mode
+                isSelectingHoleLocation = true;
+                alert('Click on the line segment where holes are located');
+                // Highlight all lines to show they're clickable
+                redrawProfile();
+            } else {
+                // Clear hole location when unchecked
+                holeLocationInfo = null;
+                isSelectingHoleLocation = false;
+                redrawProfile();
+            }
+        }
+
+        function selectHoleLocation(pieceIndex, lineIndex) {
+            // Store the selected location
+            holeLocationInfo = { pieceIndex, lineIndex };
+            // Exit selection mode
+            isSelectingHoleLocation = false;
+            // Redraw to show slash marks
+            redrawProfile();
+        }
+
+        function drawHoleSlashes(start, end) {
+            // Calculate line direction and perpendicular
+            const dx = end.x - start.x;
+            const dy = end.y - start.y;
+            const length = Math.sqrt(dx * dx + dy * dy);
+
+            if (length === 0) return;
+
+            // Unit vectors
+            const dirX = dx / length;
+            const dirY = dy / length;
+            const perpX = -dirY; // Perpendicular
+            const perpY = dirX;
+
+            const slashLength = 18; // Length of each slash mark
+            const halfSlash = slashLength / 2;
+
+            // Draw 2 evenly spaced slashes at 33% and 66% along the line
+            [0.33, 0.66].forEach(fraction => {
+                const centerX = start.x + dx * fraction;
+                const centerY = start.y + dy * fraction;
+
+                // Draw slash perpendicular to the line
+                const slash = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                slash.setAttribute('x1', centerX - perpX * halfSlash);
+                slash.setAttribute('y1', centerY - perpY * halfSlash);
+                slash.setAttribute('x2', centerX + perpX * halfSlash);
+                slash.setAttribute('y2', centerY + perpY * halfSlash);
+                slash.setAttribute('stroke', '#FF9800'); // Orange color
+                slash.setAttribute('stroke-width', '2');
+                slash.setAttribute('class', 'hole-slash');
+                linesGroup.appendChild(slash);
+            });
+        }
+
         function toggleCoatedSide() {
             const toggle = document.getElementById('sideToggle');
             coatedSideRight = toggle.checked;
 
             redrawProfile();
-            
+
             const sideText = coatedSideRight ? 'Side B Colored' : 'Side A Colored';
             const currentMode = isEditMode ? 'Edit Mode' : 'Create Mode';
             document.getElementById('mode').textContent = `${currentMode} - ${sideText}`;
@@ -6168,7 +6236,24 @@ ORDERING:
 
             // Draw lines for this piece
             for (let i = 0; i < piecePoints.length - 1; i++) {
-                drawLine(piecePoints[i], piecePoints[i + 1], i);
+                const line = drawLine(piecePoints[i], piecePoints[i + 1], i);
+
+                // Add click handler for hole location selection
+                if (isSelectingHoleLocation) {
+                    line.style.cursor = 'pointer';
+                    line.setAttribute('stroke-width', '4'); // Make thicker for easier clicking
+                    line.addEventListener('click', function(e) {
+                        e.stopPropagation();
+                        selectHoleLocation(pieceIndex, i);
+                    });
+                }
+
+                // Draw slash marks if this line has holes
+                if (holeLocationInfo &&
+                    holeLocationInfo.pieceIndex === pieceIndex &&
+                    holeLocationInfo.lineIndex === i) {
+                    drawHoleSlashes(piecePoints[i], piecePoints[i + 1]);
+                }
             }
 
             // Draw HEM info box and curve at the correct vertex
