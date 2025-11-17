@@ -4,11 +4,7 @@
         try {
         // Gather data from designer fields
         const data = {};
-        data.customer_name = document.getElementById('customerName')?.value || '';
-        data.job_name = document.getElementById('jobName')?.value || '';
         data.profile_name = document.getElementById('profileName')?.value || '';
-        data.color = document.getElementById('color')?.value || '';
-        data.color_manufacturer = document.getElementById('colorManufacturer')?.value || '';
         data.quantity = document.getElementById('quantity')?.value || '';
         data.length = document.getElementById('lengthInput')?.value || '';
         data.material_usage = document.getElementById('totalLength') ? document.getElementById('totalLength').textContent.replace('"','') : '';
@@ -19,35 +15,29 @@
         data.dimensions = '';
         data.signature = '';
 
-        // Metal type and gauge
-        const metalType = document.getElementById('metalType').value;
-        const metalGauge = document.getElementById('metalGauge').value;
-        // Steel
-        data.steel_22 = metalType === 'steel' && metalGauge === '22';
-        data.steel_24 = metalType === 'steel' && metalGauge === '24';
-        data.steel_26 = metalType === 'steel' && metalGauge === '26';
-        data.steel_28 = metalType === 'steel' && metalGauge === '28';
-        data.steel_30 = metalType === 'steel' && metalGauge === '30';
-        // Aluminum
-        data.al_019 = metalType === 'aluminum' && metalGauge === '.019';
-        data.al_027 = metalType === 'aluminum' && metalGauge === '.027';
-        data.al_032 = metalType === 'aluminum' && metalGauge === '.032';
-        data.al_040 = metalType === 'aluminum' && metalGauge === '.040';
-        data.al_050 = metalType === 'aluminum' && metalGauge === '.050';
-
         // Hole specifications
         data.has_holes = document.getElementById('hasHoles')?.checked || false;
         const holeUnit = document.querySelector('input[name="holeUnits"]:checked')?.value || 'inches';
         data.hole_unit = holeUnit;
-        data.hole_size = getHoleSizeValue().toFixed(holeUnit === 'mm' ? 1 : 4);
-        data.hole_spacing = getHoleSpacingValue().toFixed(holeUnit === 'mm' ? 1 : 4);
-        data.start_from_end = getStartFromEndValue().toFixed(holeUnit === 'mm' ? 1 : 4);
-        data.distance_from_edge = getDistanceFromEdgeValue().toFixed(holeUnit === 'mm' ? 1 : 4);
+
+        // Format hole measurements - hole size can be mm or inches, but spacing/distances always in inches
+        if (holeUnit === 'mm') {
+            data.hole_size = getHoleSizeValue().toFixed(1) + ' mm';
+        } else {
+            data.hole_size = decimalToFraction(getHoleSizeValue()) + '"';
+        }
+        // Spacing, distance from end, and distance from edge are always in inches
+        data.hole_spacing = decimalToFraction(getHoleSpacingValue()) + '"';
+        data.start_from_end = decimalToFraction(getStartFromEndValue()) + '"';
+        data.distance_from_edge = decimalToFraction(getDistanceFromEdgeValue()) + '"';
 
         // Ribs specifications
         data.has_ribs = document.getElementById('hasRibs')?.checked || false;
 
-        // DXF and task specifications  
+        // Notes
+        data.notes = document.getElementById('productNotes')?.value || '';
+
+        // DXF and task specifications
         data.dxf_standards = document.getElementById('dxfStandards')?.value || '';
         data.task_priority = document.getElementById('taskPriority')?.value || '';
 
@@ -75,14 +65,49 @@
             }
         }
         
-        // Show or hide hole details column based on has_holes
+        // Handle visibility of notes and holes sections
         const holeDetailsColumn = document.getElementById('holeDetailsColumn');
-        if (holeDetailsColumn) {
-            if (data.has_holes) {
-                holeDetailsColumn.style.display = 'block';
+        const notesSection = document.getElementById('notesSection');
+        const notesAndHolesContainer = document.getElementById('notesAndHolesContainer');
+
+        const hasHoles = data.has_holes;
+        const hasNotes = data.notes && data.notes.trim();
+
+        if (notesAndHolesContainer) {
+            if (hasHoles && hasNotes) {
+                // Both exist: show container with 2 columns (notes narrower, holes wider)
+                notesAndHolesContainer.style.display = 'grid';
+                notesAndHolesContainer.style.gridTemplateColumns = '1fr 2fr';
+                if (holeDetailsColumn) holeDetailsColumn.style.display = 'block';
+                if (notesSection) notesSection.style.display = 'block';
+            } else if (hasHoles && !hasNotes) {
+                // Only holes: show container with 1 column (holes only)
+                notesAndHolesContainer.style.display = 'grid';
+                notesAndHolesContainer.style.gridTemplateColumns = '1fr';
+                if (holeDetailsColumn) holeDetailsColumn.style.display = 'block';
+                if (notesSection) notesSection.style.display = 'none';
+            } else if (!hasHoles && hasNotes) {
+                // Only notes: show container with 1 column (notes only)
+                notesAndHolesContainer.style.display = 'grid';
+                notesAndHolesContainer.style.gridTemplateColumns = '1fr';
+                if (holeDetailsColumn) holeDetailsColumn.style.display = 'none';
+                if (notesSection) notesSection.style.display = 'block';
             } else {
-                holeDetailsColumn.style.display = 'none';
+                // Neither: hide entire container
+                notesAndHolesContainer.style.display = 'none';
             }
+        }
+
+        // Update hole units display - clarify that spacing/distances are always in inches
+        const holeUnitsDisplay = document.getElementById('holeUnitsDisplay');
+        if (holeUnitsDisplay) {
+            holeUnitsDisplay.textContent = holeUnit === 'mm' ? 'hole size in millimeters, spacing/distances in inches' : 'inches';
+        }
+
+        // Update header product name
+        const headerProductName = document.getElementById('headerProductName');
+        if (headerProductName) {
+            headerProductName.textContent = data.profile_name;
         }
 
         // Copy the profile SVG to the drawing area
@@ -115,7 +140,16 @@
             
             drawingArea.appendChild(svgClone);
         }
-        
+
+        // Generate timestamp
+        const now = new Date();
+        const dateStr = now.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+        const timeStr = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+        const timestampEl = document.getElementById('printTimestamp');
+        if (timestampEl) {
+            timestampEl.textContent = `Generated: ${dateStr} at ${timeStr}`;
+        }
+
         } catch (error) {
             console.error('Error in populatePrintSheetFromDesigner:', error);
             alert('Error populating print sheet: ' + error.message);
@@ -127,7 +161,7 @@
 
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kynetic Metalworks - 2D Profile Designer</title>
+    <title>Design New Product</title>
     <style>
         /* Scope all resets to our container only - don't affect Odoo's layout */
         .profile-designer * {
@@ -138,7 +172,7 @@
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background: white;
             margin: 0;
-            padding: 20px;
+            padding: 0;
         }
 
         .profile-designer .container {
@@ -150,7 +184,7 @@
             font-family: Arial, sans-serif;
             font-size: 12px;
             color: black;
-            padding: 20px;
+            padding: 0;
             box-sizing: border-box;
         }
 
@@ -484,6 +518,7 @@
             cursor: pointer;
             opacity: 0;
             transition: opacity 0.3s ease;
+            z-index: 5;
         }
 
         .edit-mode .clickable-bg {
@@ -502,6 +537,7 @@
             fill: rgba(243, 156, 18, 0.15);
             stroke-dasharray: 3,3;
             opacity: 0.8;
+            z-index: 1;
         }
 
         .snap-guide {
@@ -689,7 +725,7 @@
         }
 
         .coating-arrow {
-            stroke: #b0b4b9;
+            stroke: #277178;
             stroke-width: 2;
             fill: none;
             stroke-linejoin: miter;
@@ -1104,6 +1140,15 @@
             font-size: 12px;
         }
 
+        /* SVG text elements should use their inline font-size, not the CSS */
+        svg .data-field {
+            font-size: inherit;
+            display: inline;
+            min-width: auto;
+            padding: 0;
+            border: none;
+        }
+
         .data-field.wide {
             min-width: 250px;
         }
@@ -1117,87 +1162,102 @@
         }
 
         /* Print Sheet Header Section */
-        .header {
-            position: relative;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 10px;
-            border-bottom: 2px solid black;
-            padding: 8px 15px;
+
+        /* Settings Container Styles */
+        .settings-container {
+            padding: 10px;
+            max-width: 1200px;
+            margin: 0 auto;
         }
 
-        .logo-section {
-            display: flex;
-            align-items: center;
+        .settings-section {
+            background: white;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            overflow: hidden;
         }
 
-        .logo-box {
-            width: 100px;
-            height: 65px;
-            background-color: #2c5f5f;
-            color: white;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            font-weight: bold;
-        }
-
-        .logo-text {
+        .section-header {
+            background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+            padding: 12px 20px;
+            margin: 0;
             font-size: 16px;
-            margin-bottom: 2px;
+            font-weight: 600;
+            color: #2c3e50;
+            border-bottom: 2px solid #dee2e6;
         }
 
-        .dots {
+        .section-content {
+            padding: 20px;
+        }
+
+        .field-row {
             display: flex;
-            gap: 1px;
-            margin-bottom: 2px;
+            gap: 20px;
+            flex-wrap: wrap;
+            align-items: flex-start;
         }
 
-        .dot {
-            width: 6px;
-            height: 6px;
-            background-color: white;
-            border-radius: 50%;
+        .field-group {
+            margin-bottom: 15px;
         }
 
-        .metalworks {
-            font-size: 10px;
-            letter-spacing: 1px;
-        }
-
-        .title-section {
-            position: absolute;
-            left: 50%;
-            transform: translateX(-50%);
-            top: 8px;
-            text-align: center;
-            pointer-events: none; /* allow clicks through header to controls */
-        }
-
-        .order-sheet-title {
-            font-size: 28px;
-            font-weight: bold;
-            margin: 0 6px 3px;
-        }
-
-        .dates-section {
-            text-align: left;
-            min-width: 240px;
-        }
-
-        .date-row {
-            margin-bottom: 5px;
+        .field-group.checkbox-field {
             display: flex;
             align-items: center;
+            gap: 8px;
+            margin-bottom: 12px;
         }
 
-        .date-label {
-            font-size: 12px;
-            font-weight: bold;
-            width: 90px;
-            display: inline-block;
+        .field-group.checkbox-field input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+
+        .field-group.checkbox-field label {
+            font-size: 14px;
+            font-weight: 500;
+            color: #495057;
+            cursor: pointer;
+            margin: 0;
+        }
+
+        .field-label {
+            display: block;
+            font-weight: 600;
+            color: #495057;
+            margin-bottom: 6px;
+            font-size: 13px;
+        }
+
+        .field-label.inline {
+            display: inline;
+        }
+
+        .order-input, .order-select {
+            padding: 8px 12px;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+            font-size: 14px;
+            transition: border-color 0.2s;
+            width: 100%;
+            max-width: 400px;
+        }
+
+        .order-input:focus, .order-select:focus {
+            outline: none;
+            border-color: #3498db;
+            box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+        }
+
+        /* Profile Name Input Focus */
+        #profileName:focus {
+            outline: none;
+            border-color: #3498db !important;
+            box-shadow: 0 0 0 4px rgba(52, 152, 219, 0.15) !important;
         }
 
         /* Main Content Sections */
@@ -1301,7 +1361,7 @@
         /* Profile Drawing Area */
         .profile-section {
             margin: 4px 0 2px 0;
-            padding: 0 15px;
+            padding: 15px;
         }
 
         .drawing-area {
@@ -1462,11 +1522,6 @@
             margin-bottom: 20px;
         }
         
-        .nav-brand {
-            font-size: 18px;
-            font-weight: bold;
-            color: #ecf0f1;
-        }
         
         .nav-menu {
             display: flex;
@@ -1524,291 +1579,168 @@
     </style>
 
 <div class="profile-designer">
-    <!-- Top Navigation Bar -->
-    <div class="top-nav">
-        <div class="nav-brand">Kynetic MetalWorks - 2D Profile Designer</div>
-        <div class="nav-menu">
-            <a href="#" class="nav-item active" onclick="showDesigner()">Designer</a>
-            <a href="#" class="nav-item" onclick="showTemplates()">Templates</a>
-            <a href="#" class="nav-item" onclick="showHistory()">History</a>
-            <a href="#" class="nav-item" onclick="showHelp()">Help</a>
-        </div>
-        <div class="nav-actions">
-            <button class="nav-btn" onclick="saveProject()">Save</button>
-            <button class="nav-btn" onclick="loadProject()">Load</button>
-            <button class="nav-btn success" onclick="exportDXF()">Export DXF</button>
-        </div>
-    </div>
     
     <div class="container">
-        <!-- Order Sheet Style Header -->
-        <div class="header">
-            <div class="logo-section">
-                <div class="logo-box">
-                    <div class="logo-text">KYNETIC</div>
-                    <div class="dots">
-                        <div class="dot"></div>
-                        <div class="dot"></div>
-                        <div class="dot"></div>
-                        <div class="dot"></div>
-                        <div class="dot"></div>
-                        <div class="dot"></div>
-                    </div>
-                    <div class="metalworks">metalworks</div>
-                </div>
-            </div>
+
+        <div class="settings-container">
+
             
-            <div class="title-section">
-                <div class="order-sheet-title">2D PROFILE DESIGNER</div>
+            <div style="margin-bottom: 25px;">
+                <label for="profileName" style="display: block; font-size: 14px; font-weight: 600; color: #495057; margin-bottom: 8px;">Product Name:</label>
+                <input type="text" id="profileName" value="" placeholder="Enter product name" required="" style="width: 100%; max-width: 800px; padding: 12px 16px; border: 2px solid #ced4da; border-radius: 6px; font-size: 16px; font-weight: 500; transition: border-color 0.2s;">
             </div>
+
             
-            <div class="dates-section">
-                <div class="date-row">
-                    <span class="date-label">Date Created:</span>
-                    <span class="data-field" id="dateCreated"></span>
-                </div>
-                <div class="date-row">
-                    <span class="date-label">Designer:</span>
-                    <span class="data-field" placeholder="Your Name"></span>
-                </div>
-                <div class="date-row">
-                    <span class="date-label">Version:</span>
-                    <span class="data-field">1.0</span>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Customer and Job Information Section -->
-        <div class="section bordered">
-            <div class="row">
-                <div class="col">
-                    <div class="field-group">
-                        <span class="field-label inline">Customer:</span>
-                        <input type="text" id="customerName" class="order-input" placeholder="Customer Name" required>
-                    </div>
-                </div>
-                <div class="col">
-                    <div class="field-group">
-                        <span class="field-label inline">Job:</span>
-                        <input type="text" id="jobName" class="order-input" placeholder="Job Name">
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Material Properties and Order Information Section -->
-        <div class="section bordered">
-            <div class="row">
-                <!-- Left Column: Material Properties -->
-                <div class="col">
-                    <!-- Hidden selects for compatibility -->
-                    <select id="metalType" style="display: none;" onchange="updateGaugeOptions()">
-                        <option value="steel" selected>Steel</option>
-                        <option value="aluminum">Aluminum</option>
-                    </select>
-                    <select id="metalGauge" style="display: none;">
-                        <option value="22" selected>22</option>
-                        <option value="24">24</option>
-                        <option value="26">26</option>
-                        <option value="28">28</option>
-                        <option value="30">30</option>
-                    </select>
+            <input type="hidden" id="quantity" value="1">
+
+            
+            <div class="settings-section">
+                <h3 class="section-header">Product Specifications</h3>
+                <div class="section-content">
                     
-                    <!-- Material Type Toggle -->
-                    <div class="material-type-toggle" style="margin-bottom: 10px;">
-                        <div class="material-toggle-label">
-                            <span>Material Type:</span>
-                            <div class="material-toggle" onclick="toggleMaterialType()">
-                                <div class="material-toggle-slider" id="materialToggleSlider">
-                                    <span class="material-label left">Steel</span>
-                                    <span class="material-label right">AL</span>
+                    <div class="field-row" style="margin-bottom: 15px; align-items: center;">
+                        <div class="field-group" style="margin-bottom: 0;">
+                            <span class="field-label">Length (inches):</span>
+                            <input type="number" id="lengthInput" class="order-input" step="0.01" min="0" placeholder="Enter length" style="width: 120px;">
+                        </div>
+
+                        <div class="field-group" style="margin-bottom: 0;">
+                            <span class="field-label">Unbent Width:</span>
+                            <span class="data-field" id="totalLength">0.00"</span>
+                        </div>
+
+                        <div class="field-group checkbox-field" style="margin-bottom: 0;">
+                            <input type="checkbox" id="hasRibs">
+                            <label for="hasRibs">Include Ribs</label>
+                        </div>
+
+                        <div class="field-group checkbox-field" style="margin-bottom: 0;">
+                            <input type="checkbox" id="hasHoles" onchange="document.getElementById('holeFields').style.display = this.checked ? 'block' : 'none';">
+                            <label for="hasHoles">Include Holes</label>
+                        </div>
+                    </div>
+
+                    
+                    <div id="holeFields" style="display: none; margin-top: 10px; padding: 15px; background: white; border-radius: 6px; border: 1px solid #ced4da;">
+                        <h4 style="margin: 0 0 5px 0; font-size: 14px; font-weight: 600; color: #495057;">Hole Specifications</h4>
+                        <p style="margin: 0 0 15px 0; font-size: 12px; color: #666; font-style: italic;">All measurements from center of hole. Spacing/distances always in inches.</p>
+
+
+                        <div style="display: flex; gap: 20px; align-items: flex-start;">
+
+                            <div style="display: flex; flex-direction: column; gap: 8px; min-width: 100px;">
+                                <span class="field-label" style="margin-bottom: 4px;">Hole Size Units:</span>
+                                <label style="cursor: pointer; font-size: 14px; display: flex; align-items: center;">
+                                    <input type="radio" name="holeUnits" value="inches" checked="" onchange="updateHoleUnitLabels()" style="margin-right: 6px;"> Inches
+                                </label>
+                                <label style="cursor: pointer; font-size: 14px; display: flex; align-items: center;">
+                                    <input type="radio" name="holeUnits" value="mm" onchange="updateHoleUnitLabels()" style="margin-right: 6px;"> Millimeters
+                                </label>
+                            </div>
+
+                            
+                            <div class="field-row" style="align-items: flex-start; flex: 1;">
+                            <div class="field-group" style="margin-bottom: 0;">
+                                <span class="field-label"><span id="holeSizeLabel">Hole Size:</span></span>
+                                <div style="display: flex; gap: 8px; align-items: center;">
+                                    <input type="number" id="holeSizeWhole" class="order-input" min="0" value="0" step="1" style="width: 80px; text-align: right;">
+                                    <span id="holeSizeControls" style="display: flex; align-items: center; gap: 6px; padding: 4px 8px; background: #f8f9fa; border-radius: 4px;">
+                                        <span id="holeSizeFraction" style="min-width: 30px; text-align: center; font-weight: 500; font-size: 13px;">0</span>
+                                        <span style="display: flex; flex-direction: column; gap: 2px;">
+                                            <button type="button" onclick="adjustHoleSize('holeSize', 1)" style="border: none; background: #007bff; color: white; cursor: pointer; width: 18px; height: 14px; border-radius: 2px; font-size: 11px; font-weight: bold; line-height: 1; padding: 0;">+</button>
+                                            <button type="button" onclick="adjustHoleSize('holeSize', -1)" style="border: none; background: #007bff; color: white; cursor: pointer; width: 18px; height: 14px; border-radius: 2px; font-size: 11px; font-weight: bold; line-height: 1; padding: 0;">−</button>
+                                        </span>
+                                    </span>
+                                </div>
+                            </div>
+
+                            <div class="field-group" style="margin-bottom: 0;">
+                                <span class="field-label"><span id="holeSpacingLabel">Spacing:</span></span>
+                                <div style="display: flex; gap: 8px; align-items: center;">
+                                    <input type="number" id="holeSpacingWhole" class="order-input" min="0" value="12" step="1" style="width: 80px; text-align: right;">
+                                    <span id="holeSpacingControls" style="display: flex; align-items: center; gap: 6px; padding: 4px 8px; background: #f8f9fa; border-radius: 4px;">
+                                        <span id="holeSpacingFraction" style="min-width: 30px; text-align: center; font-weight: 500; font-size: 13px;">0</span>
+                                        <span style="display: flex; flex-direction: column; gap: 2px;">
+                                            <button type="button" onclick="adjustHoleSize('holeSpacing', 1)" style="border: none; background: #007bff; color: white; cursor: pointer; width: 18px; height: 14px; border-radius: 2px; font-size: 11px; font-weight: bold; line-height: 1; padding: 0;">+</button>
+                                            <button type="button" onclick="adjustHoleSize('holeSpacing', -1)" style="border: none; background: #007bff; color: white; cursor: pointer; width: 18px; height: 14px; border-radius: 2px; font-size: 11px; font-weight: bold; line-height: 1; padding: 0;">−</button>
+                                        </span>
+                                    </span>
+                                </div>
+                            </div>
+
+                            <div class="field-group" style="margin-bottom: 0;">
+                                <span class="field-label"><span id="startFromEndLabel">From End:</span></span>
+                                <div style="display: flex; gap: 8px; align-items: center;">
+                                    <input type="number" id="startFromEndWhole" class="order-input" min="0" value="6" step="1" style="width: 80px; text-align: right;">
+                                    <span id="startFromEndControls" style="display: flex; align-items: center; gap: 6px; padding: 4px 8px; background: #f8f9fa; border-radius: 4px;">
+                                        <span id="startFromEndFraction" style="min-width: 30px; text-align: center; font-weight: 500; font-size: 13px;">0</span>
+                                        <span style="display: flex; flex-direction: column; gap: 2px;">
+                                            <button type="button" onclick="adjustHoleSize('startFromEnd', 1)" style="border: none; background: #007bff; color: white; cursor: pointer; width: 18px; height: 14px; border-radius: 2px; font-size: 11px; font-weight: bold; line-height: 1; padding: 0;">+</button>
+                                            <button type="button" onclick="adjustHoleSize('startFromEnd', -1)" style="border: none; background: #007bff; color: white; cursor: pointer; width: 18px; height: 14px; border-radius: 2px; font-size: 11px; font-weight: bold; line-height: 1; padding: 0;">−</button>
+                                        </span>
+                                    </span>
+                                </div>
+                            </div>
+
+                            <div class="field-group" style="margin-bottom: 0;">
+                                <span class="field-label"><span id="distanceFromEdgeLabel">From Edge:</span></span>
+                                <div style="display: flex; gap: 8px; align-items: center;">
+                                    <input type="number" id="distanceFromEdgeWhole" class="order-input" min="0" value="1" step="1" style="width: 80px; text-align: right;">
+                                    <span id="distanceFromEdgeControls" style="display: flex; align-items: center; gap: 6px; padding: 4px 8px; background: #f8f9fa; border-radius: 4px;">
+                                        <span id="distanceFromEdgeFraction" style="min-width: 30px; text-align: center; font-weight: 500; font-size: 13px;">0</span>
+                                        <span style="display: flex; flex-direction: column; gap: 2px;">
+                                            <button type="button" onclick="adjustHoleSize('distanceFromEdge', 1)" style="border: none; background: #007bff; color: white; cursor: pointer; width: 18px; height: 14px; border-radius: 2px; font-size: 11px; font-weight: bold; line-height: 1; padding: 0;">+</button>
+                                            <button type="button" onclick="adjustHoleSize('distanceFromEdge', -1)" style="border: none; background: #007bff; color: white; cursor: pointer; width: 18px; height: 14px; border-radius: 2px; font-size: 11px; font-weight: bold; line-height: 1; padding: 0;">−</button>
+                                        </span>
+                                    </span>
                                 </div>
                             </div>
                         </div>
-                    </div>
-                    
-                    <div class="material-group">
-                        <span class="material-label"></span>
-                        <div class="option-group" id="steelOptions">
-                            <div class="option">
-                                <span class="gauge-option" data-gauge="22">22</span>
-                            </div>
-                            <div class="option">
-                                <span class="gauge-option" data-gauge="24">24</span>
-                            </div>
-                            <div class="option">
-                                <span class="gauge-option" data-gauge="26">26</span>
-                            </div>
-                            <div class="option">
-                                <span class="gauge-option" data-gauge="28">28</span>
-                            </div>
-                            <div class="option">
-                                <span class="gauge-option" data-gauge="30">30</span>
-                            </div>
                         </div>
                     </div>
-                    
-                    <div class="material-group">
-                        <span class="material-label"></span>
-                        <div class="option-group" id="aluminumOptions" style="display: none;">
-                            <div class="option">
-                                <span class="gauge-option" data-gauge=".019">.019</span>
-                            </div>
-                            <div class="option">
-                                <span class="gauge-option" data-gauge=".027">.027</span>
-                            </div>
-                            <div class="option">
-                                <span class="gauge-option" data-gauge=".032">.032</span>
-                            </div>
-                            <div class="option">
-                                <span class="gauge-option" data-gauge=".040">.040</span>
-                            </div>
-                            <div class="option">
-                                <span class="gauge-option" data-gauge=".050">.050</span>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="field-group">
-                        <span class="field-label inline">Color:</span>
-                        <div style="position: relative;">
-                            <input type="text" id="color" class="order-input color-picker-input" placeholder="Select color..." style="width: 100%; cursor: pointer;" readonly>
-                            <div id="colorPickerPopup" class="color-picker-popup" style="display: none;"></div>
-                        </div>
-                    </div>
-                    
-                    <div class="field-group" style="margin-top: 15px;">
-                        <span class="field-label inline">Color Manufacturer:</span>
-                        <input type="text" id="colorManufacturer" class="order-input" placeholder="e.g. Sherwin Williams" style="width: 100%;">
-                    </div>
-                </div>
-                
-                <!-- Right Column: Quantity & Measurements -->
-                <div class="col">
-                    <div class="field-group">
-                        <span class="field-label">Quantity:</span>
-                        <input type="number" id="quantity" class="order-input" value="1" min="1" style="width: 100px;">
-                    </div>
-                    
-                    <div class="field-group">
-                        <span class="field-label">Length (inches):</span>
-                        <input type="number" id="lengthInput" class="order-input" step="0.01" min="0" placeholder="Enter length" style="width: 120px;">
-                    </div>
-                    
-                    <div class="field-group">
-                        <span class="field-label">Total Material Usage (inches):</span>
-                        <span class="data-field" id="totalLength">0.00</span>
-                    </div>
-                    
-                    <div class="field-group">
-                        <input type="checkbox" id="hasRibs" style="margin-right: 8px;">
-                        <span class="field-label inline">Include Ribs</span>
-                    </div>
-                    
-                    <div class="field-group">
-                        <input type="checkbox" id="hasHoles" style="margin-right: 8px;">
-                        <span class="field-label inline">Holes</span>
-                    </div>
-                </div>
-                
-                <!-- Third Column: Hole Specifications -->
-                <div class="col">
-                    <div id="holeFields" style="display: none; margin-top: 10px;">
-                        <!-- Unit Toggle -->
-                        <div class="field-group" style="margin-bottom: 12px; padding: 8px; background: #f8f9fa; border-radius: 4px;">
-                            <span class="field-label" style="margin-right: 10px;">Units:</span>
-                            <label style="margin-right: 15px; cursor: pointer;">
-                                <input type="radio" name="holeUnits" value="inches" checked onchange="updateHoleUnitLabels()"> Inches
-                            </label>
-                            <label style="cursor: pointer;">
-                                <input type="radio" name="holeUnits" value="mm" onchange="updateHoleUnitLabels()"> Millimeters
-                            </label>
-                        </div>
 
-                        <div class="field-group">
-                            <span class="field-label"><span id="holeSizeLabel">Hole Size (inches):</span></span>
-                            <div class="increment-input-container">
-                                <input type="number" id="holeSizeWhole" class="order-input" min="0" value="0" step="0.1" style="width: 70px;">
-                                <span class="increment-controls" id="holeSizeControls">
-                                    <button type="button" onclick="adjustHoleSize('holeSize', 1)" style="font-size: 10px; width: 20px; height: 15px;">+</button>
-                                    <span id="holeSizeFraction" class="fraction-display">1/4</span>
-                                    <button type="button" onclick="adjustHoleSize('holeSize', -1)" style="font-size: 10px; width: 20px; height: 15px;">-</button>
-                                </span>
-                            </div>
-                        </div>
-
-                        <div class="field-group">
-                            <span class="field-label"><span id="holeSpacingLabel">Spacing (OC inches):</span></span>
-                            <div class="increment-input-container">
-                                <input type="number" id="holeSpacingWhole" class="order-input" min="0" value="12" step="0.1" style="width: 70px;">
-                                <span class="increment-controls" id="holeSpacingControls">
-                                    <button type="button" onclick="adjustHoleSize('holeSpacing', 1)" style="font-size: 10px; width: 20px; height: 15px;">+</button>
-                                    <span id="holeSpacingFraction" class="fraction-display">0</span>
-                                    <button type="button" onclick="adjustHoleSize('holeSpacing', -1)" style="font-size: 10px; width: 20px; height: 15px;">-</button>
-                                </span>
-                            </div>
-                        </div>
-
-                        <div class="field-group">
-                            <span class="field-label"><span id="startFromEndLabel">From End (OC inches):</span></span>
-                            <div class="increment-input-container">
-                                <input type="number" id="startFromEndWhole" class="order-input" min="0" value="6" step="0.1" style="width: 70px;">
-                                <span class="increment-controls" id="startFromEndControls">
-                                    <button type="button" onclick="adjustHoleSize('startFromEnd', 1)" style="font-size: 10px; width: 20px; height: 15px;">+</button>
-                                    <span id="startFromEndFraction" class="fraction-display">0</span>
-                                    <button type="button" onclick="adjustHoleSize('startFromEnd', -1)" style="font-size: 10px; width: 20px; height: 15px;">-</button>
-                                </span>
-                            </div>
-                        </div>
-
-                        <div class="field-group">
-                            <span class="field-label"><span id="distanceFromEdgeLabel">From Edge (OC inches):</span></span>
-                            <div class="increment-input-container">
-                                <input type="number" id="distanceFromEdgeWhole" class="order-input" min="0" value="1" step="0.1" style="width: 70px;">
-                                <span class="increment-controls" id="distanceFromEdgeControls">
-                                    <button type="button" onclick="adjustHoleSize('distanceFromEdge', 1)" style="font-size: 10px; width: 20px; height: 15px;">+</button>
-                                    <span id="distanceFromEdgeFraction" class="fraction-display">0</span>
-                                    <button type="button" onclick="adjustHoleSize('distanceFromEdge', -1)" style="font-size: 10px; width: 20px; height: 15px;">-</button>
-                                </span>
-                            </div>
-                        </div>
+                    
+                    <div style="margin-top: 20px;">
+                        <label for="productNotes" style="display: block; font-size: 14px; font-weight: 600; color: #495057; margin-bottom: 8px;">Notes:</label>
+                        <textarea id="productNotes" placeholder="Add any additional notes or specifications..." style="width: 100%; max-width: 800px; min-height: 80px; padding: 12px; border: 2px solid #ced4da; border-radius: 6px; font-size: 14px; font-family: Arial, sans-serif; resize: vertical;"></textarea>
                     </div>
                 </div>
             </div>
+
+
+            <div class="settings-section" style="display: none;">
+                <h3 class="section-header">DXF Settings</h3>
+                <div class="section-content">
+                    <div class="field-group">
+                        <span class="field-label">DXF Standards:</span>
+                        <select id="dxfStandards" class="order-select">
+                            <option value="Imperial (Inches)" selected="">Imperial (Inches)</option>
+                            <option value="Metric (Millimeters)">Metric (Millimeters)</option>
+                            <option value="AutoCAD 2018">AutoCAD 2018</option>
+                            <option value="AutoCAD 2021">AutoCAD 2021</option>
+                            <option value="Custom">Custom Standards</option>
+                        </select>
+                    </div>
+
+                    <div class="field-group">
+                        <span class="field-label">Task Priority:</span>
+                        <select id="taskPriority" class="order-select">
+                            <option value="Standard" selected="">Standard (5-7 business days)</option>
+                            <option value="Rush">Rush (2-3 business days)</option>
+                            <option value="Expedited">Expedited (1-2 business days)</option>
+                            <option value="Emergency">Emergency (Same day)</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
         </div>
         
-        <!-- Profile Drawing Section -->
+
         <div class="profile-section">
-            <div class="field-group centered-field">
-                <span class="field-label">Profile Name:</span>
-                <input type="text" id="profileName" class="order-input full" value="Custom Profile" placeholder="Profile Description" required>
-            </div>
-            
-            <div class="field-group" style="display: none;">
-                <span class="field-label">DXF Standards:</span>
-                <select id="dxfStandards" class="order-select full">
-                    <option value="Imperial (Inches)" selected>Imperial (Inches)</option>
-                    <option value="Metric (Millimeters)">Metric (Millimeters)</option>
-                    <option value="AutoCAD 2018">AutoCAD 2018</option>
-                    <option value="AutoCAD 2021">AutoCAD 2021</option>
-                    <option value="Custom">Custom Standards</option>
-                </select>
-            </div>
-            
-            <div class="field-group" style="display: none;">
-                <span class="field-label">Task Submission Priority:</span>
-                <select id="taskPriority" class="order-select full">
-                    <option value="Standard" selected>Standard (5-7 business days)</option>
-                    <option value="Rush">Rush (2-3 business days)</option>
-                    <option value="Expedited">Expedited (1-2 business days)</option>
-                    <option value="Emergency">Emergency (Same day)</option>
-                </select>
-            </div>
-            
             <div class="drawing-area">
                 <div class="canvas-container" id="canvasContainer">
-                    <svg id="canvas" class="drawing-canvas" 
-                         style="cursor: crosshair; background: radial-gradient(circle, #666666 1px, transparent 1px); background-size: 24px 24px;">
+                    <svg id="canvas" class="drawing-canvas" style="cursor: crosshair; background: radial-gradient(circle, #666666 1px, transparent 1px); background-size: 24px 24px;">
                         <g id="grid"></g>
                         <g id="lines"></g>
                         <g id="points"></g>
@@ -1819,7 +1751,7 @@
             </div>
         </div>
         
-        <!-- Control Buttons and Settings -->
+        
         <div class="controls-section">
             <div class="control-row">
                 <div class="side-indicator">
@@ -1841,13 +1773,14 @@
                         <button class="mode-btn active" onclick="setMode('create')" id="createModeBtn">Create</button>
                         <button class="mode-btn" onclick="setMode('edit')" id="editModeBtn">Edit</button>
                     </div>
+                    <div style="text-align: center; font-size: 11px; color: #666; margin-top: 4px; font-style: italic;">Press Tab to toggle</div>
                 </div>
-                
+
                 <div class="action-buttons">
                     <button class="btn btn-warning" onclick="undoLastAction()" id="undoBtn">Undo</button>
+                    <button class="btn btn-primary" onclick="addNewPiece()" id="addPieceBtn" style="display: none;">Add Piece</button>
                     <button class="btn btn-danger" onclick="clearCanvas()">Clear Profile</button>
-                    <button class="btn btn-primary" onclick="forcePrint()">Print</button>
-                    <button class="btn btn-success" onclick="sendToKynetic()" id="sendToKyneticBtn" style="background: #27ae60 !important; color: white !important; border: 1px solid #27ae60 !important;">Send to Kynetic</button>
+                    <button class="btn btn-success" onclick="downloadPDF()" id="downloadBtn" style="background: #27ae60 !important; color: white !important; border: 1px solid #27ae60 !important;">Download PDF</button>
                 </div>
             </div>
             
@@ -1857,7 +1790,7 @@
                 <span id="zoomValue">150%</span>
             </div>
         </div>
-    </div> <!-- End profile-designer wrapper -->
+    </div> 
     <script>
     // Odoo integration fix v2.6
     console.log('Profile Designer v2.6 - CSS Scoped to Prevent Odoo Conflicts');
@@ -1954,13 +1887,20 @@
     
     // FORCE PRINT FUNCTION FOR ODOO COMPATIBILITY
     function forcePrint() {
-        
+        // Validate product name is not empty
+        const profileName = document.getElementById('profileName').value.trim();
+        if (!profileName) {
+            alert('Please enter a Product Name before printing.');
+            document.getElementById('profileName').focus();
+            return;
+        }
+
         // First, populate the print sheet with data
         populatePrintSheetFromDesigner();
-        
+
         // Clear the preview line so it doesn't appear in print
         clearPreviewLine();
-        
+
         // Get the print sheet content
         const printSheet = document.getElementById('printSheetSection');
         if (!printSheet) {
@@ -2018,9 +1958,9 @@ ${printSheet.outerHTML}
     }
     </script>
         </div>
-    </div>
+    
 
-    <!-- Edit Popup (moved outside container) -->
+    
     <div id="editPopup" class="edit-popup">
         <h4 id="popupTitle">Edit Element</h4>
 
@@ -2038,7 +1978,7 @@ ${printSheet.outerHTML}
 
         <div class="input-group">
             <label id="popupLabel">Value:</label>
-            <!-- Length input with fraction controls and arrows -->
+
             <div id="lengthInputs" style="display: none;">
                 <div style="display: flex; align-items: center; gap: 5px;">
                     <input type="number" id="wholeInches" min="0" step="1" style="width: 60px;" placeholder="0"> inches
@@ -2052,7 +1992,7 @@ ${printSheet.outerHTML}
                     <span>in</span>
                 </div>
             </div>
-            <!-- Angle input (whole degrees only) -->
+
             <input type="number" id="popupInput" step="1" placeholder="Enter angle in degrees" style="display: none;">
 
             <input type="text" id="customTextInput" placeholder='Enter text (e.g., "X", "Y", "VARIES")' style="display: none; width: 100%; padding: 5px;">
@@ -2144,6 +2084,8 @@ function loadHtml2Canvas() {
         let currentEditElement = null;
         let coatedSideRight = false; // false = left/top coated, true = right/bottom coated
         let points = [];
+        let pieces = []; // Array to store completed pieces
+        let currentPieceIndex = 0; // Track which piece is being worked on
         let entities = []; // DXF entity storage
         let scale = 24; // Initialize to baseScale - this will be used for measurements only
         let offset = { x: 50, y: 50 };
@@ -2846,6 +2788,23 @@ function loadHtml2Canvas() {
         }
 
         function handleKeyDown(event) {
+            // Tab key to toggle between create and edit mode
+            if (event.code === 'Tab') {
+                // Only handle if not typing in an input field
+                if (!['INPUT', 'TEXTAREA'].includes(event.target.tagName)) {
+                    event.preventDefault();
+                    // Toggle between modes
+                    if (isEditMode) {
+                        setMode('create');
+                    } else {
+                        // Only switch to edit mode if we have enough points
+                        if (points.length >= 2) {
+                            setMode('edit');
+                        }
+                    }
+                }
+            }
+
             if (event.code === 'Space' && !isSpacePressed) {
                 // Only prevent default if not typing in an input field
                 if (!['INPUT', 'TEXTAREA'].includes(event.target.tagName)) {
@@ -3075,7 +3034,7 @@ ORDERING:
 
         function simplifyFraction(numerator, denominator = 16) {
             if (numerator === 0) return "0";
-            
+
             const gcd = (a, b) => {
                 a = Math.abs(a);
                 b = Math.abs(b);
@@ -3086,13 +3045,31 @@ ORDERING:
                 }
                 return a;
             };
-            
+
             const divisor = gcd(numerator, denominator);
             const simplifiedNum = numerator / divisor;
             const simplifiedDen = denominator / divisor;
-            
+
             if (simplifiedDen === 1) return simplifiedNum.toString();
             return `${simplifiedNum}/${simplifiedDen}`;
+        }
+
+        function decimalToFraction(decimalValue) {
+            // Convert a decimal value to fractional display (e.g., 1.25 -> "1 1/4")
+            const whole = Math.floor(decimalValue);
+            const fractionalPart = decimalValue - whole;
+
+            // Convert to sixteenths and round
+            const sixteenths = Math.round(fractionalPart * 16);
+
+            if (sixteenths === 0) {
+                return whole.toString();
+            } else if (sixteenths === 16) {
+                return (whole + 1).toString();
+            } else {
+                const fractionStr = simplifyFraction(sixteenths, 16);
+                return whole > 0 ? `${whole} ${fractionStr}` : fractionStr;
+            }
         }
 
         function adjustFraction(direction) {
@@ -3105,7 +3082,7 @@ ORDERING:
         let currentHemSixteenths = 16; // Default 1 inch = 16 sixteenths
 
         // Global variables to track hole size sixteenths values
-        let currentHoleSizeSixteenths = 4; // Default 1/4 inch = 4 sixteenths
+        let currentHoleSizeSixteenths = 0; // Default 0 inch = 0 sixteenths
         let currentHoleSpacingSixteenths = 0; // Default 12 inches = 0 sixteenths (whole numbers)
         let currentStartFromEndSixteenths = 0; // Default 6 inches = 0 sixteenths
         let currentDistanceFromEdgeSixteenths = 0; // Default 1 inch = 0 sixteenths
@@ -3114,7 +3091,8 @@ ORDERING:
             const isMetric = document.querySelector('input[name="holeUnits"]:checked').value === 'mm';
             let wholeElement = document.getElementById(fieldType + 'Whole');
 
-            if (isMetric) {
+            // Only hole size can be metric, all other fields are always imperial
+            if (isMetric && fieldType === 'holeSize') {
                 // Metric mode: increment by 0.1 mm
                 let currentValue = parseFloat(wholeElement.value) || 0;
                 currentValue += direction * 0.1;
@@ -3127,22 +3105,22 @@ ORDERING:
 
                 switch(fieldType) {
                     case 'holeSize':
-                        currentHoleSizeSixteenths = Math.max(1, Math.min(15, currentHoleSizeSixteenths + direction));
+                        currentHoleSizeSixteenths += direction;
                         currentSixteenths = currentHoleSizeSixteenths;
                         displayElement = document.getElementById('holeSizeFraction');
                         break;
                     case 'holeSpacing':
-                        currentHoleSpacingSixteenths = Math.max(0, Math.min(15, currentHoleSpacingSixteenths + direction));
+                        currentHoleSpacingSixteenths += direction;
                         currentSixteenths = currentHoleSpacingSixteenths;
                         displayElement = document.getElementById('holeSpacingFraction');
                         break;
                     case 'startFromEnd':
-                        currentStartFromEndSixteenths = Math.max(0, Math.min(15, currentStartFromEndSixteenths + direction));
+                        currentStartFromEndSixteenths += direction;
                         currentSixteenths = currentStartFromEndSixteenths;
                         displayElement = document.getElementById('startFromEndFraction');
                         break;
                     case 'distanceFromEdge':
-                        currentDistanceFromEdgeSixteenths = Math.max(0, Math.min(15, currentDistanceFromEdgeSixteenths + direction));
+                        currentDistanceFromEdgeSixteenths += direction;
                         currentSixteenths = currentDistanceFromEdgeSixteenths;
                         displayElement = document.getElementById('distanceFromEdgeFraction');
                         break;
@@ -3169,6 +3147,15 @@ ORDERING:
                         case 'startFromEnd': currentStartFromEndSixteenths = 15; break;
                         case 'distanceFromEdge': currentDistanceFromEdgeSixteenths = 15; break;
                     }
+                } else if (currentSixteenths < 0) {
+                    // Don't go below 0 if we're at whole number 0
+                    currentSixteenths = 0;
+                    switch(fieldType) {
+                        case 'holeSize': currentHoleSizeSixteenths = 0; break;
+                        case 'holeSpacing': currentHoleSpacingSixteenths = 0; break;
+                        case 'startFromEnd': currentStartFromEndSixteenths = 0; break;
+                        case 'distanceFromEdge': currentDistanceFromEdgeSixteenths = 0; break;
+                    }
                 }
 
                 if (currentSixteenths === 0) {
@@ -3194,94 +3181,61 @@ ORDERING:
         }
 
         function getHoleSpacingValue() {
-            const isMetric = document.querySelector('input[name="holeUnits"]:checked').value === 'mm';
+            // Hole spacing is always in inches
             const value = parseFloat(document.getElementById('holeSpacingWhole').value) || 0;
-
-            if (isMetric) {
-                return value;
-            } else {
-                return value + (currentHoleSpacingSixteenths / 16);
-            }
+            return value + (currentHoleSpacingSixteenths / 16);
         }
 
         function getStartFromEndValue() {
-            const isMetric = document.querySelector('input[name="holeUnits"]:checked').value === 'mm';
+            // Start from end is always in inches
             const value = parseFloat(document.getElementById('startFromEndWhole').value) || 0;
-
-            if (isMetric) {
-                return value;
-            } else {
-                return value + (currentStartFromEndSixteenths / 16);
-            }
+            return value + (currentStartFromEndSixteenths / 16);
         }
 
         function getDistanceFromEdgeValue() {
-            const isMetric = document.querySelector('input[name="holeUnits"]:checked').value === 'mm';
+            // Distance from edge is always in inches
             const value = parseFloat(document.getElementById('distanceFromEdgeWhole').value) || 0;
-
-            if (isMetric) {
-                return value;
-            } else {
-                return value + (currentDistanceFromEdgeSixteenths / 16);
-            }
+            return value + (currentDistanceFromEdgeSixteenths / 16);
         }
 
-        // Update hole measurement unit labels
+        // Update hole measurement unit labels - only affects hole size, other measurements stay in inches
         function updateHoleUnitLabels() {
             const isMetric = document.querySelector('input[name="holeUnits"]:checked').value === 'mm';
             const unit = isMetric ? 'mm' : 'inches';
 
-            // Update labels
+            // Update labels - only hole size label changes, others always show inches
             document.getElementById('holeSizeLabel').textContent = `Hole Size (${unit}):`;
-            document.getElementById('holeSpacingLabel').textContent = `Spacing (OC ${unit}):`;
-            document.getElementById('startFromEndLabel').textContent = `From End (OC ${unit}):`;
-            document.getElementById('distanceFromEdgeLabel').textContent = `From Edge (OC ${unit}):`;
+            document.getElementById('holeSpacingLabel').textContent = `Spacing:`;
+            document.getElementById('startFromEndLabel').textContent = `From End:`;
+            document.getElementById('distanceFromEdgeLabel').textContent = `From Edge:`;
 
-            // Show/hide fraction displays and update values
-            const fractionDisplays = ['holeSize', 'holeSpacing', 'startFromEnd', 'distanceFromEdge'];
+            // Show/hide fraction displays and update values - ONLY for hole size
+            const holeSizeControls = document.getElementById('holeSizeControls');
+            const holeSizeWholeInput = document.getElementById('holeSizeWhole');
 
-            fractionDisplays.forEach(field => {
-                const controls = document.getElementById(field + 'Controls');
-                const wholeInput = document.getElementById(field + 'Whole');
+            if (isMetric) {
+                // Hide fraction controls in metric mode for hole size
+                holeSizeControls.style.display = 'none';
+                // Convert current hole size value to mm (1 inch = 25.4 mm)
+                const currentInches = parseFloat(holeSizeWholeInput.value) || 0;
+                const currentMm = currentInches * 25.4;
+                holeSizeWholeInput.value = currentMm.toFixed(1);
+            } else {
+                // Show fraction controls in imperial mode for hole size
+                holeSizeControls.style.display = 'inline-flex';
+                // Convert current hole size value to inches (1 mm = 0.0393701 inches)
+                const currentMm = parseFloat(holeSizeWholeInput.value) || 0;
+                const currentInches = currentMm / 25.4;
+                const wholeInches = Math.floor(currentInches);
+                const fractionInches = currentInches - wholeInches;
+                const sixteenths = Math.round(fractionInches * 16);
 
-                if (isMetric) {
-                    // Hide fraction controls in metric mode
-                    controls.style.display = 'none';
-                    // Convert current value to mm (1 inch = 25.4 mm)
-                    const currentInches = parseFloat(wholeInput.value) || 0;
-                    const currentMm = currentInches * 25.4;
-                    wholeInput.value = currentMm.toFixed(1);
-                } else {
-                    // Show fraction controls in imperial mode
-                    controls.style.display = 'inline-flex';
-                    // Convert current value to inches (1 mm = 0.0393701 inches)
-                    const currentMm = parseFloat(wholeInput.value) || 0;
-                    const currentInches = currentMm / 25.4;
-                    const wholeInches = Math.floor(currentInches);
-                    const fractionInches = currentInches - wholeInches;
-                    const sixteenths = Math.round(fractionInches * 16);
+                holeSizeWholeInput.value = wholeInches;
+                currentHoleSizeSixteenths = sixteenths;
+                document.getElementById('holeSizeFraction').textContent = sixteenths === 0 ? '0' : simplifyFraction(sixteenths);
+            }
 
-                    wholeInput.value = wholeInches;
-
-                    // Update the sixteenths variables and display
-                    const fractionDisplay = document.getElementById(field + 'Fraction');
-                    switch(field) {
-                        case 'holeSize':
-                            currentHoleSizeSixteenths = sixteenths;
-                            break;
-                        case 'holeSpacing':
-                            currentHoleSpacingSixteenths = sixteenths;
-                            break;
-                        case 'startFromEnd':
-                            currentStartFromEndSixteenths = sixteenths;
-                            break;
-                        case 'distanceFromEdge':
-                            currentDistanceFromEdgeSixteenths = sixteenths;
-                            break;
-                    }
-                    fractionDisplay.textContent = sixteenths === 0 ? '0' : simplifyFraction(sixteenths);
-                }
-            });
+            // Spacing, distance from end, and distance from edge always stay in inches - no conversion needed
         }
 
         // Helper functions to set hole values from decimal format
@@ -3319,7 +3273,11 @@ ORDERING:
 
             const textMode = document.getElementById('textModeRadio').checked;
             const customTextInput = document.getElementById('customTextInput');
-            const customKey = `${currentEditElement.type}-${currentEditElement.index}`;
+
+            // Create piece-aware key if pieceIndex exists
+            const customKey = currentEditElement.pieceIndex !== undefined
+                ? `p${currentEditElement.pieceIndex}-${currentEditElement.type}-${currentEditElement.index}`
+                : `${currentEditElement.type}-${currentEditElement.index}`;
 
             if (textMode) {
                 // Text mode - save custom label text
@@ -3353,7 +3311,13 @@ ORDERING:
 
                 // Convert to decimal inches using current sixteenths
                 const newValue = wholeValue + (currentSixteenths / 16);
-                applyLengthEditByIndex(currentEditElement.index, newValue);
+
+                // Use piece-aware edit function if pieceIndex exists
+                if (currentEditElement.pieceIndex !== undefined) {
+                    applyLengthEditByIndexForPiece(currentEditElement.index, newValue, currentEditElement.pieceIndex);
+                } else {
+                    applyLengthEditByIndex(currentEditElement.index, newValue);
+                }
             } else if (currentEditElement.type === 'angle') {
                 // Get value from decimal input
                 const input = document.getElementById('popupInput');
@@ -3363,7 +3327,13 @@ ORDERING:
                     alert('Please enter a valid angle.');
                     return;
                 }
-                applyAngleEditByIndex(currentEditElement.index, newValue);
+
+                // Use piece-aware edit function if pieceIndex exists
+                if (currentEditElement.pieceIndex !== undefined) {
+                    applyAngleEditByIndexForPiece(currentEditElement.index, newValue, currentEditElement.pieceIndex);
+                } else {
+                    applyAngleEditByIndex(currentEditElement.index, newValue);
+                }
             }
 
             redrawProfile();
@@ -3404,7 +3374,7 @@ ORDERING:
             if (coordsElement) {
                 coordsElement.textContent = `Mouse: (${formatLength(dxfCoords.x).replace('"', '')}, ${formatLength(dxfCoords.y).replace('"', '')})`;
             }
-
+            
             // Handle dragging in edit mode
             if (isDragging && dragPointIndex >= 0) {
                 // Save old position
@@ -3636,6 +3606,50 @@ ORDERING:
                         showHemPopup(prevIdx, false); // End hem or mid hem
                     }
                 }
+            }
+            // Update "Add Piece" button visibility
+            updateAddPieceButtonVisibility();
+        }
+
+        function addNewPiece() {
+            // Validate current piece has at least 2 points
+            if (points.length < 2) {
+                alert('Current piece needs at least 2 points before starting a new piece.');
+                return;
+            }
+
+            // Save current piece
+            pieces.push({
+                points: [...points], // Copy points array
+                hemVertexIndex: window.hemVertexIndex,
+                hemInfo: window.hemInfo ? {...window.hemInfo} : null
+            });
+
+            // Clear current points for new piece
+            points = [];
+            delete window.hemVertexIndex;
+            delete window.hemInfo;
+
+            // Increment piece counter
+            currentPieceIndex++;
+
+            // Clear labels and redraw
+            labelCustomPositions = {};
+            customLabels = {};
+
+            // Redraw all pieces
+            redrawProfile();
+            updateStats();
+
+            // Hide "Add Piece" button until new piece has 2+ points
+            updateAddPieceButtonVisibility();
+        }
+
+        function updateAddPieceButtonVisibility() {
+            const addPieceBtn = document.getElementById('addPieceBtn');
+            if (addPieceBtn) {
+                // Show button only when in drawing mode and current piece has 2+ points
+                addPieceBtn.style.display = (isDrawing && points.length >= 2) ? 'inline-block' : 'none';
             }
         }
 
@@ -4850,7 +4864,7 @@ ORDERING:
         // Track all placed labels for collision detection
         let placedLabels = [];
 
-        // Track custom label positions for dragging persistence
+        // Label dragging state
         let labelCustomPositions = {};
         let isDraggingLabel = false;
         let draggedLabelElement = null;
@@ -4863,7 +4877,7 @@ ORDERING:
 
         // Helper function to check if label collides with other labels
         function checkLabelCollisions(x, y, width, height, existingLabels) {
-            const padding = 8; // Extra padding between labels (increased from 4 to 8 for better spacing)
+            const padding = 8; // Extra padding between labels
             for (let label of existingLabels) {
                 // Check rectangle overlap with padding
                 if (!(x + width + padding < label.x ||
@@ -4876,83 +4890,76 @@ ORDERING:
             return false; // No collision
         }
 
-        // Check if mouse is near the edge of a label box (for drag detection)
-        function isNearEdge(mouseX, mouseY, labelX, labelY, labelWidth, labelHeight) {
-            const edgeThreshold = 5; // 5px from edge
-            const isNearLeft = mouseX >= labelX && mouseX <= labelX + edgeThreshold;
-            const isNearRight = mouseX >= labelX + labelWidth - edgeThreshold && mouseX <= labelX + labelWidth;
-            const isNearTop = mouseY >= labelY && mouseY <= labelY + edgeThreshold;
-            const isNearBottom = mouseY >= labelY + labelHeight - edgeThreshold && mouseY <= labelY + labelHeight;
-
-            const isInHorizontalRange = mouseX >= labelX && mouseX <= labelX + labelWidth;
-            const isInVerticalRange = mouseY >= labelY && mouseY <= labelY + labelHeight;
-
-            return (isNearLeft || isNearRight) && isInVerticalRange ||
-                   (isNearTop || isNearBottom) && isInHorizontalRange;
-        }
-
-        // Start dragging a label
+        // Helper functions for label dragging
         function startLabelDrag(labelBg, labelText, leaderLine, mouseX, mouseY) {
             isDraggingLabel = true;
             draggedLabelElement = { bg: labelBg, text: labelText };
             draggedLabelLeaderLine = leaderLine;
-
             const labelX = parseFloat(labelBg.getAttribute('x'));
             const labelY = parseFloat(labelBg.getAttribute('y'));
-
             dragOffset.x = mouseX - labelX;
             dragOffset.y = mouseY - labelY;
             dragStartPos.x = mouseX;
             dragStartPos.y = mouseY;
-
             canvas.style.cursor = 'grabbing';
         }
 
-        // Update label position during drag
+        // Piece-aware version of startLabelDrag
+        function startLabelDragForPiece(labelBg, labelText, leaderLine, mouseX, mouseY, pieceIndex) {
+            isDraggingLabel = true;
+            draggedLabelElement = { bg: labelBg, text: labelText, pieceIndex: pieceIndex };
+            draggedLabelLeaderLine = leaderLine;
+            const labelX = parseFloat(labelBg.getAttribute('x'));
+            const labelY = parseFloat(labelBg.getAttribute('y'));
+            dragOffset.x = mouseX - labelX;
+            dragOffset.y = mouseY - labelY;
+            dragStartPos.x = mouseX;
+            dragStartPos.y = mouseY;
+            canvas.style.cursor = 'grabbing';
+        }
+
         function updateLabelDrag(mouseX, mouseY) {
             if (!isDraggingLabel || !draggedLabelElement) return;
 
             const newX = mouseX - dragOffset.x;
             const newY = mouseY - dragOffset.y;
 
-            // Update background rect position
             draggedLabelElement.bg.setAttribute('x', newX);
             draggedLabelElement.bg.setAttribute('y', newY);
 
-            // Update text position (center of background)
             const textWidth = parseFloat(draggedLabelElement.bg.getAttribute('width'));
             const textHeight = parseFloat(draggedLabelElement.bg.getAttribute('height'));
+
             draggedLabelElement.text.setAttribute('x', newX + textWidth / 2);
             draggedLabelElement.text.setAttribute('y', newY + textHeight / 2);
 
-            // Update leader line if it exists
             if (draggedLabelLeaderLine) {
                 draggedLabelLeaderLine.setAttribute('x1', newX + textWidth / 2);
                 draggedLabelLeaderLine.setAttribute('y1', newY + textHeight / 2);
             }
         }
 
-        // End label drag and save position
         function endLabelDrag() {
             if (!isDraggingLabel) return;
 
-            // Check if actually dragged (more than 5px)
             const dragDistance = Math.sqrt(
                 Math.pow(dragStartPos.x - event.clientX, 2) +
                 Math.pow(dragStartPos.y - event.clientY, 2)
             );
 
             if (dragDistance > 5 && draggedLabelElement) {
-                // Save custom position
                 const type = draggedLabelElement.bg.getAttribute('data-type');
                 const index = draggedLabelElement.bg.getAttribute('data-index');
+                const pieceIndex = draggedLabelElement.bg.getAttribute('data-piece-index');
                 const labelX = parseFloat(draggedLabelElement.bg.getAttribute('x'));
                 const labelY = parseFloat(draggedLabelElement.bg.getAttribute('y'));
                 const labelWidth = parseFloat(draggedLabelElement.bg.getAttribute('width'));
                 const labelHeight = parseFloat(draggedLabelElement.bg.getAttribute('height'));
 
-                labelCustomPositions[`${type}-${index}`] = {
-                    x: labelX + labelWidth / 2,  // Store center position
+                // Use piece-aware key if pieceIndex is present
+                const positionKey = pieceIndex !== null ? `p${pieceIndex}-${type}-${index}` : `${type}-${index}`;
+                labelCustomPositions[positionKey] = {
+                    x: labelX + labelWidth / 2,
                     y: labelY + labelHeight / 2
                 };
             }
@@ -4997,7 +5004,7 @@ ORDERING:
             const labelHeight = 16;
 
             // Try different offset distances with zoom-aware scaling
-            const baseOffsets = [24, 28, 32, 36, 40, 44, 48, 52, 56, 60, 64, 72, 80, 88, 96, 104, 112, 120, 128, 140, 160]; // Extended range with more options
+            const baseOffsets = [24, 32, 40, 48, 56, 64, 72, 80, 96, 112, 128]; // Extended range
             const vertexRadius = 12; // Collision radius around vertices
 
             for (let offset of baseOffsets) {
@@ -5055,19 +5062,39 @@ ORDERING:
         function drawMeasurements() {
             labelsGroup.innerHTML = '';
             placedLabels = []; // Reset placed labels tracking
-            const lineCount = points.length - 1;
 
+            // Get all pieces (completed + current piece being worked on)
+            const allPieces = [...pieces];
+            if (points.length > 0) {
+                allPieces.push({
+                    points,
+                    hemVertexIndex: window.hemVertexIndex,
+                    hemInfo: window.hemInfo
+                });
+            }
+
+            // Draw measurements for each piece
+            allPieces.forEach((piece, pieceIndex) => {
+                drawPieceMeasurements(piece, pieceIndex);
+            });
+        }
+
+        function drawPieceMeasurements(piece, pieceIndex) {
+            const piecePoints = piece.points;
+            const lineCount = piecePoints.length - 1;
+
+            // Draw length measurements
             for (let i = 0; i < lineCount; i++) {
                 // Get current and next points
-                const current = points[i];
-                const next = points[i + 1];
+                const current = piecePoints[i];
+                const next = piecePoints[i + 1];
 
                 // Special handling for hems
-                const isRegularHem = typeof window.hemVertexIndex !== 'undefined' &&
-                                   i === points.length - 2 &&
-                                   window.hemVertexIndex === points.length - 2;
+                const isRegularHem = typeof piece.hemVertexIndex !== 'undefined' &&
+                                   i === piecePoints.length - 2 &&
+                                   piece.hemVertexIndex === piecePoints.length - 2;
 
-                const isFirstPointHem = points[0].isHem && i === 0;
+                const isFirstPointHem = piecePoints[0].isHem && i === 0;
 
                 // Skip measurement for regular hems but not for first point hems with exactly 2 points
                 if (isRegularHem && !isFirstPointHem) {
@@ -5081,8 +5108,8 @@ ORDERING:
                 const deltaY = nextDxf.y - currentDxf.y;
                 const length = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
 
-                // Format label text - check for custom label first
-                const customLabelKey = `length-${i}`;
+                // Format label text - check for custom label first (with piece-aware key)
+                const customLabelKey = `p${pieceIndex}-length-${i}`;
                 const labelText = customLabels[customLabelKey] || formatLength(length);
                 const textWidth = labelText.length * 8;
                 const labelWidth = textWidth + 8;
@@ -5090,7 +5117,7 @@ ORDERING:
 
                 // Check for custom position or calculate optimal label position
                 let labelPos;
-                const customPosKey = `length-${i}`;
+                const customPosKey = `p${pieceIndex}-length-${i}`;
                 if (labelCustomPositions[customPosKey]) {
                     // Use custom dragged position
                     labelPos = {
@@ -5101,14 +5128,14 @@ ORDERING:
                     };
                 } else {
                     // Calculate optimal label position avoiding vertices and other labels
-                    labelPos = calculateLabelPosition(current, next, i, labelText);
+                    labelPos = calculateLabelPositionForPiece(current, next, i, labelText, piecePoints);
                 }
 
                 // Always draw leader line to show connection to segment
                 const leaderLine = createLeaderLine(labelPos.x, labelPos.y, labelPos.targetX, labelPos.targetY);
 
-                // Create the label
-                createClickableLabel(labelPos.x, labelPos.y, labelText, 'measurement-label', 'length', i, leaderLine);
+                // Create the label with piece-aware index stored as data attribute
+                createClickableLabelForPiece(labelPos.x, labelPos.y, labelText, 'measurement-label', 'length', i, leaderLine, pieceIndex);
 
                 // Track this label's position for collision detection
                 placedLabels.push({
@@ -5118,32 +5145,32 @@ ORDERING:
                     height: labelHeight
                 });
             }
-            
-            // Draw angle measurements for interior vertices
-            for (let i = 1; i < points.length - 1; i++) {
-                const current = points[i];
-                const prev = points[i - 1];
-                const next = points[i + 1];
 
-                // Check for custom label first
-                const customLabelKey = `angle-${i - 1}`;
+            // Draw angle measurements for interior vertices
+            for (let i = 1; i < piecePoints.length - 1; i++) {
+                const current = piecePoints[i];
+                const prev = piecePoints[i - 1];
+                const next = piecePoints[i + 1];
+
+                // Check for custom label first (with piece-aware key)
+                const customLabelKey = `p${pieceIndex}-angle-${i - 1}`;
                 let labelText;
 
                 if (customLabels[customLabelKey]) {
                     // Use custom label if it exists
                     labelText = customLabels[customLabelKey];
-                } else if (typeof window.hemVertexIndex !== 'undefined' && i === window.hemVertexIndex) {
+                } else if (typeof piece.hemVertexIndex !== 'undefined' && i === piece.hemVertexIndex) {
                     // Show 'HEM' if hemVertexIndex is set and matches this vertex
                     labelText = 'HEM';
                 } else {
                     // Calculate and format angle
-                    const angle = calculateVertexAngle(i);
+                    const angle = calculateVertexAngleForPiece(i, piecePoints);
                     labelText = `${Math.round(angle)}°`;
                 }
 
                 // Get the actual angle value for threshold check
                 // If custom label or HEM, use 0 to force exterior positioning
-                const angleValue = (customLabels[customLabelKey] || labelText === 'HEM') ? 0 : calculateVertexAngle(i);
+                const angleValue = (customLabels[customLabelKey] || labelText === 'HEM') ? 0 : calculateVertexAngleForPiece(i, piecePoints);
 
                 // Threshold for interior vs exterior label positioning
                 const INTERIOR_ANGLE_THRESHOLD = 45;
@@ -5152,7 +5179,7 @@ ORDERING:
                 let leaderLine = null;
 
                 // Check for custom position or calculate optimal label position
-                const customPosKey = `angle-${i - 1}`;
+                const customPosKey = `p${pieceIndex}-angle-${i - 1}`;
                 if (labelCustomPositions[customPosKey]) {
                     // Use custom dragged position
                     labelPos = {
@@ -5176,7 +5203,7 @@ ORDERING:
 
                 // Draw arc for angle FIRST (so it appears behind the label)
                 if (labelText !== 'HEM') {
-                    const angle = calculateVertexAngle(i);
+                    const angle = calculateVertexAngleForPiece(i, piecePoints);
                     drawAngleArc(prev, current, next, angle);
                 }
 
@@ -5185,7 +5212,7 @@ ORDERING:
                     leaderLine = createLeaderLine(labelPos.x, labelPos.y, labelPos.targetX, labelPos.targetY);
                 }
 
-                createClickableLabel(labelPos.x, labelPos.y, labelText, 'angle-label', 'angle', i - 1, leaderLine);
+                createClickableLabelForPiece(labelPos.x, labelPos.y, labelText, 'angle-label', 'angle', i - 1, leaderLine, pieceIndex);
 
                 // Track angle label position for collision detection
                 const textWidth = labelText.length * 8;
@@ -5240,11 +5267,9 @@ ORDERING:
                     if (!isEditMode) return;
                     e.stopPropagation();
                     e.preventDefault();
-
                     const rect = canvas.getBoundingClientRect();
                     const mouseX = e.clientX - rect.left;
                     const mouseY = e.clientY - rect.top;
-
                     startLabelDrag(bg, label, leaderLine, mouseX, mouseY);
                 };
                 bg.addEventListener('mousedown', mousedownHandler);
@@ -5268,6 +5293,81 @@ ORDERING:
                 bg.style.pointerEvents = 'none';
                 label.style.pointerEvents = 'none';
             }
+
+            labelsGroup.appendChild(bg);
+            labelsGroup.appendChild(label);
+        }
+
+        // Piece-aware version of createClickableLabel
+        function createClickableLabelForPiece(x, y, text, className, type, index, leaderLine = null, pieceIndex) {
+            // Create background rectangle for better clicking
+            const bg = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+            const textWidth = text.length * 8;
+            bg.setAttribute('x', x - textWidth/2 - 4);
+            bg.setAttribute('y', y - 8);
+            bg.setAttribute('width', textWidth + 8);
+            bg.setAttribute('height', 16);
+            bg.setAttribute('class', 'clickable-bg');
+            bg.setAttribute('data-type', type);
+            bg.setAttribute('data-index', index);
+            bg.setAttribute('data-piece-index', pieceIndex);
+
+            // Create text element
+            const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            label.setAttribute('x', x);
+            label.setAttribute('y', y);
+            label.setAttribute('class', className);
+            label.setAttribute('text-anchor', 'middle');
+            label.setAttribute('dominant-baseline', 'central');
+            label.setAttribute('data-type', type);
+            label.setAttribute('data-index', index);
+            label.setAttribute('data-piece-index', pieceIndex);
+            label.textContent = text;
+
+            // Prevent editing if label is 'HEM' and type is 'angle'
+            if (!(type === 'angle' && text === 'HEM')) {
+                // Double-click to edit
+                const dblClickHandler = function(e) {
+                    if (!isEditMode) return;
+                    e.stopPropagation();
+                    e.preventDefault();
+                    showEditPopupForPiece(e, type, index, text, pieceIndex);
+                };
+                bg.addEventListener('dblclick', dblClickHandler);
+                label.addEventListener('dblclick', dblClickHandler);
+
+                // Mousedown to start drag
+                const mousedownHandler = function(e) {
+                    if (!isEditMode) return;
+                    e.stopPropagation();
+                    e.preventDefault();
+                    const rect = canvas.getBoundingClientRect();
+                    const mouseX = e.clientX - rect.left;
+                    const mouseY = e.clientY - rect.top;
+                    startLabelDragForPiece(bg, label, leaderLine, mouseX, mouseY, pieceIndex);
+                };
+                bg.addEventListener('mousedown', mousedownHandler);
+                label.addEventListener('mousedown', mousedownHandler);
+
+                // Show grab cursor on hover
+                bg.addEventListener('mouseenter', () => {
+                    if (isEditMode && !isDraggingLabel) {
+                        bg.style.cursor = 'grab';
+                    }
+                });
+                bg.addEventListener('mouseleave', () => {
+                    if (!isDraggingLabel) {
+                        bg.style.cursor = '';
+                    }
+                });
+            } else {
+                // Make non-editable visually
+                bg.style.cursor = 'default';
+                label.style.cursor = 'default';
+                bg.style.pointerEvents = 'none';
+                label.style.pointerEvents = 'none';
+            }
+
             labelsGroup.appendChild(bg);
             labelsGroup.appendChild(label);
         }
@@ -5298,14 +5398,10 @@ ORDERING:
                 numericModeRadio.checked = true;
                 customTextInput.value = '';
             }
-            
+
             if (type === 'length') {
                 title.textContent = `Edit Line ${index + 1} Length`;
                 label.textContent = 'Length:';
-                
-                // Show fraction inputs, hide decimal input
-                lengthInputs.style.display = 'block';
-                input.style.display = 'none';
                 
                 // Convert current value to whole inches and sixteenths
                 // Parse fraction string like "3 15/16"" to decimal
@@ -5417,6 +5513,148 @@ ORDERING:
             }, 100);
         }
 
+        // Piece-aware version of showEditPopup
+        function showEditPopupForPiece(event, type, index, currentValue, pieceIndex) {
+            const popup = document.getElementById('editPopup');
+            const title = document.getElementById('popupTitle');
+            const label = document.getElementById('popupLabel');
+            const input = document.getElementById('popupInput');
+            const lengthInputs = document.getElementById('lengthInputs');
+            const wholeInches = document.getElementById('wholeInches');
+            const fractionDisplay = document.getElementById('fractionDisplay');
+            const customTextInput = document.getElementById('customTextInput');
+            const numericModeRadio = document.getElementById('numericModeRadio');
+            const textModeRadio = document.getElementById('textModeRadio');
+
+            currentEditElement = { type: type, index: index, pieceIndex: pieceIndex };
+
+            // Check if there's a custom label for this element (with piece-aware key)
+            const customKey = `p${pieceIndex}-${type}-${index}`;
+            const hasCustomLabel = customLabels[customKey] !== undefined;
+
+            // Set mode based on whether custom label exists
+            if (hasCustomLabel) {
+                textModeRadio.checked = true;
+                customTextInput.value = customLabels[customKey];
+            } else {
+                numericModeRadio.checked = true;
+                customTextInput.value = '';
+            }
+
+            if (type === 'length') {
+                title.textContent = `Edit Piece ${pieceIndex + 1} Line ${index + 1} Length`;
+                label.textContent = 'Length:';
+
+                // Convert current value to whole inches and sixteenths
+                // Parse fraction string like "3 15/16"" to decimal
+                let decimalValue;
+                const cleanValue = currentValue.replace('"', '').trim();
+
+                if (cleanValue.includes('/')) {
+                    // Parse fraction format like "3 15/16" or "15/16"
+                    const parts = cleanValue.split(' ');
+                    let wholeNumber = 0;
+                    let fractionPart = '';
+
+                    if (parts.length === 2) {
+                        // Format: "3 15/16"
+                        wholeNumber = parseFloat(parts[0]) || 0;
+                        fractionPart = parts[1];
+                    } else {
+                        // Format: "15/16"
+                        fractionPart = parts[0];
+                    }
+
+                    // Parse the fraction
+                    if (fractionPart.includes('/')) {
+                        const fractionParts = fractionPart.split('/');
+                        const numerator = parseFloat(fractionParts[0]) || 0;
+                        const denominator = parseFloat(fractionParts[1]) || 1;
+                        decimalValue = wholeNumber + (numerator / denominator);
+                    } else {
+                        decimalValue = wholeNumber;
+                    }
+                } else {
+                    // Simple decimal or whole number
+                    decimalValue = parseFloat(cleanValue) || 0;
+                }
+
+                const snappedValue = snapToSixteenth(decimalValue);
+                const wholeInchesValue = Math.floor(snappedValue);
+                const remainder = snappedValue - wholeInchesValue;
+                const sixteenthsValue = Math.round(remainder * 16);
+
+                // Set global variable and update display
+                currentSixteenths = sixteenthsValue;
+                wholeInches.value = wholeInchesValue;
+                fractionDisplay.textContent = simplifyFraction(currentSixteenths);
+            } else {
+                title.textContent = `Edit Piece ${pieceIndex + 1} Vertex ${index + 1} Angle`;
+                label.textContent = 'Angle (degrees):';
+
+                // Show decimal input, hide fraction inputs
+                lengthInputs.style.display = 'none';
+                input.style.display = 'block';
+                input.value = parseFloat(currentValue.replace('°', '')).toFixed(1);
+            }
+
+            // Get the position of the clicked element
+            const targetElement = event.target;
+            const canvasRect = canvas.getBoundingClientRect();
+
+            let elementX, elementY;
+
+            if (targetElement.tagName === 'text') {
+                elementX = parseFloat(targetElement.getAttribute('x'));
+                elementY = parseFloat(targetElement.getAttribute('y'));
+            } else if (targetElement.tagName === 'rect') {
+                const rectX = parseFloat(targetElement.getAttribute('x'));
+                const rectY = parseFloat(targetElement.getAttribute('y'));
+                const rectWidth = parseFloat(targetElement.getAttribute('width'));
+                const rectHeight = parseFloat(targetElement.getAttribute('height'));
+                elementX = rectX + rectWidth / 2;
+                elementY = rectY + rectHeight / 2;
+            }
+
+            const pageX = canvasRect.left + elementX;
+            const pageY = canvasRect.top + elementY;
+
+            popup.style.left = (pageX + 30) + 'px';
+            popup.style.top = (pageY - 25) + 'px';
+
+            popup.style.display = 'block';
+            const popupRect = popup.getBoundingClientRect();
+
+            if (popupRect.right > window.innerWidth) {
+                popup.style.left = (pageX - popupRect.width - 30) + 'px';
+            }
+
+            if (popupRect.bottom > window.innerHeight) {
+                popup.style.top = (pageY - popupRect.height - 10) + 'px';
+            }
+
+            if (popupRect.top < 0) {
+                popup.style.top = (pageY + 30) + 'px';
+            }
+
+            // Show appropriate inputs based on mode
+            toggleEditMode();
+
+            setTimeout(() => {
+                if (hasCustomLabel) {
+                    customTextInput.focus();
+                    customTextInput.select();
+                } else {
+                    if (type === 'length') {
+                        wholeInches.focus();
+                    } else {
+                        input.focus();
+                        input.select();
+                    }
+                }
+            }, 100);
+        }
+
         function drawAngleArc(prevPoint, centerPoint, nextPoint, angle) {
             const vec1 = { x: prevPoint.x - centerPoint.x, y: prevPoint.y - centerPoint.y };
             const vec2 = { x: nextPoint.x - centerPoint.x, y: nextPoint.y - centerPoint.y };
@@ -5467,19 +5705,117 @@ ORDERING:
             const current = points[vertexIndex];
             const prev = points[vertexIndex - 1];
             const next = points[vertexIndex + 1];
-            
+
             const vec1 = { x: prev.x - current.x, y: prev.y - current.y };
             const vec2 = { x: next.x - current.x, y: next.y - current.y };
-            
+
             const dot = vec1.x * vec2.x + vec1.y * vec2.y;
             const mag1 = Math.sqrt(vec1.x * vec1.x + vec1.y * vec1.y);
             const mag2 = Math.sqrt(vec2.x * vec2.x + vec2.y * vec2.y);
-            
+
             let interiorAngle = Math.acos(dot / (mag1 * mag2)) * 180 / Math.PI;
             // Return supplementary angle (exterior angle)
             let supplementaryAngle = 180 - interiorAngle;
-            
+
             return supplementaryAngle;
+        }
+
+        // Piece-aware version of calculateVertexAngle
+        function calculateVertexAngleForPiece(vertexIndex, piecePoints) {
+            const current = piecePoints[vertexIndex];
+            const prev = piecePoints[vertexIndex - 1];
+            const next = piecePoints[vertexIndex + 1];
+
+            const vec1 = { x: prev.x - current.x, y: prev.y - current.y };
+            const vec2 = { x: next.x - current.x, y: next.y - current.y };
+
+            const dot = vec1.x * vec2.x + vec1.y * vec2.y;
+            const mag1 = Math.sqrt(vec1.x * vec1.x + vec1.y * vec1.y);
+            const mag2 = Math.sqrt(vec2.x * vec2.x + vec2.y * vec2.y);
+
+            let interiorAngle = Math.acos(dot / (mag1 * mag2)) * 180 / Math.PI;
+            // Return supplementary angle (exterior angle)
+            let supplementaryAngle = 180 - interiorAngle;
+
+            return supplementaryAngle;
+        }
+
+        // Piece-aware version of calculateLabelPosition
+        function calculateLabelPositionForPiece(start, end, lineIndex, text, piecePoints) {
+            // Base midpoint position
+            const baseMidX = (start.x + end.x) / 2;
+            const baseMidY = (start.y + end.y) / 2;
+
+            // Calculate perpendicular offset direction (always offset perpendicular to line)
+            const dx = end.x - start.x;
+            const dy = end.y - start.y;
+            const lineLength = Math.sqrt(dx * dx + dy * dy);
+
+            if (lineLength === 0) return { x: baseMidX, y: baseMidY - 24, needsLeader: false, targetX: baseMidX, targetY: baseMidY };
+
+            // Normalized perpendicular vector (rotated 90 degrees)
+            const perpX = -dy / lineLength;
+            const perpY = dx / lineLength;
+
+            // Calculate label dimensions
+            const textWidth = text ? text.length * 8 : 40; // Estimate if text not provided
+            const labelWidth = textWidth + 8;
+            const labelHeight = 16;
+
+            // Try different offset distances with zoom-aware scaling
+            const baseOffsets = [24, 32, 40, 48, 56, 64, 72, 80, 96, 112, 128]; // Extended range
+            const vertexRadius = 12; // Collision radius around vertices
+
+            for (let offset of baseOffsets) {
+                // Try both sides of the line
+                for (let side of [1, -1]) {
+                    const testX = baseMidX + perpX * offset * side;
+                    const testY = baseMidY + perpY * offset * side;
+
+                    // Check if this position collides with any vertex in this piece
+                    let hasVertexCollision = false;
+                    for (let point of piecePoints) {
+                        const distX = testX - point.x;
+                        const distY = testY - point.y;
+                        const distance = Math.sqrt(distX * distX + distY * distY);
+
+                        if (distance < vertexRadius) {
+                            hasVertexCollision = true;
+                            break;
+                        }
+                    }
+
+                    // Check label-to-label collisions
+                    const labelX = testX - labelWidth / 2;
+                    const labelY = testY - labelHeight / 2;
+                    const hasLabelCollision = checkLabelCollisions(labelX, labelY, labelWidth, labelHeight, placedLabels);
+
+                    // If no collision, use this position
+                    if (!hasVertexCollision && !hasLabelCollision) {
+                        return {
+                            x: testX,
+                            y: testY,
+                            needsLeader: offset > 56, // Use leader line if offset is large
+                            targetX: baseMidX,
+                            targetY: baseMidY
+                        };
+                    }
+                }
+            }
+
+            // Fallback: if all positions collide, place it far away and use leader line
+            // Try progressively farther positions in a spiral pattern
+            const farOffset = 140;
+            const testX = baseMidX + perpX * farOffset;
+            const testY = baseMidY + perpY * farOffset;
+
+            return {
+                x: testX,
+                y: testY,
+                needsLeader: true,
+                targetX: baseMidX,
+                targetY: baseMidY
+            };
         }
 
         function calculateInteriorLabelPosition(prev, current, next, angle) {
@@ -5577,7 +5913,7 @@ ORDERING:
             const labelHeight = 16;
 
             // Start closer for small angles, progressively try further distances only if needed
-            const distances = [45, 48, 50, 52, 55, 58, 60, 62, 65, 68, 70, 75, 80, 85, 90, 95, 100, 105, 110, 115, 120, 130, 140, 150, 160];
+            const distances = [45, 50, 55, 60, 65, 70, 80, 90, 100, 110, 120];
             const vertexRadius = 12; // Collision radius around vertices
 
             for (let distance of distances) {
@@ -5729,19 +6065,37 @@ ORDERING:
         function redrawProfile() {
             pointsGroup.innerHTML = '';
             linesGroup.innerHTML = '';
-            
-            points.forEach((point, index) => {
-                drawPoint(point, index);
+            labelsGroup.innerHTML = '';
+
+            // Draw all completed pieces
+            pieces.forEach((piece, pieceIndex) => {
+                drawPiece(piece, pieceIndex);
             });
-            
-            // Only draw lines and points. HEM visuals will be handled separately.
-            for (let i = 0; i < points.length - 1; i++) {
-                drawLine(points[i], points[i + 1], i);
+
+            // Draw current piece being worked on
+            if (points.length > 0) {
+                drawPiece({ points, hemVertexIndex: window.hemVertexIndex, hemInfo: window.hemInfo }, currentPieceIndex);
             }
 
-            // Draw only the HEM info box and curve at the correct vertex
-            // Hem vertices are now invisible for seamless appearance
-            points.forEach((point, index) => {
+            drawMeasurements();
+            updateStats(); // Ensure material usage updates after any change
+        }
+
+        function drawPiece(piece, pieceIndex) {
+            const piecePoints = piece.points;
+
+            // Draw points for this piece
+            piecePoints.forEach((point, index) => {
+                drawPoint(point, index);
+            });
+
+            // Draw lines for this piece
+            for (let i = 0; i < piecePoints.length - 1; i++) {
+                drawLine(piecePoints[i], piecePoints[i + 1], i);
+            }
+
+            // Draw HEM info box and curve at the correct vertex
+            piecePoints.forEach((point, index) => {
                 if (point.isHem && point.hemData) {
                     // Draw curve at the correct vertex (seamless with profile)
                     addHemArcAtVertex(index);
@@ -5749,13 +6103,12 @@ ORDERING:
                     showHemInfoBox(point.hemData);
                 }
             });
-
-            drawMeasurements();
-            updateStats(); // Ensure material usage updates after any change
         }
 
         function clearCanvas() {
             points = [];
+            pieces = []; // Clear all pieces
+            currentPieceIndex = 0; // Reset piece counter
             dxfEntities = []; // Clear DXF entities as well
             pointsGroup.innerHTML = '';
             linesGroup.innerHTML = '';
@@ -5768,38 +6121,73 @@ ORDERING:
             // Clear hem vertex index when starting a new profile
             window.hemVertexIndex = undefined;
             setMode('create');
-            
+
             closeEditPopup();
-            
+
             // Only clear the canvas - preserve form fields in top bar
-            
+
             document.getElementById('mode').textContent = 'Click on the canvas to start drawing your profile';
             updateStats();
             clearPreviewLine();
+            updateAddPieceButtonVisibility();
         }
 
         function updateStats() {
-            // Check if any custom length labels exist
+            const totalLengthEl = document.getElementById('totalLength');
+
+            // Calculate width for each piece
+            const allPieces = [...pieces];
+            if (points.length > 0) {
+                allPieces.push({ points, hemVertexIndex: window.hemVertexIndex, hemInfo: window.hemInfo });
+            }
+
+            if (allPieces.length === 0) {
+                totalLengthEl.textContent = '0"';
+                return;
+            }
+
+            // If only one piece, show single width
+            if (allPieces.length === 1) {
+                const width = calculatePieceWidth(allPieces[0], 0);
+                totalLengthEl.textContent = width;
+                return;
+            }
+
+            // Multiple pieces - show each piece width
+            let displayText = '';
+            allPieces.forEach((piece, index) => {
+                const width = calculatePieceWidth(piece, index);
+                displayText += `Piece ${index + 1}: ${width}`;
+                if (index < allPieces.length - 1) {
+                    displayText += ', ';
+                }
+            });
+            totalLengthEl.textContent = displayText;
+        }
+
+        function calculatePieceWidth(piece, pieceIndex) {
+            const piecePoints = piece.points;
+
+            // Check if any custom length labels exist for this piece
             let hasCustomLength = false;
-            for (let i = 0; i < points.length - 1; i++) {
-                if (customLabels[`length-${i}`]) {
+            for (let i = 0; i < piecePoints.length - 1; i++) {
+                if (customLabels[`p${pieceIndex}-length-${i}`]) {
                     hasCustomLength = true;
                     break;
                 }
             }
 
-            // If custom lengths exist, show "Custom" instead of calculating
+            // If custom lengths exist, show "Custom"
             if (hasCustomLength) {
-                document.getElementById('totalLength').textContent = 'Custom';
-                return;
+                return 'Custom';
             }
 
             let totalLength = 0;
 
             // Calculate line segments length
-            for (let i = 0; i < points.length - 1; i++) {
-                const current = points[i];
-                const next = points[i + 1];
+            for (let i = 0; i < piecePoints.length - 1; i++) {
+                const current = piecePoints[i];
+                const next = piecePoints[i + 1];
 
                 // Calculate length using DXF coordinates
                 const currentDxf = screenToDxf(current);
@@ -5809,24 +6197,20 @@ ORDERING:
                 const segmentLength = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
 
                 // Snap each segment to 1/16" before adding to total
-                // This ensures the sum matches what users see for individual segments
                 totalLength += snapToSixteenth(segmentLength);
             }
 
             // Add hem lengths to total material usage
-            points.forEach(point => {
+            piecePoints.forEach(point => {
                 if (point.isHem && point.hemData && point.hemData.length) {
-                    // Hem length is already in inches
                     const hemLength = typeof point.hemData.length === 'number'
                         ? point.hemData.length
                         : parseFloat(point.hemData.length) || 0;
-
-                    // Snap hem length to 1/16" before adding to total
                     totalLength += snapToSixteenth(hemLength);
                 }
             });
 
-            document.getElementById('totalLength').textContent = formatLength(totalLength);
+            return formatLength(totalLength);
         }
 
         function applyLengthEditByIndex(lineIndex, newLength) {
@@ -5931,6 +6315,147 @@ ORDERING:
                     showLineCrossPopup();
                     return;
                 }
+            }
+
+            // Force redraw of all measurements with collision detection
+            drawMeasurements();
+        }
+
+        // Piece-aware version of applyLengthEditByIndex
+        function applyLengthEditByIndexForPiece(lineIndex, newLength, pieceIndex) {
+            // Determine if we're editing a completed piece or the current piece
+            let piecePoints;
+            let isCompletedPiece = false;
+
+            if (pieceIndex < pieces.length) {
+                // Editing a completed piece
+                piecePoints = pieces[pieceIndex].points;
+                isCompletedPiece = true;
+            } else {
+                // Editing current piece being worked on
+                piecePoints = points;
+            }
+
+            const startPoint = piecePoints[lineIndex];
+            const endPoint = piecePoints[lineIndex + 1];
+
+            // Convert to DXF coordinates for calculation
+            const startDxf = screenToDxf(startPoint);
+            const endDxf = screenToDxf(endPoint);
+
+            const deltaX = endDxf.x - startDxf.x;
+            const deltaY = endDxf.y - startDxf.y;
+            const currentLength = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+
+            if (currentLength === 0) return;
+
+            const ratio = newLength / currentLength;
+            const newEndDxf = {
+                x: startDxf.x + deltaX * ratio,
+                y: startDxf.y + deltaY * ratio
+            };
+
+            // Convert back to screen coordinates
+            const newEndPoint = dxfToScreen(newEndDxf);
+
+            // Temporarily update the point and check for line crossing
+            const oldEndPoint = { ...piecePoints[lineIndex + 1] };
+            piecePoints[lineIndex + 1] = { ...endPoint, x: newEndPoint.x, y: newEndPoint.y };
+
+            // Check for line crossing within this piece
+            for (let i = 0; i < piecePoints.length - 2; i++) {
+                if (i === lineIndex - 1 || i === lineIndex || i === lineIndex + 1) continue; // skip adjacent lines
+                const lineA = { start: piecePoints[i], end: piecePoints[i + 1] };
+                const newLine = { start: piecePoints[lineIndex], end: piecePoints[lineIndex + 1] };
+                if (doLinesIntersect(lineA.start, lineA.end, newLine.start, newLine.end)) {
+                    piecePoints[lineIndex + 1] = oldEndPoint;
+                    showLineCrossPopup();
+                    return;
+                }
+            }
+
+            // If editing a completed piece, update it in the pieces array
+            if (isCompletedPiece) {
+                pieces[pieceIndex].points = piecePoints;
+            }
+
+            // Force redraw of all measurements with collision detection
+            drawMeasurements();
+        }
+
+        // Piece-aware version of applyAngleEditByIndex
+        function applyAngleEditByIndexForPiece(vertexIndex, newAngle, pieceIndex) {
+            // Determine if we're editing a completed piece or the current piece
+            let piecePoints;
+            let isCompletedPiece = false;
+
+            if (pieceIndex < pieces.length) {
+                // Editing a completed piece
+                piecePoints = pieces[pieceIndex].points;
+                isCompletedPiece = true;
+            } else {
+                // Editing current piece being worked on
+                piecePoints = points;
+            }
+
+            const actualVertexIndex = vertexIndex + 1;
+            const maxVertices = Math.max(0, piecePoints.length - 2);
+            if (maxVertices === 0 || actualVertexIndex >= piecePoints.length - 1) return;
+
+            const currentPoint = piecePoints[actualVertexIndex];
+            const prevPoint = piecePoints[actualVertexIndex - 1];
+            const nextPoint = piecePoints[actualVertexIndex + 1];
+
+            const deltaX = nextPoint.x - currentPoint.x;
+            const deltaY = nextPoint.y - currentPoint.y;
+            const lineLength = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+
+            // User entered the angle value they want
+            // Use it directly as the interior angle for geometry calculation
+            const interiorAngle = newAngle;
+
+            // Get the angle of the incoming line (from prev to current)
+            const incomingAngle = Math.atan2(currentPoint.y - prevPoint.y, currentPoint.x - prevPoint.x);
+
+            // Try both rotation directions
+            const ccwAngle = incomingAngle + (interiorAngle * Math.PI / 180);  // counter-clockwise
+            const cwAngle = incomingAngle - (interiorAngle * Math.PI / 180);   // clockwise
+
+            // Calculate potential new positions for both options
+            const ccwX = currentPoint.x + Math.cos(ccwAngle) * lineLength;
+            const ccwY = currentPoint.y + Math.sin(ccwAngle) * lineLength;
+            const cwX = currentPoint.x + Math.cos(cwAngle) * lineLength;
+            const cwY = currentPoint.y + Math.sin(cwAngle) * lineLength;
+
+            // Choose the option that results in a point closer to the current next point
+            const ccwDistance = Math.sqrt((ccwX - nextPoint.x)**2 + (ccwY - nextPoint.y)**2);
+            const cwDistance = Math.sqrt((cwX - nextPoint.x)**2 + (cwY - nextPoint.y)**2);
+
+            const newAngleRad = ccwDistance < cwDistance ? ccwAngle : cwAngle;
+
+            // Calculate new coordinates for the next point
+            const newX = currentPoint.x + Math.cos(newAngleRad) * lineLength;
+            const newY = currentPoint.y + Math.sin(newAngleRad) * lineLength;
+
+            // Temporarily update the point and check for line crossing
+            const oldNextPoint = { ...piecePoints[actualVertexIndex + 1] };
+            piecePoints[actualVertexIndex + 1] = { ...piecePoints[actualVertexIndex + 1], x: newX, y: newY };
+
+            // Check for line crossing within this piece
+            for (let i = 0; i < piecePoints.length - 2; i++) {
+                if (i === actualVertexIndex - 1 || i === actualVertexIndex || i === actualVertexIndex + 1) continue; // skip adjacent lines
+                const lineA = { start: piecePoints[i], end: piecePoints[i + 1] };
+                const newLine = { start: piecePoints[actualVertexIndex], end: piecePoints[actualVertexIndex + 1] };
+                if (doLinesIntersect(lineA.start, lineA.end, newLine.start, newLine.end)) {
+                    piecePoints[actualVertexIndex + 1] = oldNextPoint;
+                    showLineCrossPopup();
+                    return;
+                }
+            }
+
+            // If editing a completed piece, update it in the pieces array
+            if (isCompletedPiece) {
+                pieces[pieceIndex].points = piecePoints;
             }
 
             // Force redraw of all measurements with collision detection
@@ -6206,17 +6731,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Initialize color picker
     initializeColorPicker();
-    
-    // Set current date
-    const dateCreatedField = document.getElementById('dateCreated');
-    if (dateCreatedField) {
-        const today = new Date();
-        const dateStr = (today.getMonth() + 1).toString().padStart(2, '0') + '/' + 
-                       today.getDate().toString().padStart(2, '0') + '/' + 
-                       today.getFullYear();
-        dateCreatedField.textContent = dateStr;
-    }
-    
+
     updateOrderSheetGaugeDisplay();
     
     // Add hole checkbox event listener
@@ -6246,14 +6761,13 @@ document.addEventListener('DOMContentLoaded', function() {
 // Submit profile request function
 function submitProfileRequest() {
     // Validate required fields
-    const customerName = document.getElementById('customerName').value.trim();
     const profileName = document.getElementById('profileName').value.trim();
-    
-    if (!customerName || !profileName) {
-        alert('Please fill in Customer Name and Profile Name');
+
+    if (!profileName) {
+        alert('Please fill in Profile Name');
         return;
     }
-    
+
     if (points.length < 2) {
         alert('Please create a profile with at least 2 points before submitting');
         return;
@@ -6318,15 +6832,11 @@ function createTaskData() {
     // Create comprehensive task description
     const taskDescription = `NEW PROFILE MANUFACTURING REQUEST
 
-CUSTOMER INFORMATION:
-- Customer Name: ${document.getElementById('customerName').value.trim()}
+PRODUCT INFORMATION:
 - Profile Name: ${document.getElementById('profileName').value.trim()}
 - Description: ${document.getElementById('profileDescription').value.trim() || 'No description provided'}
 
 SPECIFICATIONS:
-- Metal Type: ${document.getElementById('metalType').value}
-- Gauge: ${document.getElementById('metalGauge').value}
-- Color: ${document.getElementById('color').value.trim()}
 - Quantity: ${document.getElementById('quantity').value}
 - Ribs: ${document.getElementById('hasRibs').checked ? 'Yes' : 'No'}
 - Holes: ${document.getElementById('hasHoles').checked ? 'Yes' : 'No'}${document.getElementById('hasHoles').checked ? `
@@ -6362,7 +6872,7 @@ NEXT STEPS FOR EMPLOYEE:
 Request submitted: ${new Date().toLocaleString()}`;
 
     return {
-        title: `Profile Request: ${document.getElementById('profileName').value.trim()} - ${document.getElementById('customerName').value.trim()}`,
+        title: `Profile Design: ${document.getElementById('profileName').value.trim()}`,
         description: taskDescription
     };
 }
@@ -6571,732 +7081,261 @@ async function svgToPngBlob(svgElement, scale = 2) {
     }
 }
 
-async function sendToKynetic() {
-    // Get button and original text first
-    const button = document.getElementById('sendToKyneticBtn');
-    const originalText = button.textContent;
-    
-    try {
-        // Show confirmation dialog
-        const confirmed = confirm('Send this order to Kynetic Manufacturing System?');
-        if (!confirmed) return;
+async function downloadPDF() {
+    // Validate product name is not empty
+    const profileName = document.getElementById('profileName').value.trim();
+    if (!profileName) {
+        alert('Please enter a Product Name before downloading.');
+        document.getElementById('profileName').focus();
+        return;
+    }
 
-        // Collect the order data
-        const orderData = getOrderSheetData();
-        
-        // Validate required fields
-        if (!orderData.customer_name || !orderData.job_name || !orderData.profile_name) {
-            alert('Please fill in Customer Name, Job Name, and Profile Name before sending to Kynetic.');
+    // Validate length is not empty
+    const lengthValue = document.getElementById('lengthInput').value.trim();
+    if (!lengthValue) {
+        alert('Please enter a Length before downloading.');
+        document.getElementById('lengthInput').focus();
+        return;
+    }
+
+    const button = document.getElementById('downloadBtn');
+    const originalText = button.textContent;
+
+    try {
+        // Show loading state
+        button.textContent = 'Generating PDF...';
+        button.disabled = true;
+
+        // Clear the preview line so it doesn't appear in PDF
+        clearPreviewLine();
+
+        // Populate the print sheet with data
+        populatePrintSheetFromDesigner();
+
+        // Get the print sheet content
+        const printSheet = document.getElementById('printSheetSection');
+        if (!printSheet) {
+            alert('Print sheet not found!');
             return;
         }
 
-        // Show loading state
-        button.textContent = 'Sending...';
-        button.disabled = true;
-
-        // Capture complete profile using the same logic as populatePrintSheetFromDesigner
-        let imageBlob = null;
-        try {
-            console.log('=== STARTING PROFILE IMAGE CAPTURE ===');
-            console.log('Step 1: Looking for canvas element...');
-            const originalSvg = document.getElementById('canvas');
-            
-            if (!originalSvg) {
-                console.error('❌ SVG canvas not found for image capture!');
-                console.log('Available elements with id:', Array.from(document.querySelectorAll('[id]')).map(el => el.id));
-            } else {
-                console.log('✓ Canvas element found:', originalSvg);
-                console.log('Step 2: Cloning SVG...');
-                const svgClone = originalSvg.cloneNode(true);
-                console.log('✓ SVG cloned');
-                
-                // Get the bounding box of the actual content (same as print logic)
-                console.log('Step 3: Getting bounding box...');
-                const bbox = originalSvg.getBBox ? originalSvg.getBBox() : null;
-                console.log('BBox result:', bbox);
-                
-                if (bbox && bbox.width > 0 && bbox.height > 0) {
-                    console.log('✓ Using content bbox:', bbox);
-                    
-                    // Use the same padding as the print logic
-                    const padding = 50;
-                    svgClone.setAttribute('viewBox', `${bbox.x - padding} ${bbox.y - padding} ${bbox.width + padding * 2} ${bbox.height + padding * 2}`);
-                    svgClone.setAttribute('preserveAspectRatio', 'xMidYMid meet');
-                } else {
-                    console.log('⚠ Using fallback viewBox (bbox not available)');
-                    svgClone.setAttribute('viewBox', '0 0 800 600');
-                    svgClone.setAttribute('preserveAspectRatio', 'xMidYMid meet');
-                }
-                
-                console.log('Step 4: Styling SVG clone...');
-                // Set up the SVG for capture (similar to print sheet styling)
-                svgClone.style.width = '800px';
-                svgClone.style.height = '600px';
-                svgClone.style.background = 'white';
-                svgClone.id = 'temp-capture-svg';
-                console.log('✓ SVG styled');
-                
-                console.log('Step 5: Creating temporary container...');
-                // Create a temporary container (like the print drawing area)
-                const tempContainer = document.createElement('div');
-                tempContainer.style.position = 'absolute';
-                tempContainer.style.top = '-9999px';
-                tempContainer.style.left = '-9999px';
-                tempContainer.style.width = '800px';
-                tempContainer.style.height = '600px';
-                tempContainer.style.background = 'white';
-                tempContainer.style.display = 'flex';
-                tempContainer.style.alignItems = 'center';
-                tempContainer.style.justifyContent = 'center';
-                tempContainer.appendChild(svgClone);
-                document.body.appendChild(tempContainer);
-                console.log('✓ Temporary container created and added to DOM');
-                
-                try {
-                    console.log('Step 6: Loading html2canvas...');
-                    // Load html2canvas if not available
-                    if (typeof html2canvas === 'undefined') {
-                        console.log('html2canvas not loaded, loading now...');
-                        await loadHtml2Canvas();
-                        console.log('✓ html2canvas loaded');
-                    } else {
-                        console.log('✓ html2canvas already available');
-                    }
-                    
-                    console.log('Step 7: Waiting for render (100ms)...');
-                    // Small delay to ensure container is fully rendered
-                    await new Promise(resolve => setTimeout(resolve, 100));
-                    console.log('✓ Wait complete');
-                    
-                    console.log('Step 8: Capturing with html2canvas...');
-                    // Capture the temporary container (same approach as print)
-                    const canvas = await html2canvas(tempContainer, {
-                        backgroundColor: 'white',
-                        scale: 2,
-                        useCORS: true,
-                        allowTaint: true,
-                        logging: true,
-                        width: 800,
-                        height: 600,
-                        scrollX: 0,
-                        scrollY: 0
-                    });
-                    console.log('✓ Canvas created:', canvas.width, 'x', canvas.height);
-                    
-                    console.log('Step 9: Converting canvas to blob...');
-                    imageBlob = await new Promise((resolve) => {
-                        canvas.toBlob(resolve, 'image/png', 1.0);
-                    });
-                    console.log('✓ Blob created:', imageBlob);
-                    
-                } finally {
-                    console.log('Step 10: Cleaning up temporary container...');
-                    // Clean up temporary elements
-                    document.body.removeChild(tempContainer);
-                    console.log('✓ Cleanup complete');
-                }
-                
-                if (imageBlob && imageBlob.size > 0) {
-                    console.log('✅ SUCCESS! Profile image captured, size:', imageBlob.size, 'bytes');
-                } else {
-                    console.error('❌ FAILED! Image blob is null or empty:', imageBlob);
-                }
-            }
-        } catch (captureErr) {
-            console.error('❌ EXCEPTION during image capture:', captureErr);
-            console.error('Error stack:', captureErr.stack);
+        // Load required libraries
+        if (typeof html2canvas === 'undefined') {
+            await loadHtml2Canvas();
         }
-        
-        console.log('=== PROFILE IMAGE CAPTURE COMPLETE ===');
-        console.log('Final imageBlob:', imageBlob);
-        console.log('imageBlob size:', imageBlob?.size || 'N/A');
 
-        // Send to Odoo (include imageBlob when available)
-        const result = await createManufacturingTask(orderData, imageBlob);
-
-        if (result.success) {
-            console.log('SUCCESS! Result:', result);
-            alert('✓ Profile Design Submitted Successfully!\n\nYour profile request has been sent to Kynetic Metal Works.\n\nProfile: ' + orderData.profile_name + '\nCustomer: ' + orderData.customer_name + '\n\nOur team will review your submission and contact you shortly.');
-        } else {
-            console.error('FAILED! Result:', result);
-            alert('Error sending to Kynetic: ' + (result.error || 'Unknown error'));
+        if (typeof jspdf === 'undefined' && typeof jsPDF === 'undefined') {
+            await loadJsPDF();
         }
+
+        // Make print sheet visible but off-screen for capture
+        printSheet.style.display = 'block';
+        printSheet.style.visibility = 'visible';
+        printSheet.style.position = 'fixed';
+        printSheet.style.top = '-10000px';
+        printSheet.style.left = '0';
+        printSheet.style.width = '816px';  // 8.5 inches at 96 DPI
+        printSheet.style.height = '1056px'; // 11 inches at 96 DPI
+        printSheet.style.zIndex = '-1';
+        printSheet.style.background = 'white';
+
+        // Wait for rendering
+        await new Promise(resolve => setTimeout(resolve, 500));
+
+        // Capture the print sheet as canvas
+        const canvas = await html2canvas(printSheet, {
+            backgroundColor: '#ffffff',
+            scale: 2,
+            useCORS: true,
+            allowTaint: true,
+            width: 816,
+            height: 1056
+        });
+
+        // Hide the print sheet again
+        printSheet.style.display = 'none';
+
+        // Create PDF using jsPDF
+        const jsPDFConstructor = window.jspdf?.jsPDF || window.jsPDF;
+        if (!jsPDFConstructor) {
+            throw new Error('jsPDF library not loaded properly');
+        }
+
+        const pdf = new jsPDFConstructor({
+            orientation: 'portrait',
+            unit: 'px',
+            format: [816, 1056]
+        });
+
+        // Convert canvas to image and add to PDF
+        const imgData = canvas.toDataURL('image/png');
+        pdf.addImage(imgData, 'PNG', 0, 0, 816, 1056);
+
+        // Download the PDF
+        const fileName = `${profileName.replace(/[^a-z0-9]/gi, '_')}_Product_Spec.pdf`;
+        pdf.save(fileName);
+
+        // Show success message
+        button.textContent = 'Downloaded!';
+        setTimeout(() => {
+            button.textContent = originalText;
+        }, 2000);
 
     } catch (error) {
-        console.error('Error in sendToKynetic:', error);
-        alert('Error sending to Kynetic: ' + error.message);
+        console.error('Error generating PDF:', error);
+        alert('Error generating PDF: ' + error.message);
     } finally {
-        // Restore button state
-        button.textContent = originalText;
         button.disabled = false;
+        button.textContent = originalText;
     }
 }
 
-function getOrderSheetData() {
-    // Use the same data collection logic as the print sheet
-    const data = {};
-    data.customer_name = document.getElementById('customerName')?.value || '';
-    data.job_name = document.getElementById('jobName')?.value || '';
-    data.profile_name = document.getElementById('profileName')?.value || '';
-    data.color = document.getElementById('color')?.value || '';
-    data.color_manufacturer = document.getElementById('colorManufacturer')?.value || '';
-    data.quantity = document.getElementById('quantity')?.value || '';
-    data.length = document.getElementById('lengthInput')?.value || '';
-    data.material_usage = document.getElementById('totalLength') ? document.getElementById('totalLength').textContent.replace('"','') : '';
-    data.date_ordered = new Date().toLocaleDateString();
-
-    // Metal type and gauge
-    const metalType = document.getElementById('metalType').value;
-    const metalGauge = document.getElementById('metalGauge').value;
-    data.metal_type = metalType;
-    data.metal_gauge = metalGauge;
-
-    // Calculate ribs from hems data
-    data.ribs = window.hems ? window.hems.length : 0;
-
-    // Hole specifications
-    data.has_holes = document.getElementById('hasHoles')?.checked || false;
-    const holeUnit = document.querySelector('input[name="holeUnits"]:checked')?.value || 'inches';
-    data.hole_unit = holeUnit;
-    data.hole_size = getHoleSizeValue().toFixed(holeUnit === 'mm' ? 1 : 4) + ' ' + holeUnit;
-    data.hole_spacing = getHoleSpacingValue().toFixed(holeUnit === 'mm' ? 1 : 4) + ' ' + holeUnit;
-    data.start_from_end = getStartFromEndValue().toFixed(holeUnit === 'mm' ? 1 : 4) + ' ' + holeUnit;
-    data.distance_from_edge = getDistanceFromEdgeValue().toFixed(holeUnit === 'mm' ? 1 : 4) + ' ' + holeUnit;
-
-    // DXF and task specifications
-    data.dxf_standards = document.getElementById('dxfStandards')?.value || '';
-    data.task_priority = document.getElementById('taskPriority')?.value || '';
-
-    return data;
-}
-
-async function createManufacturingTask(orderData, profileImageBlob) {
-    try {
-        console.log('=== STARTING PROFILE SUBMISSION VIA EMAIL ===');
-        console.log('Order Data:', orderData);
-
-        // CONFIGURATION: Set your email address where submissions should be sent
-        const SUBMISSION_EMAIL = 'webeckematthew@gmail.com'; // Change this to your email
-
-        // Generate the order sheet image
-        console.log('Generating order sheet image...');
-        let orderSheetBlob = null;
-        try {
-            // Load html2canvas if not available
-            if (typeof html2canvas === 'undefined') {
-                console.log('Loading html2canvas library...');
-                await loadHtml2Canvas();
-            }
-
-            // Populate and show the print sheet
-            console.log('Populating print sheet...');
-            populatePrintSheetFromDesigner();
-
-            const printSheet = document.getElementById('printSheetSection');
-            console.log('Print sheet element found:', !!printSheet);
-
-            if (printSheet) {
-                // Make it visible but off-screen
-                printSheet.style.display = 'block';
-                printSheet.style.visibility = 'visible';
-                printSheet.style.position = 'fixed';
-                printSheet.style.top = '-10000px';
-                printSheet.style.left = '0';
-                printSheet.style.width = '8.5in';
-                printSheet.style.height = '11in';
-                printSheet.style.zIndex = '-1';
-
-                // Wait longer for rendering (especially for SVG to settle)
-                console.log('Waiting for render...');
-                await new Promise(resolve => setTimeout(resolve, 1500));
-
-                // Capture it with html2canvas
-                console.log('Capturing with html2canvas...');
-                const canvas = await html2canvas(printSheet, {
-                    backgroundColor: '#ffffff',
-                    scale: 2,
-                    useCORS: true,
-                    allowTaint: true,
-                    logging: true,
-                    width: 816, // 8.5 inches * 96 DPI
-                    height: 1056 // 11 inches * 96 DPI
-                });
-
-                console.log('Canvas created:', canvas.width, 'x', canvas.height);
-
-                orderSheetBlob = await new Promise((resolve) => {
-                    canvas.toBlob(resolve, 'image/png', 1.0);
-                });
-
-                console.log('✓ Order sheet captured successfully! Size:', orderSheetBlob?.size, 'bytes');
-
-                // Hide it again
-                printSheet.style.display = 'none';
-            } else {
-                console.error('Print sheet element not found!');
-            }
-        } catch (sheetErr) {
-            console.error('Failed to capture order sheet:', sheetErr);
-            console.error('Error stack:', sheetErr.stack);
-        }
-
-        // Create a simple, clean email body
-        const emailBody = `
-<h2>🆕 New Profile Design Request</h2>
-<p><strong>Submitted by:</strong> ${orderData.customer_name}</p>
-<p><strong>Submission Time:</strong> ${new Date().toLocaleString()}</p>
-<hr/>
-
-<h3>📋 Order Information</h3>
-<table style="width:100%; border-collapse: collapse; margin-bottom: 20px;">
-    <tr style="background-color: #f0f0f0;">
-        <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold; width: 30%;">Job Name</td>
-        <td style="padding: 8px; border: 1px solid #ddd;">${orderData.job_name}</td>
-    </tr>
-    <tr>
-        <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Profile Name</td>
-        <td style="padding: 8px; border: 1px solid #ddd;">${orderData.profile_name}</td>
-    </tr>
-    <tr style="background-color: #f0f0f0;">
-        <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Customer</td>
-        <td style="padding: 8px; border: 1px solid #ddd;">${orderData.customer_name}</td>
-    </tr>
-    <tr>
-        <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Date Ordered</td>
-        <td style="padding: 8px; border: 1px solid #ddd;">${orderData.date_ordered}</td>
-    </tr>
-</table>
-
-<h3>🔧 Material Specifications</h3>
-<table style="width:100%; border-collapse: collapse; margin-bottom: 20px;">
-    <tr style="background-color: #f0f0f0;">
-        <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold; width: 30%;">Material Type</td>
-        <td style="padding: 8px; border: 1px solid #ddd;">${orderData.metal_type}</td>
-    </tr>
-    <tr>
-        <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Gauge</td>
-        <td style="padding: 8px; border: 1px solid #ddd;">${orderData.metal_gauge}</td>
-    </tr>
-    <tr style="background-color: #f0f0f0;">
-        <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Color</td>
-        <td style="padding: 8px; border: 1px solid #ddd;">${orderData.color} (${orderData.color_manufacturer})</td>
-    </tr>
-</table>
-
-<h3>📐 Dimensions & Quantity</h3>
-<table style="width:100%; border-collapse: collapse; margin-bottom: 20px;">
-    <tr style="background-color: #f0f0f0;">
-        <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold; width: 30%;">Quantity</td>
-        <td style="padding: 8px; border: 1px solid #ddd;">${orderData.quantity}</td>
-    </tr>
-    <tr>
-        <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Length</td>
-        <td style="padding: 8px; border: 1px solid #ddd;">${orderData.length} inches</td>
-    </tr>
-    <tr style="background-color: #f0f0f0;">
-        <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Material Usage</td>
-        <td style="padding: 8px; border: 1px solid #ddd;">${orderData.material_usage} inches</td>
-    </tr>
-    <tr>
-        <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Ribs</td>
-        <td style="padding: 8px; border: 1px solid #ddd;">${orderData.ribs}</td>
-    </tr>
-</table>
-
-${orderData.has_holes ? `
-<h3>🔩 Hole Specifications</h3>
-<table style="width:100%; border-collapse: collapse; margin-bottom: 20px;">
-    <tr style="background-color: #f0f0f0;">
-        <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold; width: 30%;">Hole Size</td>
-        <td style="padding: 8px; border: 1px solid #ddd;">${orderData.hole_size || 'Not specified'}</td>
-    </tr>
-    <tr>
-        <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Hole Spacing (OC)</td>
-        <td style="padding: 8px; border: 1px solid #ddd;">${orderData.hole_spacing || 'Not specified'}</td>
-    </tr>
-    <tr style="background-color: #f0f0f0;">
-        <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Start From End (OC)</td>
-        <td style="padding: 8px; border: 1px solid #ddd;">${orderData.start_from_end || 'Not specified'}</td>
-    </tr>
-    <tr>
-        <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Distance From Edge (OC)</td>
-        <td style="padding: 8px; border: 1px solid #ddd;">${orderData.distance_from_edge || 'Not specified'}</td>
-    </tr>
-</table>
-` : '<p><strong>Holes:</strong> No</p>'}
-
-<h3>⚙️ Production Details</h3>
-<table style="width:100%; border-collapse: collapse; margin-bottom: 20px;">
-    <tr style="background-color: #f0f0f0;">
-        <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold; width: 30%;">DXF Standards</td>
-        <td style="padding: 8px; border: 1px solid #ddd;">${orderData.dxf_standards}</td>
-    </tr>
-    <tr>
-        <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Task Priority</td>
-        <td style="padding: 8px; border: 1px solid #ddd;">${orderData.task_priority}</td>
-    </tr>
-</table>
-`;
-
-        console.log('Email Body to Submit:', emailBody);
-
-        // Send via FormSubmit.co (free email service)
-        // Create FormData to send email
-        const formData = new FormData();
-        formData.append('_subject', `New Profile Request: ${orderData.profile_name} | ${orderData.customer_name}`);
-        formData.append('_template', 'table'); // Use table template for better formatting
-        formData.append('_captcha', 'false'); // Disable captcha for seamless submission
-
-        // Add all order data as individual fields for better email formatting
-        formData.append('Customer_Name', orderData.customer_name || 'Not provided');
-        // formData.append('Customer_Email', orderData.customer_email || 'Not provided');
-        // formData.append('Customer_Phone', orderData.customer_phone || 'Not provided');
-        formData.append('Job_Name', orderData.job_name || 'Not provided');
-        formData.append('Profile_Name', orderData.profile_name || 'Not provided');
-        formData.append('Date_Ordered', orderData.date_ordered || 'Not provided');
-        formData.append('Metal_Type', orderData.metal_type || 'Not provided');
-        formData.append('Metal_Gauge', orderData.metal_gauge || 'Not provided');
-        formData.append('Color', `${orderData.color} (${orderData.color_manufacturer})` || 'Not provided');
-        formData.append('Quantity', orderData.quantity || 'Not provided');
-        formData.append('Length', orderData.length + ' inches' || 'Not provided');
-        formData.append('Material_Usage', orderData.material_usage + ' inches' || 'Not provided');
-        formData.append('Ribs', orderData.ribs || '0');
-        formData.append('Has_Holes', orderData.has_holes ? 'Yes' : 'No');
-
-        if (orderData.has_holes) {
-            formData.append('Hole_Size', orderData.hole_size || 'Not specified');
-            formData.append('Hole_Spacing', orderData.hole_spacing || 'Not specified');
-            formData.append('Start_From_End', orderData.start_from_end || 'Not specified');
-            formData.append('Distance_From_Edge', orderData.distance_from_edge || 'Not specified');
-        }
-
-        formData.append('DXF_Standards', orderData.dxf_standards || 'Not specified');
-        formData.append('Task_Priority', orderData.task_priority || 'Not specified');
-
-        // Note: emailBody is not sent - all data is in individual fields above
-        // The images contain all visual information
-
-        console.log('Sending email via FormSubmit...');
-        console.log('DEBUG: profileImageBlob =', profileImageBlob);
-        console.log('DEBUG: profileImageBlob type =', profileImageBlob?.type);
-        console.log('DEBUG: profileImageBlob size =', profileImageBlob?.size);
-        console.log('DEBUG: orderSheetBlob =', orderSheetBlob);
-        console.log('DEBUG: orderSheetBlob type =', orderSheetBlob?.type);
-        console.log('DEBUG: orderSheetBlob size =', orderSheetBlob?.size);
-
-        // Add profile image if available (use unique field name)
-        if (profileImageBlob && profileImageBlob.size > 0) {
-            const profileFilename = `Profile_${(orderData.profile_name || 'design').replace(/[^a-z0-9\-_.]/gi, '_')}_${Date.now()}.png`;
-            formData.append('Profile_Image', profileImageBlob, profileFilename);
-            console.log('✓ Added profile image attachment:', profileFilename, profileImageBlob.size, 'bytes');
-        } else {
-            console.warn('⚠ No profile image blob to attach!');
-        }
-
-        // Add order sheet image if available (use unique field name)
-        if (orderSheetBlob && orderSheetBlob.size > 0) {
-            const sheetFilename = `OrderSheet_${(orderData.profile_name || 'order').replace(/[^a-z0-9\-_.]/gi, '_')}_${Date.now()}.png`;
-            formData.append('Order_Sheet', orderSheetBlob, sheetFilename);
-            console.log('✓ Added order sheet attachment:', sheetFilename, orderSheetBlob.size, 'bytes');
-        } else {
-            console.warn('⚠ No order sheet blob to attach!');
-        }
-
-        // Debug: Log all FormData entries
-        console.log('DEBUG: FormData contents:');
-        for (let pair of formData.entries()) {
-            if (pair[1] instanceof Blob) {
-                console.log(`  ${pair[0]}: [Blob ${pair[1].size} bytes, type: ${pair[1].type}]`);
-            } else {
-                console.log(`  ${pair[0]}: ${pair[1]}`);
-            }
-        }
-
-        // Send the email via FormSubmit.co
-        // NOTE: The first time you use a new email, FormSubmit will send a confirmation email
-        const formSubmitURL = `https://formsubmit.co/${SUBMISSION_EMAIL}`;
-
-        try {
-            console.log('Sending form to:', formSubmitURL);
-            console.log('FormData has', Array.from(formData.entries()).length, 'entries');
-
-            const emailResponse = await fetch(formSubmitURL, {
-                method: 'POST',
-                body: formData
-            });
-
-            console.log('Email Response Status:', emailResponse.status, emailResponse.statusText);
-            console.log('Email Response Headers:', Object.fromEntries(emailResponse.headers.entries()));
-
-            // Try to read response body for debugging
-            const responseText = await emailResponse.text();
-            console.log('Email Response Body (first 500 chars):', responseText.substring(0, 500));
-
-            if (!emailResponse.ok) {
-                throw new Error(`Failed to send email: ${emailResponse.status} ${emailResponse.statusText}\nResponse: ${responseText}`);
-            }
-
-            console.log('=== PROFILE SUBMISSION COMPLETE VIA EMAIL ===');
-            console.log('Email sent to:', SUBMISSION_EMAIL);
-
-            return {
-                success: true,
-                method: 'email',
-                sent_to: SUBMISSION_EMAIL
-            };
-
-        } catch (error) {
-            console.error('Failed to send email:', error);
-            throw error;
-        }
-
-    } catch (error) {
-        console.error('=== LEAD CREATION FAILED ===');
-        console.error('Error Details:', error);
-        console.error('Error Stack:', error.stack);
-        return {
-            success: false,
-            error: error.message
-        };
-    }
+// Load jsPDF library dynamically
+function loadJsPDF() {
+    return new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+        script.onload = resolve;
+        script.onerror = () => reject(new Error('Failed to load jsPDF library'));
+        document.head.appendChild(script);
+    });
 }
     </script>
     
     <div id="printSheetSection" style="display:none;">
+
         
-        <div class="header">
-            <div class="logo-section">
-                <div class="logo-box">
-                    <div class="logo-text">KYNETIC</div>
-                    <div class="dots">
-                        <div class="dot"></div>
-                        <div class="dot"></div>
-                        <div class="dot"></div>
-                        <div class="dot"></div>
-                        <div class="dot"></div>
-                        <div class="dot"></div>
-                    </div>
-                    <div class="metalworks">metalworks</div>
-                </div>
+        <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid black; padding: 5px; margin-bottom: 5px;">
+            <div style="width: 100px;">
+                <svg viewBox="0 0 2500 1500" style="width: 100%; height: auto;">
+                    <path fill="#277178" d="M2365.2279,32.623H134.7721c-60.9648,0-110.3865,49.4217-110.3865,110.3865v828.7085c82.2121,1.1518,148.5052,68.1426,148.5052,150.6285s-66.2931,149.4765-148.5052,150.6284v84.0157c0,60.9648,49.4217,110.3863,110.3865,110.3863h2230.4558c60.9649,0,110.3865-49.4216,110.3865-110.3863V143.0095c0-60.9648-49.4216-110.3865-110.3865-110.3865ZM1783.0055,639.0689h86.0416v309.4252h-86.0416v-309.4252ZM1485.1714,639.0689h266.509v74.0876h-90.0128v235.3376h-86.0416v-235.3376h-90.4546v-74.0876ZM1244.2618,639.0689h219.296v74.0876h-133.255v43.581h113.8404v68.8581h-113.8404v48.811h137.2263v74.0876h-223.2673v-309.4252ZM911.5681,639.0689h67.0687l125.7537,157.3276v-157.3276h86.0416v309.4252h-68.3923l-124.4296-152.0976v152.0976h-86.0421v-309.4252ZM313.2586,639.0689h86.0421v117.6686l95.3077-117.6686h186.6387l56.0378,126.3846,57.3609-126.3846h93.5429l-108.1039,207.0097v102.4155h-85.6004v-103.2872l-104.9751-203.4938-111.6679,135.9432,121.7824,170.8378h-98.8377l-77.6584-113.7466-23.8271,24.4055v89.3411h-86.0421v-309.4252ZM465.2382,1331.4432c-83.2048,0-150.6557-67.4509-150.6557-150.6557s67.4509-150.6557,150.6557-150.6557,150.6557,67.4509,150.6557,150.6557-67.4509,150.6557-150.6557,150.6557ZM781.0934,1331.4432c-83.2048,0-150.6557-67.4509-150.6557-150.6557s67.4509-150.6557,150.6557-150.6557,150.6556,67.4509,150.6556,150.6557-67.4508,150.6557-150.6556,150.6557ZM1095.4243,1331.4432c-83.2048,0-150.6556-67.4509-150.6556-150.6557s67.4508-150.6557,150.6556-150.6557,150.6558,67.4509,150.6558,150.6557-67.4509,150.6557-150.6558,150.6557ZM1408.469,1331.4432c-83.2048,0-150.6557-67.4509-150.6557-150.6557s67.4509-150.6557,150.6557-150.6557,150.6557,67.4509,150.6557,150.6557-67.4509,150.6557-150.6557,150.6557ZM1722.2264,1331.4432c-83.2048,0-150.6556-67.4509-150.6556-150.6557s67.4508-150.6557,150.6556-150.6557,150.6558,67.4509,150.6558,150.6557-67.4509,150.6557-150.6558,150.6557ZM2034.6976,1331.4432c-83.2049,0-150.6558-67.4509-150.6558-150.6557s67.4509-150.6557,150.6558-150.6557,150.6556,67.4509,150.6556,150.6557-67.4507,150.6557-150.6556,150.6557ZM2166.4374,917.5517c-14.4162,10.7521-30.7419,18.9579-48.9782,24.6231-18.2417,5.6658-36.3332,8.4984-54.2725,8.4984-23.24,0-44.4955-4.576-63.759-13.7279-19.2699-9.1525-35.8915-21.3552-49.8595-36.6082-13.9755-15.2536-24.7861-32.393-32.4316-51.4259-7.653-19.0254-11.4721-38.4191-11.4721-58.1805,0-18.8828,3.5992-37.4048,10.8105-55.5655,7.2049-18.1543,17.7184-34.6472,31.5482-49.4644,13.8233-14.8177,30.6669-26.6527,50.5221-35.5189,19.8563-8.8592,42.2837-13.2921,67.2896-13.2921,30.0043,0,56.182,6.1762,78.5408,18.522,22.3512,12.3523,38.9739,28.6952,49.8595,49.0286l-65.7446,46.196c-3.8265-10.1667-9.3417-18.0111-16.5466-23.5338-7.2113-5.5157-15.0016-9.3701-23.3859-11.5493-8.3832-2.1786-16.5466-3.2685-24.488-3.2685-12.3555,0-23.0203,2.3968-31.9899,7.1909-8.9772,4.7941-16.3268,11.1134-22.0628,18.9579-5.736,7.8444-10.0032,16.5605-12.7951,26.1483-2.7994,9.5883-4.1921,19.176-4.1921,28.7638,0,10.7521,1.6136,21.0684,4.8536,30.9424,3.2336,9.8805,7.9425,18.6716,14.1192,26.3665,6.1778,7.7018,13.7472,13.7284,22.7243,18.0862,8.9697,4.3583,19.0426,6.5375,30.2251,6.5375,7.9415,0,16.0287-1.233,24.2682-3.7048,8.2309-2.4649,15.7328-6.4619,22.5024-11.9846,6.7642-5.5157,11.9138-12.9243,15.4433-22.2263l70.1576,41.4018c-6.1778,15.1104-16.478,28.0417-30.8867,38.7874Z"></path>
+                </svg>
             </div>
-            
-            <div class="title-section">
-                <div class="order-sheet-title">ORDER SHEET</div>
+            <div style="flex: 1; text-align: center; padding: 0 20px;">
+                <h1 style="margin: 0; font-size: 22px; font-weight: normal;"><span id="headerProductName" style="font-weight: bold; font-size: 22px;"></span> Product Spec</h1>
             </div>
-            
-            <div class="dates-section">
-                <div class="date-row">
-                    <span class="date-label">Date Ordered:</span>
-                    <span class="data-field" data-field="date_ordered" data-placeholder="MM/DD/YYYY"></span>
-                </div>
-                <div class="date-row">
-                    <span class="date-label">Completed By:</span>
-                    <span class="data-field" data-field="completed_by" data-placeholder="Employee Name"></span>
-                </div>
-                <div class="date-row">
-                    <span class="date-label">Date Finished:</span>
-                    <span class="data-field" data-field="date_finished" data-placeholder="MM/DD/YYYY"></span>
-                </div>
-            </div>
+            <div style="width: 100px;"></div>
         </div>
+
+
         
-        
-        <div class="section bordered">
-            <div class="row">
-                <div class="col">
-                    <div class="field-group">
-                        <span class="field-label inline">Customer:</span>
-                        <span class="data-field compact" data-field="customer_name" data-placeholder="Customer Name"></span>
+        <div class="section" style="border: 1px solid black; padding: 8px; margin-bottom: 5px;">
+            <h3 style="margin: 0 0 5px 0; border-bottom: 1px solid black; padding-bottom: 2px; font-size: 15px;">Specifications</h3>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 5px;">
+                <div>
+                    <div class="field-group" style="margin-bottom: 3px;">
+                        <span class="field-label" style="font-weight: bold; display: inline-block; width: 150px;">Length (inches):</span>
+                        <span class="data-field" data-field="length"></span>
+                    </div>
+                    <div class="field-group" style="margin-bottom: 3px;">
+                        <span class="field-label" style="font-weight: bold; display: inline-block; width: 150px;">Unbent Width (inches):</span>
+                        <span class="data-field" data-field="material_usage"></span>
                     </div>
                 </div>
-                <div class="col">
-                    <div class="field-group">
-                        <span class="field-label inline">Job:</span>
-                        <span class="data-field wide" data-field="job_name" data-placeholder="Job Name"></span>
+
+                <div>
+                    <div class="field-group" style="margin-bottom: 3px;">
+                        <span class="checkbox" data-field="has_ribs" style="margin-right: 8px;"></span>
+                        <span class="field-label inline" style="font-weight: bold;">Include Ribs</span>
+                    </div>
+                    <div class="field-group" style="margin-bottom: 3px;">
+                        <span class="checkbox" data-field="has_holes" style="margin-right: 8px;"></span>
+                        <span class="field-label inline" style="font-weight: bold;">Include Holes</span>
                     </div>
                 </div>
             </div>
+
         </div>
+
+
         
-        
-        <div class="section bordered">
-            <div class="row">
-                <div class="col wide">
-                    <div class="material-group">
-                        <span class="material-label">Steel</span>
-                        <div class="option-group">
-                            <div class="option">
-                                <span class="checkbox" data-field="steel_22"></span>
-                                <span class="option-label">22</span>
-                            </div>
-                            <div class="option">
-                                <span class="checkbox" data-field="steel_24"></span>
-                                <span class="option-label">24</span>
-                            </div>
-                            <div class="option">
-                                <span class="checkbox" data-field="steel_26"></span>
-                                <span class="option-label">26</span>
-                            </div>
-                            <div class="option">
-                                <span class="checkbox" data-field="steel_28"></span>
-                                <span class="option-label">28</span>
-                            </div>
-                            <div class="option">
-                                <span class="checkbox" data-field="steel_30"></span>
-                                <span class="option-label">30</span>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="material-group">
-                        <span class="material-label">Al</span>
-                        <div class="option-group">
-                            <div class="option">
-                                <span class="checkbox" data-field="al_019"></span>
-                                <span class="option-label">.019</span>
-                            </div>
-                            <div class="option">
-                                <span class="checkbox" data-field="al_027"></span>
-                                <span class="option-label">.027</span>
-                            </div>
-                            <div class="option">
-                                <span class="checkbox" data-field="al_032"></span>
-                                <span class="option-label">.032</span>
-                            </div>
-                            <div class="option">
-                                <span class="checkbox" data-field="al_040"></span>
-                                <span class="option-label">.040</span>
-                            </div>
-                            <div class="option">
-                                <span class="checkbox" data-field="al_050"></span>
-                                <span class="option-label">.050</span>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="field-group">
-                        <span class="field-label inline">Color:</span>
-                        <span class="data-field wide" data-field="color" data-placeholder="Color Name"></span>
-                    </div>
-                    
-                    <div class="field-group" style="margin-top: 15px;">
-                        <span class="field-label inline">Color Manufacturer:</span>
-                        <span class="data-field wide" data-field="color_manufacturer" data-placeholder="Manufacturer"></span>
-                    </div>
+        <div id="notesAndHolesContainer" style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 5px;">
+
+            
+            <div id="notesSection" class="section" style="border: 1px solid black; padding: 8px;">
+                <h3 style="margin: 0 0 5px 0; border-bottom: 1px solid black; padding-bottom: 2px; font-size: 15px;">Notes</h3>
+                <div style="padding: 5px 0;">
+                    <span class="data-field" data-field="notes" style="white-space: pre-wrap; display: block; min-height: 40px; font-size: 12px; border: none;"></span>
                 </div>
+            </div>
+
+            
+            <div id="holeDetailsColumn" class="section" style="border: 1px solid black; padding: 8px; max-height: 250px; overflow: hidden;">
+                <h3 style="margin: 0 0 5px 0; border-bottom: 1px solid black; padding-bottom: 2px; font-size: 15px;">Hole Specifications</h3>
+
                 
-                <div class="col narrow">
-                    <div class="field-group">
-                        <span class="field-label">Quantity:</span>
-                        <span class="data-field" data-field="quantity" data-placeholder="0"></span>
-                    </div>
-                    <div class="field-group">
-                        <span class="field-label">Length (inches):</span>
-                        <span class="data-field" data-field="length" data-placeholder="0.00"></span>
-                    </div>
-                    <div class="field-group">
-                        <span class="field-label">Total Material Usage (inches):</span>
-                        <span class="data-field" data-field="material_usage" data-placeholder="0.00"></span>
-                    </div>
-                    <div class="field-group">
-                        <span class="checkbox" data-field="has_ribs"></span>
-                        <span class="field-label inline">Include Ribs</span>
-                    </div>
-                    <div class="field-group">
-                        <span class="checkbox" data-field="has_holes"></span>
-                        <span class="field-label inline">Holes</span>
-                    </div>
+                <div style="margin-top: 5px; padding: 0; background: #f9f9f9; border: 1px solid #ddd; border-radius: 4px; display: flex; align-items: center; justify-content: center; max-width: 580px; margin-left: auto; margin-right: auto;">
+                    <svg viewBox="0 0 680 220" style="width: 100%; height: auto; display: block; max-width: 680px; padding: 0; margin: 0;">
+                        
+                        
+                        <path d="M 170 95 L 170 145 L 620 145 L 620 95 Z" fill="#e8e8e8" stroke="none"></path>
+                        <line x1="170" y1="95" x2="170" y2="145" stroke="#333" stroke-width="2"></line>
+                        <line x1="170" y1="95" x2="620" y2="95" stroke="#333" stroke-width="2"></line>
+                        <line x1="170" y1="145" x2="620" y2="145" stroke="#333" stroke-width="2"></line>
+
+                        
+                        <circle cx="250" cy="120" r="9" fill="white" stroke="#333" stroke-width="2"></circle>
+                        <circle cx="420" cy="120" r="9" fill="white" stroke="#333" stroke-width="2"></circle>
+
+                        
+                        <line x1="170" y1="70" x2="250" y2="70" stroke="#0066cc" stroke-width="1.5"></line>
+                        <line x1="170" y1="65" x2="170" y2="75" stroke="#0066cc" stroke-width="1.5"></line>
+                        <line x1="250" y1="65" x2="250" y2="75" stroke="#0066cc" stroke-width="1.5"></line>
+                        <line x1="210" y1="55" x2="210" y2="70" stroke="#0066cc" stroke-width="1"></line>
+                        <text x="210" y="35" text-anchor="middle" fill="#0066cc">
+                            <tspan x="210" font-size="22" font-weight="bold" data-field="start_from_end"></tspan>
+                            <tspan x="210" dy="15" font-size="12" font-style="italic">From End</tspan>
+                        </text>
+
+                        
+                        <line x1="250" y1="165" x2="420" y2="165" stroke="#009900" stroke-width="1.5"></line>
+                        <line x1="250" y1="160" x2="250" y2="170" stroke="#009900" stroke-width="1.5"></line>
+                        <line x1="420" y1="160" x2="420" y2="170" stroke="#009900" stroke-width="1.5"></line>
+                        <line x1="335" y1="165" x2="335" y2="185" stroke="#009900" stroke-width="1"></line>
+                        <text x="335" y="198" text-anchor="middle" fill="#009900">
+                            <tspan x="335" font-size="22" font-weight="bold" data-field="hole_spacing"></tspan>
+                            <tspan x="335" dy="15" font-size="12" font-style="italic">Spacing</tspan>
+                        </text>
+
+                        
+                        <line x1="130" y1="95" x2="130" y2="120" stroke="#cc6600" stroke-width="1.5"></line>
+                        <line x1="125" y1="95" x2="135" y2="95" stroke="#cc6600" stroke-width="1.5"></line>
+                        <line x1="125" y1="120" x2="135" y2="120" stroke="#cc6600" stroke-width="1.5"></line>
+                        <line x1="100" y1="107" x2="130" y2="107" stroke="#cc6600" stroke-width="1"></line>
+                        <text x="95" y="108" text-anchor="end" fill="#cc6600">
+                            <tspan x="95" font-size="22" font-weight="bold" data-field="distance_from_edge"></tspan>
+                            <tspan x="95" dy="15" font-size="12" font-style="italic">From Edge</tspan>
+                        </text>
+
+                        
+                        <circle cx="420" cy="120" r="9" fill="none" stroke="#9933cc" stroke-width="2" stroke-dasharray="2,1"></circle>
+                        <line x1="429" y1="120" x2="490" y2="120" stroke="#9933cc" stroke-width="1.5"></line>
+                        <line x1="485" y1="115" x2="485" y2="125" stroke="#9933cc" stroke-width="1.5"></line>
+                        <line x1="490" y1="120" x2="510" y2="120" stroke="#9933cc" stroke-width="1"></line>
+                        <text x="515" y="121" fill="#9933cc">
+                            <tspan x="515" font-size="22" font-weight="bold" data-field="hole_size"></tspan>
+                            <tspan x="515" dy="15" font-size="12" font-style="italic">Hole Size</tspan>
+                        </text>
+                    </svg>
                 </div>
-                
-                <div class="col narrow" id="holeDetailsColumn">
-                    <div class="field-group">
-                        <span class="field-label">Hole Size (inches):</span>
-                        <span class="data-field compact" data-field="hole_size" data-placeholder="N/A"></span>
-                    </div>
-                    <div class="field-group">
-                        <span class="field-label">Hole Spacing (OC):</span>
-                        <span class="data-field compact" data-field="hole_spacing" data-placeholder="N/A"></span>
-                    </div>
-                    <div class="field-group">
-                        <span class="field-label">Start From End (OC):</span>
-                        <span class="data-field compact" data-field="start_from_end" data-placeholder="N/A"></span>
-                    </div>
-                    <div class="field-group">
-                        <span class="field-label">Distance From Edge (OC):</span>
-                        <span class="data-field compact" data-field="distance_from_edge" data-placeholder="N/A"></span>
-                    </div>
-                </div>
+                <div style="text-align: center; font-size: 10px; color: #666; margin-top: 5px; font-style: italic;">Measurements are from the center of the hole</div>
             </div>
+
         </div>
-        
-        
-        <div class="profile-section">
-            <div class="field-group" style="text-align: center;">
-                <span class="field-label">Profile Name:</span>
-                <span class="data-field full" data-field="profile_name" data-placeholder="Profile Description"></span>
-            </div>
-            
-            <div class="field-group" style="display: none;">
-                <span class="field-label">DXF Standards:</span>
-                <span class="data-field wide" data-field="dxf_standards" data-placeholder="Imperial (Inches)"></span>
-            </div>
-            
-            <div class="field-group" style="display: none;">
-                <span class="field-label">Task Priority:</span>
-                <span class="data-field wide" data-field="task_priority" data-placeholder="Standard"></span>
-            </div>
-            
-            <div class="drawing-area">
+
+
+        <div class="profile-section" style="border: 1px solid black; padding: 8px; margin-bottom: 5px;">
+            <h3 style="margin: 0 0 5px 0; border-bottom: 1px solid black; padding-bottom: 2px; font-size: 15px;">Profile Drawing</h3>
+            <div class="drawing-area" style="background: white; max-height: 480px;">
                 <div class="drawing-overlay"></div>
             </div>
+            <div style="text-align: center; font-size: 10px; color: #666; margin-top: 5px; font-style: italic;">Blue arrows indicate color side</div>
         </div>
-        
-        
-        <div class="process-section">
-            <div class="process-grid">
-                <div class="process-item">
-                    <span class="process-label">Slit</span>
-                    <span class="process-checkbox" data-field="process_slit"></span>
-                </div>
-                <div class="process-item">
-                    <span class="process-label">Punched</span>
-                    <span class="process-checkbox" data-field="process_punched"></span>
-                </div>
-                <div class="process-item">
-                    <span class="process-label">Bent</span>
-                    <span class="process-checkbox" data-field="process_bent"></span>
-                </div>
-                <div class="process-item">
-                    <span class="process-label">Packaged</span>
-                    <span class="process-checkbox" data-field="process_packaged"></span>
-                </div>
-                <div class="process-item">
-                    <span class="process-label">Shipped</span>
-                    <span class="process-checkbox" data-field="process_shipped"></span>
-                </div>
-                <div class="process-item">
-                    <span class="process-label">Invoiced</span>
-                    <span class="process-checkbox" data-field="process_invoiced"></span>
-                </div>
-            </div>
-        </div>
-        
-        
-        <div class="bottom-grid">
-            <div class="bottom-field">
-                <span class="bottom-label">Shipping Weight:</span>
-                <span class="data-field" data-field="shipping_weight" ></span>
-            </div>
-            <div class="bottom-field">
-                <span class="bottom-label">Dimensions:</span>
-                <span class="data-field" data-field="dimensions"></span>
-            </div>
-            <div class="bottom-field">
-                <span class="bottom-label">Signature:</span>
-                <span class="data-field" data-field="signature"></span>
-            </div>
-        </div>
-    </div>
 
-</body>
-</html>
+
+        <div style="text-align: center; padding: 3px; border-top: 1px solid #ccc; margin-top: 3px; font-size: 10px; color: #666;">
+            <div id="printTimestamp"></div>
+        </div>
+
+    </div>

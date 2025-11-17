@@ -1,8 +1,11 @@
-<t t-foreach="docs" t-as="o">
-    <!-- Set variables for attributes -->
-    <t t-set="metal_type_attr" t-value="False"/>
-    <t t-set="gauge_attr" t-value="False"/>
-    <t t-set="color_attr" t-value="False"/>
+<t t-name="web.basic_layout">
+    <t t-call="web.html_container">
+        <t t-if="not o" t-set="o" t-value="doc"/>
+
+        <!-- Set variables for attributes -->
+        <t t-set="metal_type_attr" t-value="False"/>
+        <t t-set="gauge_attr" t-value="False"/>
+        <t t-set="color_attr" t-value="False"/>
     <t t-foreach="o.product_id.product_template_attribute_value_ids" t-as="attr">
         <t t-if="attr.attribute_id.name == 'Metal Type'">
             <t t-set="metal_type_attr" t-value="attr.name"/>
@@ -60,7 +63,7 @@
             <tr>
                 <td style="width: 50%; padding: 5px 20px;">
                     <span style="font-size: 15px; font-weight: bold; margin-right: 10px;">Customer:</span>
-                    <span style="display: inline-block; min-width: 200px; padding: 3px 8px; border-bottom: 2px solid #333;">_______________</span>
+                    <span style="display: inline-block; min-width: 200px; padding: 3px 8px; border-bottom: 2px solid #333;"><t t-esc="o.procurement_group_id.sale_id.partner_id.name or o.partner_id.name or '_______________'"/></span>
                 </td>
                 <td style="width: 50%; padding: 5px 20px;">
                     <span style="font-size: 15px; font-weight: bold; margin-right: 10px;">Job:</span>
@@ -275,6 +278,7 @@
                 </td>
             </tr>
         </table>
-        
+
     </div>
+    </t>
 </t>
