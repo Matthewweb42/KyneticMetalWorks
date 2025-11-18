@@ -554,6 +554,17 @@
             to { opacity: 1.0; }
         }
 
+        @keyframes slideDown {
+            from {
+                transform: translateY(-100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
         /* Color Picker Styles */
         .color-picker-input {
             background: white;
@@ -1748,6 +1759,12 @@
                         <g id="pieceLabels"></g>
                     </svg>
                     <div id="mode" class="mode-display">Click on the canvas to start drawing your profile</div>
+                    <div id="holeLocationNotification" style="display: none; position: absolute; top: 0; left: 0; right: 0; background: #FFF3E0; color: #E65100; padding: 12px 20px; border-bottom: 2px solid #FFB74D; font-size: 14px; z-index: 1000; animation: slideDown 0.3s ease;">
+                        <div style="display: flex; align-items: center; justify-content: space-between;">
+                            <span style="font-weight: 500;">Click on the line segment where holes are located</span>
+                            <button onclick="cancelHoleSelection()" style="background: transparent; color: #E65100; border: 1px solid #FFB74D; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: 500;">Cancel</button>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -6052,13 +6069,15 @@ ORDERING:
             if (checked) {
                 // Enter hole location selection mode
                 isSelectingHoleLocation = true;
-                alert('Click on the line segment where holes are located');
+                // Show notification banner
+                document.getElementById('holeLocationNotification').style.display = 'block';
                 // Highlight all lines to show they're clickable
                 redrawProfile();
             } else {
                 // Clear hole location when unchecked
                 holeLocationInfo = null;
                 isSelectingHoleLocation = false;
+                document.getElementById('holeLocationNotification').style.display = 'none';
                 redrawProfile();
             }
         }
@@ -6068,7 +6087,22 @@ ORDERING:
             holeLocationInfo = { pieceIndex, lineIndex };
             // Exit selection mode
             isSelectingHoleLocation = false;
+            // Hide notification
+            document.getElementById('holeLocationNotification').style.display = 'none';
             // Redraw to show slash marks
+            redrawProfile();
+        }
+
+        function cancelHoleSelection() {
+            // Uncheck the hole checkbox
+            document.getElementById('hasHoles').checked = false;
+            // Clear selection mode
+            isSelectingHoleLocation = false;
+            holeLocationInfo = null;
+            // Hide notification and hole fields
+            document.getElementById('holeLocationNotification').style.display = 'none';
+            document.getElementById('holeFields').style.display = 'none';
+            // Redraw
             redrawProfile();
         }
 
@@ -6266,8 +6300,10 @@ ORDERING:
                 }
             });
 
-            // Add piece label - find the topmost, leftmost point for label placement
-            if (piecePoints.length > 0) {
+            // Add piece label only if there are multiple pieces
+            // (pieces.length > 0 means at least one completed piece exists, indicating multi-piece mode)
+            const totalPieces = pieces.length + (points.length > 0 ? 1 : 0);
+            if (piecePoints.length > 0 && totalPieces > 1) {
                 let minY = Infinity;
                 let minX = Infinity;
                 piecePoints.forEach(point => {
