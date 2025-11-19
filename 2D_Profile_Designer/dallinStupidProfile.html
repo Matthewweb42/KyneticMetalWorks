@@ -122,7 +122,11 @@
             
             // Clone and add the SVG
             const svgClone = originalSvg.cloneNode(true);
-            
+
+            // Remove clickable backgrounds from clone (they're for editing only)
+            const clickableBgs = svgClone.querySelectorAll('.clickable-bg');
+            clickableBgs.forEach(bg => bg.remove());
+
             // Scale the viewBox to fit content properly
             const bbox = originalSvg.getBBox ? originalSvg.getBBox() : null;
             if (bbox && bbox.width > 0 && bbox.height > 0) {
@@ -130,13 +134,13 @@
                 svgClone.setAttribute('viewBox', `${bbox.x - padding} ${bbox.y - padding} ${bbox.width + padding * 2} ${bbox.height + padding * 2}`);
                 svgClone.setAttribute('preserveAspectRatio', 'xMidYMid meet');
             }
-            
+
             // Center the SVG within the drawing area
             svgClone.style.width = '95%';
             svgClone.style.height = '95%';
             svgClone.style.display = 'block';
             svgClone.style.margin = '2.5% auto';
-            svgClone.style.border = '1px solid #ccc';
+            svgClone.style.border = 'none';
             
             drawingArea.appendChild(svgClone);
         }
@@ -7829,7 +7833,7 @@ function loadJsPDF() {
 
         <div class="profile-section" style="border: 1px solid black; padding: 8px; margin-bottom: 5px;">
             <h3 style="margin: 0 0 5px 0; border-bottom: 1px solid black; padding-bottom: 2px; font-size: 15px;">Profile Drawing</h3>
-            <div class="drawing-area" style="background: white; max-height: 480px;">
+            <div class="drawing-area" style="background: white; max-height: 480px; border: none;">
                 <div class="drawing-overlay"></div>
             </div>
             <div style="text-align: center; font-size: 10px; color: #666; margin-top: 5px; font-style: italic;">Blue arrows indicate color side</div>
