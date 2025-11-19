@@ -5,6 +5,7 @@ import { Profile } from './core/Profile.js';
 import { CanvasManager } from './canvas/CanvasManager.js';
 import { LineTool } from './tools/LineTool.js';
 import { HemTool } from './tools/HemTool.js';
+import { SelectTool } from './tools/SelectTool.js';
 import { Point } from './core/Point.js';
 
 export class Editor {
@@ -39,12 +40,13 @@ export class Editor {
      * Initialize all tools
      */
     initializeTools() {
+        this.tools.select = new SelectTool(this);
         this.tools.line = new LineTool(this);
         this.tools.hem = new HemTool(this);
         // More tools will be added here
 
-        // Set default tool
-        this.setTool('line');
+        // Set default tool to select
+        this.setTool('select');
     }
 
     /**
@@ -235,6 +237,9 @@ export class Editor {
 
         // Tool-specific shortcuts
         switch (event.key.toLowerCase()) {
+            case 'v':
+                this.setTool('select');
+                break;
             case 'l':
                 this.setTool('line');
                 break;

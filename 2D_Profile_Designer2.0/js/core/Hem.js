@@ -30,7 +30,7 @@ export class Hem {
     }
 
     /**
-     * Draw the hem
+     * Draw the hem with a curved fold back
      */
     draw(ctx, transform, isSelected = false) {
         const screenStart = transform.worldToScreen(this.point);
@@ -39,12 +39,29 @@ export class Hem {
 
         ctx.save();
 
-        // Draw hem line (continuation of profile)
+        // Calculate control point for the curve (180° fold)
+        // The control point is perpendicular to the hem direction
+        const midX = (screenStart.x + screenEnd.x) / 2;
+        const midY = (screenStart.y + screenEnd.y) / 2;
+
+        // Vector perpendicular to the hem direction
+        const dx = screenEnd.x - screenStart.x;
+        const dy = screenEnd.y - screenStart.y;
+        const perpX = -dy;
+        const perpY = dx;
+        const perpLen = Math.sqrt(perpX * perpX + perpY * perpY);
+
+        // Control point offset (creates the curve)
+        const curveAmount = 0.4; // Adjust this to control curve tightness
+        const controlX = midX + (perpX / perpLen) * perpLen * curveAmount;
+        const controlY = midY + (perpY / perpLen) * perpLen * curveAmount;
+
+        // Draw curved hem line
         ctx.strokeStyle = isSelected ? '#ff6600' : '#27486D';
         ctx.lineWidth = isSelected ? 3 : 2;
         ctx.beginPath();
         ctx.moveTo(screenStart.x, screenStart.y);
-        ctx.lineTo(screenEnd.x, screenEnd.y);
+        ctx.quadraticCurveTo(controlX, controlY, screenEnd.x, screenEnd.y);
         ctx.stroke();
 
         // Draw circle at hem endpoint to indicate fold

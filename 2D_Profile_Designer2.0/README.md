@@ -4,11 +4,14 @@ Professional 2D CAD tool for sheet metal profile design, built with vanilla Java
 
 ## 🚀 Features
 
-### Current Features (v0.2 - Simplified Workflow)
+### Current Features (v0.3 - Select Mode with Hem Buttons)
+- ✅ **Select Tool** - Default mode with hem buttons at all open endpoints
+  - Clickable +/- buttons appear at open endpoints on the canvas
+  - Click + to add a hem, click - to remove hem
+  - No need to switch tools - always visible in select mode!
 - ✅ **Chain Mode Line Tool** - Click to create connected lines, each endpoint becomes the next startpoint
-- ✅ **Hem Tool** - Add 180° fold back at open endpoints (5mm fixed length)
-  - Click on any open endpoint to toggle hem on/off
-  - Visual indicator: Circle at hem endpoint
+- ✅ **Curved Hem Display** - Hems now show as curved fold backs (180° with 5mm fixed length)
+  - Visual: Smooth curved line with circle at endpoint
 - ✅ **Grid System** - Major and minor grid lines with customizable spacing
 - ✅ **Snap to Grid** - Precise point placement
 - ✅ **Pan & Zoom** - Navigate large drawings easily
@@ -22,7 +25,7 @@ Professional 2D CAD tool for sheet metal profile design, built with vanilla Java
 - ✅ **Open-ended Profiles Only** - No auto-closing, profiles are always open
 
 ### Coming Soon
-- 🔄 Selection Tool with delete
+- 🔄 Selection and deletion of segments
 - 🔄 DXF Export
 - 🔄 SVG Export
 - 🔄 Flat Pattern Calculation
@@ -63,20 +66,21 @@ Professional 2D CAD tool for sheet metal profile design, built with vanilla Java
    - Simply open `index.html` in a modern web browser
    - No build process or server required!
 
-2. **Drawing Lines (Chain Mode)**
+2. **Adding Hems (Select Mode)**
+   - The app starts in Select mode (press `V` to switch back)
+   - After drawing lines, you'll see +/- buttons at open endpoints
+   - Click the + button to add a hem
+   - Click the - button to remove a hem
+   - Hems show as curved fold backs with circle endpoints
+
+3. **Drawing Lines (Chain Mode)**
    - Click the "Line" tool in the left palette (or press `L`)
    - Click once to set the start point
    - Move mouse to see live preview
    - Click again to add the next point - the line continues from this point!
    - Keep clicking to add more connected line segments
    - Press `ESC` to finish the chain (does NOT close back to start)
-
-3. **Adding Hems**
-   - Draw some lines first to create open endpoints
-   - Click the "Hem" tool in the left palette (or press `H`)
-   - Click on any open endpoint to add/remove a hem
-   - Hems are 180° fold backs with 5mm fixed length
-   - Visual: Circle marker at the hem endpoint
+   - Switch back to Select mode (press `V`) to add hems
 
 4. **Navigation**
    - **Pan**: Middle mouse drag OR Ctrl + Left mouse drag
@@ -93,8 +97,9 @@ Professional 2D CAD tool for sheet metal profile design, built with vanilla Java
 
 | Key | Action |
 |-----|--------|
+| `V` | Activate Select Tool (shows hem buttons) |
 | `L` | Activate Line Tool |
-| `H` | Activate Hem Tool |
+| `H` | Activate Hem Tool (manual mode) |
 | `G` | Toggle Grid |
 | `Shift+G` | Toggle Snap |
 | `F` | Fit to View |
