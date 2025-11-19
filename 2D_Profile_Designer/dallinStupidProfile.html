@@ -1773,16 +1773,22 @@
         <div class="controls-section">
             <div class="control-row">
                 <div class="side-indicator">
-                    <label class="side-toggle-label" for="sideToggle">
-                        <span>Colored Side:</span>
-                        <div class="side-toggle">
-                            <input type="checkbox" id="sideToggle" onchange="toggleCoatedSide()">
-                            <div class="side-toggle-slider">
-                                <span class="side-label left">A</span>
-                                <span class="side-label right">B</span>
+                    <div id="coloredSideContainer">
+                        <div style="margin-bottom: 5px;">Colored Side:</div>
+                        <!-- Single piece toggle (shown when no pieces exist) -->
+                        <label class="side-toggle-label" for="sideToggle" id="singlePieceToggle">
+                            <div class="side-toggle">
+                                <input type="checkbox" id="sideToggle" onchange="toggleCoatedSide()">
+                                <div class="side-toggle-slider">
+                                    <span class="side-label left">A</span>
+                                    <span class="side-label right">B</span>
+                                </div>
                             </div>
+                        </label>
+                        <!-- Per-piece colored side controls (shown when pieces exist) -->
+                        <div id="perPieceCoatedSideControls" style="display: none;">
                         </div>
-                    </label>
+                    </div>
                     <div id="hashSideInfo" class="hash-info">Arrow = Color side</div>
                 </div>
                 
@@ -2545,7 +2551,9 @@ function loadHtml2Canvas() {
         function saveState(actionType, actionData = {}) {
             const state = {
                 points: JSON.parse(JSON.stringify(points)), // Deep copy
+                pieces: JSON.parse(JSON.stringify(pieces)), // Deep copy pieces including coatedSideRight
                 holeLocationInfo: holeLocationInfo ? { ...holeLocationInfo } : null, // Save hole location
+                coatedSideRight: coatedSideRight, // Save current piece's colored side
                 actionType: actionType,
                 actionData: actionData,
                 timestamp: Date.now()
@@ -2573,8 +2581,18 @@ function loadHtml2Canvas() {
             // Restore the points array
             points = JSON.parse(JSON.stringify(lastState.points));
 
+            // Restore pieces array including per-piece coatedSideRight
+            pieces = JSON.parse(JSON.stringify(lastState.pieces));
+
             // Restore hole location info
             holeLocationInfo = lastState.holeLocationInfo ? { ...lastState.holeLocationInfo } : null;
+
+            // Restore current piece's colored side
+            coatedSideRight = lastState.coatedSideRight;
+
+            // Update UI controls
+            const sideToggle = document.getElementById('sideToggle');
+            if (sideToggle) sideToggle.checked = coatedSideRight;
 
             // Redraw the profile
             redrawProfile();
@@ -2582,6 +2600,8 @@ function loadHtml2Canvas() {
             // Update undo button state
             updateUndoButton();
 
+            // Update per-piece colored side controls
+            updateCoatedSideControls();
 
         }
 
@@ -3685,6 +3705,8 @@ ORDERING:
             }
             // Update "Add Piece" button visibility
             updateAddPieceButtonVisibility();
+            // Update colored side controls when points reach 2 (shows current piece toggle)
+            updateCoatedSideControls();
         }
 
         function addNewPiece() {
@@ -3698,7 +3720,8 @@ ORDERING:
             pieces.push({
                 points: [...points], // Copy points array
                 hemVertexIndex: window.hemVertexIndex,
-                hemInfo: window.hemInfo ? {...window.hemInfo} : null
+                hemInfo: window.hemInfo ? {...window.hemInfo} : null,
+                coatedSideRight: coatedSideRight // Save colored side state
             });
 
             // Clear current points for new piece
@@ -3719,6 +3742,9 @@ ORDERING:
 
             // Hide "Add Piece" button until new piece has 2+ points
             updateAddPieceButtonVisibility();
+
+            // Update per-piece colored side controls
+            updateCoatedSideControls();
 
             // Switch to Create Mode to draw the new piece
             setMode('create');
@@ -4786,13 +4812,10 @@ ORDERING:
             line.setAttribute('data-index', index);
             linesGroup.appendChild(line);
 
-            // Add coating direction arrow
-            drawCoatingArrow(start, end);
-
             return line; // Return line element for event handlers
         }
 
-        function drawCoatingArrow(start, end) {
+        function drawCoatingArrow(start, end, pieceCoatedSide) {
             // Draw a single chevron arrow at the midpoint of the line
             const dx = end.x - start.x;
             const dy = end.y - start.y;
@@ -4818,8 +4841,8 @@ ORDERING:
             const arrowOffset = 3; // Distance from line (reduced from 10px to prevent label overlap)
             const arrowDepth = 6; // How far the chevron point extends
 
-            // Direction to offset arrow (based on coated side)
-            const direction = coatedSideRight ? 1 : -1;
+            // Direction to offset arrow (based on piece-specific coated side)
+            const direction = pieceCoatedSide ? 1 : -1;
             const offsetX = perpX * arrowOffset * direction;
             const offsetY = perpY * arrowOffset * direction;
 
@@ -6193,14 +6216,143 @@ ORDERING:
         }
 
         function toggleCoatedSide() {
-            const toggle = document.getElementById('sideToggle');
-            coatedSideRight = toggle.checked;
+            // Check which toggle triggered this (single or current piece)
+            const singleToggle = document.getElementById('singlePieceToggle');
+            const currentToggle = document.getElementById('currentPieceSideToggle');
+
+            // If single toggle is visible, use it
+            if (singleToggle && singleToggle.style.display !== 'none') {
+                const toggle = document.getElementById('sideToggle');
+                if (toggle) coatedSideRight = toggle.checked;
+            } else if (currentToggle) {
+                // Otherwise use the current piece toggle from per-piece controls
+                coatedSideRight = currentToggle.checked;
+            }
 
             redrawProfile();
+            updateCoatedSideControls();
 
             const sideText = coatedSideRight ? 'Side B Colored' : 'Side A Colored';
             const currentMode = isEditMode ? 'Edit Mode' : 'Create Mode';
             document.getElementById('mode').textContent = `${currentMode} - ${sideText}`;
+        }
+
+        function togglePieceCoatedSide(pieceIndex) {
+            // Toggle the coated side for a specific piece
+            if (pieceIndex >= 0 && pieceIndex < pieces.length) {
+                pieces[pieceIndex].coatedSideRight = !pieces[pieceIndex].coatedSideRight;
+                redrawProfile();
+                updateCoatedSideControls();
+            }
+        }
+
+        function updateCoatedSideControls() {
+            const container = document.getElementById('perPieceCoatedSideControls');
+            const singleToggle = document.getElementById('singlePieceToggle');
+            if (!container) return;
+
+            // Determine total number of pieces (completed + current)
+            const totalPieces = pieces.length + (points.length >= 2 ? 1 : 0);
+
+            // If no pieces or only one piece being worked on, show single toggle
+            if (totalPieces <= 1) {
+                container.style.display = 'none';
+                if (singleToggle) singleToggle.style.display = 'flex';
+                return;
+            }
+
+            // Hide single toggle and show per-piece controls
+            if (singleToggle) singleToggle.style.display = 'none';
+            container.style.display = 'block';
+
+            // Clear existing controls
+            container.innerHTML = '';
+
+            // Create toggle for each completed piece
+            pieces.forEach((piece, index) => {
+                const pieceControl = document.createElement('label');
+                pieceControl.className = 'side-toggle-label';
+                pieceControl.style.marginBottom = '5px';
+                pieceControl.style.display = 'flex';
+                pieceControl.style.alignItems = 'center';
+
+                const labelText = document.createElement('span');
+                labelText.textContent = `Piece ${index + 1}:`;
+                labelText.style.minWidth = '70px';
+                labelText.style.display = 'inline-block';
+
+                const toggleWrapper = document.createElement('div');
+                toggleWrapper.className = 'side-toggle';
+
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.id = `pieceSideToggle${index}`;
+                checkbox.checked = piece.coatedSideRight || false;
+                checkbox.onchange = () => togglePieceCoatedSide(index);
+
+                const slider = document.createElement('div');
+                slider.className = 'side-toggle-slider';
+
+                const leftLabel = document.createElement('span');
+                leftLabel.className = 'side-label left';
+                leftLabel.textContent = 'A';
+
+                const rightLabel = document.createElement('span');
+                rightLabel.className = 'side-label right';
+                rightLabel.textContent = 'B';
+
+                slider.appendChild(leftLabel);
+                slider.appendChild(rightLabel);
+                toggleWrapper.appendChild(checkbox);
+                toggleWrapper.appendChild(slider);
+
+                pieceControl.appendChild(labelText);
+                pieceControl.appendChild(toggleWrapper);
+                container.appendChild(pieceControl);
+            });
+
+            // Add toggle for current piece being worked on
+            if (points.length >= 2) {
+                const pieceControl = document.createElement('label');
+                pieceControl.className = 'side-toggle-label';
+                pieceControl.style.marginBottom = '5px';
+                pieceControl.style.display = 'flex';
+                pieceControl.style.alignItems = 'center';
+
+                const labelText = document.createElement('span');
+                labelText.textContent = `Piece ${pieces.length + 1}:`;
+                labelText.style.minWidth = '70px';
+                labelText.style.display = 'inline-block';
+
+                const toggleWrapper = document.createElement('div');
+                toggleWrapper.className = 'side-toggle';
+
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.id = `currentPieceSideToggle`;
+                checkbox.checked = coatedSideRight;
+                checkbox.onchange = toggleCoatedSide;
+
+                const slider = document.createElement('div');
+                slider.className = 'side-toggle-slider';
+
+                const leftLabel = document.createElement('span');
+                leftLabel.className = 'side-label left';
+                leftLabel.textContent = 'A';
+
+                const rightLabel = document.createElement('span');
+                rightLabel.className = 'side-label right';
+                rightLabel.textContent = 'B';
+
+                slider.appendChild(leftLabel);
+                slider.appendChild(rightLabel);
+                toggleWrapper.appendChild(checkbox);
+                toggleWrapper.appendChild(slider);
+
+                pieceControl.appendChild(labelText);
+                pieceControl.appendChild(toggleWrapper);
+                container.appendChild(pieceControl);
+            }
         }
 
         function setMode(mode) {
@@ -6327,6 +6479,11 @@ ORDERING:
         function drawPiece(piece, pieceIndex) {
             const piecePoints = piece.points;
 
+            // Determine this piece's coated side (use piece's stored value or current global value)
+            const pieceCoatedSide = piece.coatedSideRight !== undefined
+                ? piece.coatedSideRight
+                : coatedSideRight;
+
             // Draw points for this piece
             piecePoints.forEach((point, index) => {
                 drawPoint(point, index);
@@ -6335,6 +6492,9 @@ ORDERING:
             // Draw lines for this piece
             for (let i = 0; i < piecePoints.length - 1; i++) {
                 const line = drawLine(piecePoints[i], piecePoints[i + 1], i);
+
+                // Draw coating arrow with piece-specific coated side
+                drawCoatingArrow(piecePoints[i], piecePoints[i + 1], pieceCoatedSide);
 
                 // Add click handler for hole location selection
                 if (isSelectingHoleLocation) {
