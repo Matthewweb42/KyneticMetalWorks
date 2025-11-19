@@ -2099,6 +2099,7 @@ function loadHtml2Canvas() {
         let isEditMode = false;
         let isDragging = false;
         let dragPointIndex = -1;
+        let dragPieceIndex = -1; // Track which piece is being dragged (-1 = current piece)
         let currentEditElement = null;
         let coatedSideRight = false; // false = left/top coated, true = right/bottom coated
         let points = [];
@@ -2544,18 +2545,19 @@ function loadHtml2Canvas() {
         function saveState(actionType, actionData = {}) {
             const state = {
                 points: JSON.parse(JSON.stringify(points)), // Deep copy
+                holeLocationInfo: holeLocationInfo ? { ...holeLocationInfo } : null, // Save hole location
                 actionType: actionType,
                 actionData: actionData,
                 timestamp: Date.now()
             };
-            
+
             undoHistory.push(state);
-            
+
             // Limit history size
             if (undoHistory.length > MAX_UNDO_HISTORY) {
                 undoHistory.shift();
             }
-            
+
             // Update undo button state
             updateUndoButton();
         }
@@ -2564,19 +2566,22 @@ function loadHtml2Canvas() {
             if (undoHistory.length === 0) {
                 return;
             }
-            
+
             // Get the last state
             const lastState = undoHistory.pop();
-            
+
             // Restore the points array
             points = JSON.parse(JSON.stringify(lastState.points));
-            
+
+            // Restore hole location info
+            holeLocationInfo = lastState.holeLocationInfo ? { ...lastState.holeLocationInfo } : null;
+
             // Redraw the profile
             redrawProfile();
-            
+
             // Update undo button state
             updateUndoButton();
-            
+
 
         }
 
@@ -3399,27 +3404,31 @@ ORDERING:
             if (coordsElement) {
                 coordsElement.textContent = `Mouse: (${formatLength(dxfCoords.x).replace('"', '')}, ${formatLength(dxfCoords.y).replace('"', '')})`;
             }
-            
+
             // Handle dragging in edit mode
             if (isDragging && dragPointIndex >= 0) {
+                // Determine which points array to modify
+                const targetPoints = dragPieceIndex >= 0 ? pieces[dragPieceIndex].points : points;
+                const targetHemVertexIndex = dragPieceIndex >= 0 ? pieces[dragPieceIndex].hemVertexIndex : window.hemVertexIndex;
+                const targetHemInfo = dragPieceIndex >= 0 ? pieces[dragPieceIndex].hemInfo : window.hemInfo;
+
                 // Save old position
-                const oldPoint = { ...points[dragPointIndex] };
-                points[dragPointIndex] = { ...points[dragPointIndex], x: transformed.x, y: transformed.y };
+                const oldPoint = { ...targetPoints[dragPointIndex] };
+                targetPoints[dragPointIndex] = { ...targetPoints[dragPointIndex], x: transformed.x, y: transformed.y };
 
                 // If dragging the hem's previous vertex, update the hem endpoint to keep length and angle fixed
-                if (typeof window.hemVertexIndex !== 'undefined' && dragPointIndex === window.hemVertexIndex) {
+                if (typeof targetHemVertexIndex !== 'undefined' && dragPointIndex === targetHemVertexIndex) {
                     // Calculate the new endpoint for the hem line
-                    const hemInfo = window.hemInfo;
-                    if (hemInfo && points.length > hemInfo.index + 1) {
+                    if (targetHemInfo && targetPoints.length > targetHemInfo.index + 1) {
                         // Get the previous vertex (hem base)
-                        const base = points[hemInfo.index];
+                        const base = targetPoints[targetHemInfo.index];
                         // Get the original direction and length
-                        const origEnd = points[hemInfo.index + 1];
+                        const origEnd = targetPoints[targetHemInfo.index + 1];
                         const dx = origEnd.x - oldPoint.x;
                         const dy = origEnd.y - oldPoint.y;
                         const length = Math.sqrt(dx * dx + dy * dy);
                         // Use the hem length from hemInfo if available
-                        const hemLength = hemInfo.length || length;
+                        const hemLength = targetHemInfo.length || length;
                         // Calculate the angle
                         const angle = Math.atan2(dy, dx);
                         // Calculate new endpoint using baseScale for consistent measurements
@@ -3427,17 +3436,17 @@ ORDERING:
                             x: base.x + Math.cos(angle) * hemLength * baseScale,
                             y: base.y + Math.sin(angle) * hemLength * baseScale
                         };
-                        points[hemInfo.index + 1] = newEnd;
+                        targetPoints[targetHemInfo.index + 1] = newEnd;
                     }
                 }
 
                 // Check for line crossing after move
                 let crossed = false;
-                for (let i = 0; i < points.length - 1; i++) {
-                    for (let j = 0; j < points.length - 1; j++) {
+                for (let i = 0; i < targetPoints.length - 1; i++) {
+                    for (let j = 0; j < targetPoints.length - 1; j++) {
                         if (Math.abs(i - j) <= 1) continue; // skip adjacent lines
-                        const lineA = { start: points[i], end: points[i + 1] };
-                        const lineB = { start: points[j], end: points[j + 1] };
+                        const lineA = { start: targetPoints[i], end: targetPoints[i + 1] };
+                        const lineB = { start: targetPoints[j], end: targetPoints[j + 1] };
                         if (doLinesIntersect(lineA.start, lineA.end, lineB.start, lineB.end)) {
                             crossed = true;
                             break;
@@ -3446,7 +3455,7 @@ ORDERING:
                     if (crossed) break;
                 }
                 if (crossed) {
-                    points[dragPointIndex] = oldPoint;
+                    targetPoints[dragPointIndex] = oldPoint;
                     showLineCrossPopup();
                     redrawProfile();
                     return;
@@ -3464,17 +3473,50 @@ ORDERING:
 
         function handleMouseDown(e) {
             if (!isEditMode) return;
-            
+
             const rect = canvas.getBoundingClientRect();
             const screenX = e.clientX - rect.left;
             const screenY = e.clientY - rect.top;
-            
+
             // Transform screen coordinates to account for zoom and pan
             const transformed = screenToTransformedCoordinates(screenX, screenY);
             const x = transformed.x;
             const y = transformed.y;
-            
-            // Check if clicking on a point or hem vertex
+
+            // First check all completed pieces
+            for (let pieceIdx = 0; pieceIdx < pieces.length; pieceIdx++) {
+                const piece = pieces[pieceIdx];
+                for (let i = 0; i < piece.points.length; i++) {
+                    const point = piece.points[i];
+                    if (point.isHem) {
+                        // Check if click is inside hem square
+                        if (x >= point.x - 8 && x <= point.x + 8 && y >= point.y - 8 && y <= point.y + 8) {
+                            isDragging = true;
+                            dragPointIndex = i;
+                            dragPieceIndex = pieceIdx;
+                            const allPoints = document.querySelectorAll('.point');
+                            allPoints.forEach(pt => {
+                                if (parseInt(pt.getAttribute('data-index')) === i) pt.classList.add('dragging');
+                            });
+                            return;
+                        }
+                    } else {
+                        const distance = Math.sqrt((x - point.x) ** 2 + (y - point.y) ** 2);
+                        if (distance <= 12) {
+                            isDragging = true;
+                            dragPointIndex = i;
+                            dragPieceIndex = pieceIdx;
+                            const allPoints = document.querySelectorAll('.point');
+                            allPoints.forEach(pt => {
+                                if (parseInt(pt.getAttribute('data-index')) === i) pt.classList.add('dragging');
+                            });
+                            return;
+                        }
+                    }
+                }
+            }
+
+            // Then check current piece being worked on
             for (let i = 0; i < points.length; i++) {
                 const point = points[i];
                 if (point.isHem) {
@@ -3482,6 +3524,7 @@ ORDERING:
                     if (x >= point.x - 8 && x <= point.x + 8 && y >= point.y - 8 && y <= point.y + 8) {
                         isDragging = true;
                         dragPointIndex = i;
+                        dragPieceIndex = -1; // -1 indicates current piece
                         const allPoints = document.querySelectorAll('.point');
                         allPoints.forEach(pt => {
                             if (parseInt(pt.getAttribute('data-index')) === i) pt.classList.add('dragging');
@@ -3493,6 +3536,7 @@ ORDERING:
                     if (distance <= 12) {
                         isDragging = true;
                         dragPointIndex = i;
+                        dragPieceIndex = -1; // -1 indicates current piece
                         const allPoints = document.querySelectorAll('.point');
                         allPoints.forEach(pt => {
                             if (parseInt(pt.getAttribute('data-index')) === i) pt.classList.add('dragging');
@@ -3523,6 +3567,7 @@ ORDERING:
                 allPoints.forEach(point => point.classList.remove('dragging'));
 
                 dragPointIndex = -1;
+                dragPieceIndex = -1;
                 redrawProfile();
             }
         }
@@ -3674,6 +3719,9 @@ ORDERING:
 
             // Hide "Add Piece" button until new piece has 2+ points
             updateAddPieceButtonVisibility();
+
+            // Switch to Create Mode to draw the new piece
+            setMode('create');
         }
 
         function updateAddPieceButtonVisibility() {
@@ -6067,12 +6115,13 @@ ORDERING:
             document.getElementById('holeFields').style.display = checked ? 'block' : 'none';
 
             if (checked) {
-                // Enter hole location selection mode
-                isSelectingHoleLocation = true;
-                // Show notification banner
-                document.getElementById('holeLocationNotification').style.display = 'block';
-                // Highlight all lines to show they're clickable
-                redrawProfile();
+                // Only enter hole location selection mode if in edit mode
+                if (isEditMode) {
+                    isSelectingHoleLocation = true;
+                    document.getElementById('holeLocationNotification').style.display = 'block';
+                    redrawProfile();
+                }
+                // If not in edit mode, just show the fields but don't prompt for line selection yet
             } else {
                 // Clear hole location when unchecked
                 holeLocationInfo = null;
@@ -6083,6 +6132,8 @@ ORDERING:
         }
 
         function selectHoleLocation(pieceIndex, lineIndex) {
+            // Save state for undo
+            saveState('selectHoleLocation', { pieceIndex, lineIndex });
             // Store the selected location
             holeLocationInfo = { pieceIndex, lineIndex };
             // Exit selection mode
@@ -6162,14 +6213,20 @@ ORDERING:
                 isDrawing = true;
                 isDragging = false;
                 dragPointIndex = -1;
-                
+
+                // Cancel hole selection when leaving edit mode
+                if (isSelectingHoleLocation) {
+                    isSelectingHoleLocation = false;
+                    document.getElementById('holeLocationNotification').style.display = 'none';
+                }
+
                 createBtn.classList.add('active');
                 editBtn.classList.remove('active');
                 canvasContainer.classList.remove('edit-mode');
-                
+
                 const sideText = coatedSideRight ? 'Side B Colored' : 'Side A Colored';
                 document.getElementById('mode').textContent = `Create Mode - ${sideText}: Click on canvas to add points`;
-                
+
                 closeEditPopup();
                 redrawProfile();
                 
@@ -6179,17 +6236,24 @@ ORDERING:
                     setMode('create');
                     return;
                 }
-                
+
                 isEditMode = true;
                 isDrawing = false;
-                
+
                 createBtn.classList.remove('active');
                 editBtn.classList.add('active');
                 canvasContainer.classList.add('edit-mode');
-                
+
+                // Check if holes checkbox is checked and trigger line selection
+                const hasHolesCheckbox = document.getElementById('hasHoles');
+                if (hasHolesCheckbox && hasHolesCheckbox.checked) {
+                    isSelectingHoleLocation = true;
+                    document.getElementById('holeLocationNotification').style.display = 'block';
+                }
+
                 const sideText = coatedSideRight ? 'Side B Colored' : 'Side A Colored';
                 document.getElementById('mode').textContent = `Edit Mode - ${sideText}: Click measurements to edit, drag vertices to move`;
-                
+
                 redrawProfile();
             }
         }
