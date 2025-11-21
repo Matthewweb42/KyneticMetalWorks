@@ -1,0 +1,91 @@
+<t t-name="web.basic_layout">
+    <t t-call="web.html_container">
+        <t t-if="not o" t-set="o" t-value="doc"/>
+
+    <!-- Main container - increased padding and sizing -->
+    <div style="position: absolute; top: 0; left: 0; right: 0; width: 100%; height: 100%; padding: 10mm; box-sizing: border-box; font-family: Arial, sans-serif; font-size: 14px; line-height: 1.3;">
+
+        <!-- Header - Increased sizes -->
+        <table style="width: 100%; border-bottom: 3px solid black; margin: 0 0 8px 0; border-collapse: collapse;">
+            <tr>
+                <td style="width: 140px; vertical-align: middle; padding: 10px 20px;">
+                    <div style="width: 120px; height: 80px; background-color: #2c5f5f; color: white; text-align: center; padding-top: 12px; font-weight: bold;">
+                        <div style="font-size: 20px; margin-bottom: 3px;">KYNETIC</div>
+                        <div style="margin-bottom: 3px;">
+                            <span style="display: inline-block; width: 8px; height: 8px; background-color: white; border-radius: 50%; margin: 0 2px;"></span>
+                            <span style="display: inline-block; width: 8px; height: 8px; background-color: white; border-radius: 50%; margin: 0 2px;"></span>
+                            <span style="display: inline-block; width: 8px; height: 8px; background-color: white; border-radius: 50%; margin: 0 2px;"></span>
+                            <span style="display: inline-block; width: 8px; height: 8px; background-color: white; border-radius: 50%; margin: 0 2px;"></span>
+                            <span style="display: inline-block; width: 8px; height: 8px; background-color: white; border-radius: 50%; margin: 0 2px;"></span>
+                            <span style="display: inline-block; width: 8px; height: 8px; background-color: white; border-radius: 50%; margin: 0 2px;"></span>
+                        </div>
+                        <div style="font-size: 12px; letter-spacing: 1.5px;">metalworks</div>
+                    </div>
+                </td>
+                <td style="text-align: center; vertical-align: middle; padding: 10px;">
+                    <div style="font-size: 36px; font-weight: bold;">ORDER SHEET - DEBUG</div>
+                </td>
+                <td style="width: 280px; vertical-align: middle; padding: 10px 20px;">
+                    <div style="margin-bottom: 8px;">
+                        <span style="font-size: 14px; font-weight: bold; display: inline-block; width: 110px;">Date Ordered:</span>
+                        <span style="display: inline-block; width: 140px; padding: 3px 8px; border-bottom: 2px solid #333;"></span>
+                    </div>
+                </td>
+            </tr>
+        </table>
+
+        <!-- DEBUG INFO SECTION -->
+        <div style="padding: 20px; background: #ffffcc; margin: 20px; border: 3px solid #ff0000; font-size: 14px;">
+            <h2 style="color: #ff0000;">DEBUG INFORMATION</h2>
+
+            <div style="margin: 10px 0;"><strong>Manufacturing Order ID:</strong> <t t-esc="o.id"/></div>
+            <div style="margin: 10px 0;"><strong>Product Variant ID:</strong> <t t-esc="o.product_id.id"/></div>
+            <div style="margin: 10px 0;"><strong>Product Variant Name:</strong> <t t-esc="o.product_id.name"/></div>
+
+            <hr/>
+
+            <div style="margin: 10px 0;"><strong>Has product_tmpl_id:</strong> <t t-esc="bool(o.product_id.product_tmpl_id)"/></div>
+
+            <t t-if="o.product_id.product_tmpl_id">
+                <div style="margin: 10px 0;"><strong>Product Template ID:</strong> <t t-esc="o.product_id.product_tmpl_id.id"/></div>
+                <div style="margin: 10px 0;"><strong>Product Template Name:</strong> <t t-esc="o.product_id.product_tmpl_id.name"/></div>
+
+                <hr/>
+
+                <div style="margin: 10px 0;"><strong>x_studio_product_spec exists:</strong> <t t-esc="bool(o.product_id.product_tmpl_id.x_studio_product_spec)"/></div>
+
+                <t t-if="o.product_id.product_tmpl_id.x_studio_product_spec">
+                    <div style="margin: 10px 0; color: green;"><strong>✓ Field has data!</strong></div>
+                </t>
+                <t t-else="">
+                    <div style="margin: 10px 0; color: red;"><strong>✗ Field is empty or doesn't exist</strong></div>
+                </t>
+
+                <hr/>
+
+                <div style="margin: 10px 0;"><strong>Generated URL:</strong> /web/image/product.template/<t t-esc="o.product_id.product_tmpl_id.id"/>/x_studio_product_spec</div>
+            </t>
+            <t t-else="">
+                <div style="margin: 10px 0; color: red;"><strong>✗ product_tmpl_id NOT FOUND</strong></div>
+            </t>
+        </div>
+
+        <!-- Test Image Display -->
+        <div style="padding: 0 20px; margin-top: 50px;">
+            <h3>Image Test Area:</h3>
+            <div style="height: 400px; background-image: radial-gradient(circle, #666666 1.5px, transparent 1.5px); background-size: 30px 30px; border: 2px solid #999; margin: 0; text-align: center; display: flex; align-items: center; justify-content: center;">
+                <t t-set="product_template" t-value="o.product_id.product_tmpl_id"/>
+                <t t-if="product_template and product_template.x_studio_product_spec">
+                    <img t-attf-src="/web/image/product.template/{{product_template.id}}/x_studio_product_spec"
+                         style="max-width: 95%; max-height: 95%;"
+                         alt="Product Specification"/>
+                </t>
+                <t t-else="">
+                    <div style="color: #999; font-size: 18px;">No product specification image available</div>
+                </t>
+            </div>
+        </div>
+
+    </div>
+    </t>
+</t>
