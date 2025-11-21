@@ -2685,7 +2685,7 @@ function loadHtml2Canvas() {
             // scale = baseScale * zoomLevel; // REMOVED - this was causing the bug!
             
             // Apply transform to the main canvas groups, preserving top bar
-            const groups = ['grid', 'lines', 'points', 'labels'];
+            const groups = ['grid', 'lines', 'points', 'labels', 'pieceLabels'];
             groups.forEach(groupId => {
                 const group = document.getElementById(groupId);
                 if (group) {
@@ -2696,7 +2696,8 @@ function loadHtml2Canvas() {
             // Update grid size to 1/4" spacing - scale with zoom for visual consistency
             const gridSpacing = baseScale * zoomLevel * 0.25;
             canvas.style.backgroundSize = `${gridSpacing}px ${gridSpacing}px`;
-            
+            canvas.style.backgroundPosition = `${panOffset.x}px ${panOffset.y}px`;
+
             // Update any hem info boxes that might be showing
             updateHemInfoBoxPositions();
         }
