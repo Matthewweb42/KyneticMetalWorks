@@ -1605,7 +1605,7 @@
                 <input type="text" id="profileName" value="" placeholder="Enter product name" required="" style="width: 100%; max-width: 800px; padding: 12px 16px; border: 2px solid #ced4da; border-radius: 6px; font-size: 16px; font-weight: 500; transition: border-color 0.2s;">
             </div>
 
-            
+
             <input type="hidden" id="quantity" value="1">
 
             
@@ -1806,9 +1806,11 @@
 
                 <div class="action-buttons">
                     <button class="btn btn-warning" onclick="undoLastAction()" id="undoBtn">Undo</button>
-                    <button class="btn btn-primary" onclick="addNewPiece()" id="addPieceBtn" style="display: none;">Add Piece</button>
+                    <button class="btn btn-primary" onclick="addNewPiece()" id="addPieceBtn" disabled>Add Piece</button>
                     <button class="btn btn-danger" onclick="clearCanvas()">Clear Profile</button>
-                    <button class="btn btn-success" onclick="downloadPDF()" id="downloadBtn" style="background: #27ae60 !important; color: white !important; border: 1px solid #27ae60 !important;">Download PDF</button>
+                    <button class="btn btn-info" onclick="loadProject()" style="background: #3498db !important; color: white !important; border: 1px solid #3498db !important;">Open</button>
+                    <button class="btn btn-success" onclick="downloadProjectAndOrderSheet()" style="background: #27ae60 !important; color: white !important; border: 1px solid #27ae60 !important;">Save</button>
+                    <button class="btn btn-success" onclick="downloadPDF()" id="downloadBtn" style="background: #16a085 !important; color: white !important; border: 1px solid #16a085 !important;">Print Sheet</button>
                 </div>
             </div>
             
@@ -2936,95 +2938,432 @@ ORDERING:
         
         function saveProject() {
             const projectData = {
-                customerName: document.getElementById('customerName').value,
-                jobName: document.getElementById('jobName').value,
+                // Basic Info
                 profileName: document.getElementById('profileName').value,
-                metalType: document.getElementById('metalType').value,
-                metalGauge: document.getElementById('metalGauge').value,
-                color: document.getElementById('color').value,
-                colorManufacturer: document.getElementById('colorManufacturer').value,
                 quantity: document.getElementById('quantity').value,
+
+                // Product Specs
+                lengthInput: document.getElementById('lengthInput').value,
                 hasRibs: document.getElementById('hasRibs').checked,
                 hasHoles: document.getElementById('hasHoles').checked,
-                holeSize: getHoleSizeValue(),
-                holeSpacing: getHoleSpacingValue(),
-                startFromEnd: document.getElementById('startFromEnd').value,
-                distanceFromEdge: document.getElementById('distanceFromEdge').value,
+                productNotes: document.getElementById('productNotes').value,
+
+                // Hole Specifications
+                holeUnits: document.querySelector('input[name="holeUnits"]:checked')?.value || 'inches',
+                holeSizeWhole: document.getElementById('holeSizeWhole').value,
+                holeSizeSixteenths: currentHoleSizeSixteenths,
+                holeSpacingWhole: document.getElementById('holeSpacingWhole').value,
+                holeSpacingSixteenths: currentHoleSpacingSixteenths,
+                startFromEndWhole: document.getElementById('startFromEndWhole').value,
+                startFromEndSixteenths: currentStartFromEndSixteenths,
+                distanceFromEdgeWhole: document.getElementById('distanceFromEdgeWhole').value,
+                distanceFromEdgeSixteenths: currentDistanceFromEdgeSixteenths,
+                holeLocationInfo: holeLocationInfo,
+
+                // DXF Settings
                 dxfStandards: document.getElementById('dxfStandards').value,
                 taskPriority: document.getElementById('taskPriority').value,
+
+                // Drawing State
                 points: points,
-                savedDate: new Date().toISOString()
+                pieces: pieces,
+                coatedSideRight: coatedSideRight,
+                currentPieceIndex: currentPieceIndex,
+
+                // Custom Labels & Positions
+                labelCustomPositions: labelCustomPositions,
+                customLabels: customLabels,
+
+                // View State
+                zoomLevel: zoomLevel,
+                panOffset: panOffset,
+
+                // Hem Info
+                hasStartHem: hasStartHem,
+                hemVertexIndex: window.hemVertexIndex,
+                hemInfo: window.hemInfo,
+                currentHemSixteenths: currentHemSixteenths,
+
+                // Metadata
+                savedDate: new Date().toISOString(),
+                version: '1.0'
             };
-            
+
             const dataStr = JSON.stringify(projectData, null, 2);
             const dataBlob = new Blob([dataStr], {type: 'application/json'});
             const url = URL.createObjectURL(dataBlob);
-            
+
             const link = document.createElement('a');
             link.href = url;
-            link.download = `profile-${projectData.profileName.replace(/[^a-z0-9]/gi, '_')}-${Date.now()}.json`;
+            const fileName = projectData.profileName ?
+                projectData.profileName.replace(/[^a-z0-9]/gi, '_') :
+                'profile';
+            link.download = `${fileName}-${Date.now()}.json`;
             link.click();
-            
+
             URL.revokeObjectURL(url);
         }
         
         function loadProject() {
+            // Check if there's existing content
+            const hasContent = points.length > 0 || pieces.length > 0 ||
+                             document.getElementById('profileName').value;
+
+            if (hasContent) {
+                if (!confirm('Loading a project will replace all current data. Continue?')) {
+                    return;
+                }
+            }
+
             const input = document.createElement('input');
             input.type = 'file';
             input.accept = '.json';
-            
+
             input.onchange = function(e) {
                 const file = e.target.files[0];
                 if (!file) return;
-                
+
                 const reader = new FileReader();
                 reader.onload = function(e) {
                     try {
                         const projectData = JSON.parse(e.target.result);
-                        
-                        // Restore form fields
-                        if (projectData.customerName) document.getElementById('customerName').value = projectData.customerName;
-                        if (projectData.jobName) document.getElementById('jobName').value = projectData.jobName;
-                        if (projectData.profileName) document.getElementById('profileName').value = projectData.profileName;
-                        if (projectData.metalType) document.getElementById('metalType').value = projectData.metalType;
-                        if (projectData.metalGauge) document.getElementById('metalGauge').value = projectData.metalGauge;
-                        if (projectData.color) document.getElementById('color').value = projectData.color;
-                        if (projectData.colorManufacturer) document.getElementById('colorManufacturer').value = projectData.colorManufacturer;
-                        if (projectData.quantity) document.getElementById('quantity').value = projectData.quantity;
+
+                        // Restore Basic Info
+                        if (projectData.profileName !== undefined) document.getElementById('profileName').value = projectData.profileName;
+                        if (projectData.quantity !== undefined) document.getElementById('quantity').value = projectData.quantity;
+
+                        // Restore Product Specs
+                        if (projectData.lengthInput !== undefined) document.getElementById('lengthInput').value = projectData.lengthInput;
                         if (projectData.hasRibs !== undefined) document.getElementById('hasRibs').checked = projectData.hasRibs;
                         if (projectData.hasHoles !== undefined) {
                             document.getElementById('hasHoles').checked = projectData.hasHoles;
                             document.getElementById('holeFields').style.display = projectData.hasHoles ? 'block' : 'none';
                         }
-                        if (projectData.holeSize) setHoleSizeValue(parseFloat(projectData.holeSize));
-                        if (projectData.holeSpacing) setHoleSpacingValue(parseFloat(projectData.holeSpacing));
-                        if (projectData.startFromEnd) document.getElementById('startFromEnd').value = projectData.startFromEnd;
-                        if (projectData.distanceFromEdge) document.getElementById('distanceFromEdge').value = projectData.distanceFromEdge;
-                        if (projectData.dxfStandards) document.getElementById('dxfStandards').value = projectData.dxfStandards;
-                        if (projectData.taskPriority) document.getElementById('taskPriority').value = projectData.taskPriority;
-                        
-                        // Restore points and redraw
-                        if (projectData.points) {
+                        if (projectData.productNotes !== undefined) document.getElementById('productNotes').value = projectData.productNotes;
+
+                        // Restore Hole Specifications
+                        if (projectData.holeUnits !== undefined) {
+                            const radioBtn = document.querySelector(`input[name="holeUnits"][value="${projectData.holeUnits}"]`);
+                            if (radioBtn) radioBtn.checked = true;
+                            updateHoleUnitLabels();
+                        }
+                        if (projectData.holeSizeWhole !== undefined) document.getElementById('holeSizeWhole').value = projectData.holeSizeWhole;
+                        if (projectData.holeSizeSixteenths !== undefined) {
+                            currentHoleSizeSixteenths = projectData.holeSizeSixteenths;
+                            updateFractionDisplay('holeSize');
+                        }
+                        if (projectData.holeSpacingWhole !== undefined) document.getElementById('holeSpacingWhole').value = projectData.holeSpacingWhole;
+                        if (projectData.holeSpacingSixteenths !== undefined) {
+                            currentHoleSpacingSixteenths = projectData.holeSpacingSixteenths;
+                            updateFractionDisplay('holeSpacing');
+                        }
+                        if (projectData.startFromEndWhole !== undefined) document.getElementById('startFromEndWhole').value = projectData.startFromEndWhole;
+                        if (projectData.startFromEndSixteenths !== undefined) {
+                            currentStartFromEndSixteenths = projectData.startFromEndSixteenths;
+                            updateFractionDisplay('startFromEnd');
+                        }
+                        if (projectData.distanceFromEdgeWhole !== undefined) document.getElementById('distanceFromEdgeWhole').value = projectData.distanceFromEdgeWhole;
+                        if (projectData.distanceFromEdgeSixteenths !== undefined) {
+                            currentDistanceFromEdgeSixteenths = projectData.distanceFromEdgeSixteenths;
+                            updateFractionDisplay('distanceFromEdge');
+                        }
+                        if (projectData.holeLocationInfo !== undefined) holeLocationInfo = projectData.holeLocationInfo;
+
+                        // Restore DXF Settings
+                        if (projectData.dxfStandards !== undefined) document.getElementById('dxfStandards').value = projectData.dxfStandards;
+                        if (projectData.taskPriority !== undefined) document.getElementById('taskPriority').value = projectData.taskPriority;
+
+                        // Restore Drawing State
+                        if (projectData.points !== undefined) {
                             points.length = 0;
                             points.push(...projectData.points);
-                            redrawCanvas();
                         }
-                        
-                        // Update metal type and gauge display
-                        updateGaugeOptions();
-                        updateOrderSheetGaugeDisplay();
-                        
+                        if (projectData.pieces !== undefined) {
+                            pieces.length = 0;
+                            pieces.push(...projectData.pieces);
+                        }
+                        if (projectData.coatedSideRight !== undefined) coatedSideRight = projectData.coatedSideRight;
+                        if (projectData.currentPieceIndex !== undefined) currentPieceIndex = projectData.currentPieceIndex;
+
+                        // Restore Custom Labels & Positions
+                        if (projectData.labelCustomPositions !== undefined) labelCustomPositions = projectData.labelCustomPositions;
+                        if (projectData.customLabels !== undefined) customLabels = projectData.customLabels;
+
+                        // Restore View State
+                        if (projectData.zoomLevel !== undefined) zoomLevel = projectData.zoomLevel;
+                        if (projectData.panOffset !== undefined) panOffset = projectData.panOffset;
+
+                        // Restore Hem Info
+                        if (projectData.hasStartHem !== undefined) hasStartHem = projectData.hasStartHem;
+                        if (projectData.hemVertexIndex !== undefined) window.hemVertexIndex = projectData.hemVertexIndex;
+                        if (projectData.hemInfo !== undefined) window.hemInfo = projectData.hemInfo;
+                        if (projectData.currentHemSixteenths !== undefined) currentHemSixteenths = projectData.currentHemSixteenths;
+
+                        // Update UI
+                        updateCoatedSideControls();
+                        updateZoomDisplay();
+                        updateZoomSlider();
+                        applyZoom();
+                        redrawProfile();
+
                         alert('Project loaded successfully!');
                     } catch (error) {
                         alert('Error loading project file: ' + error.message);
+                        console.error('Load error:', error);
                     }
                 };
                 reader.readAsText(file);
             };
-            
+
             input.click();
         }
-        
+
+        async function generateOrderSheetPDF() {
+            try {
+                // Load libraries if needed
+                if (typeof html2canvas === 'undefined') {
+                    await loadHtml2Canvas();
+                }
+
+                // Get profile data from draw tool
+                const profileName = document.getElementById('profileName').value || '';
+                const length = document.getElementById('lengthInput').value || '';
+                const unbentWidth = document.getElementById('totalLength').textContent || '';
+
+                // Get hole specifications
+                const hasHoles = document.getElementById('hasHoles').checked;
+                let holeInfo = '';
+                if (hasHoles) {
+                    const holeUnits = document.querySelector('input[name="holeUnits"]:checked')?.value || 'inches';
+                    const holeSizeWhole = document.getElementById('holeSizeWhole').value;
+                    const holeSizeFraction = document.getElementById('holeSizeFraction').textContent;
+                    const holeSpacingWhole = document.getElementById('holeSpacingWhole').value;
+                    const holeSpacingFraction = document.getElementById('holeSpacingFraction').textContent;
+                    const startFromEndWhole = document.getElementById('startFromEndWhole').value;
+                    const startFromEndFraction = document.getElementById('startFromEndFraction').textContent;
+                    const distanceFromEdgeWhole = document.getElementById('distanceFromEdgeWhole').value;
+                    const distanceFromEdgeFraction = document.getElementById('distanceFromEdgeFraction').textContent;
+
+                    holeInfo = `Size: ${holeSizeWhole} ${holeSizeFraction}" ${holeUnits === 'mm' ? '(mm)' : ''} | Spacing: ${holeSpacingWhole} ${holeSpacingFraction}" | From End: ${startFromEndWhole} ${startFromEndFraction}" | From Edge: ${distanceFromEdgeWhole} ${distanceFromEdgeFraction}"`;
+                }
+
+                // Clone the SVG for embedding
+                const originalSvg = document.getElementById('canvas');
+                const svgClone = originalSvg.cloneNode(true);
+
+                // Remove clickable backgrounds
+                const clickableBgs = svgClone.querySelectorAll('.clickable-bg');
+                clickableBgs.forEach(bg => bg.remove());
+
+                // Adjust viewBox to fit content
+                const bbox = originalSvg.getBBox ? originalSvg.getBBox() : null;
+                if (bbox && bbox.width > 0 && bbox.height > 0) {
+                    const padding = 50;
+                    svgClone.setAttribute('viewBox', `${bbox.x - padding} ${bbox.y - padding} ${bbox.width + padding * 2} ${bbox.height + padding * 2}`);
+                    svgClone.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+                }
+
+                svgClone.style.width = '95%';
+                svgClone.style.height = '95%';
+                svgClone.style.border = 'none';
+
+                // Get SVG as string
+                const svgString = new XMLSerializer().serializeToString(svgClone);
+
+                // Create temporary order sheet div
+                const orderSheet = document.createElement('div');
+                orderSheet.innerHTML = `
+                    <div style="width: 816px; font-family: Arial, sans-serif; font-size: 11px; background: white; padding: 20px;">
+                        <!-- Header -->
+                        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 3px solid black; padding-bottom: 10px; margin-bottom: 15px;">
+                            <div style="width: 100px; height: 65px; background-color: #2c5f5f; color: white; text-align: center; padding-top: 8px; font-weight: bold;">
+                                <div style="font-size: 16px; margin-bottom: 2px;">KYNETIC</div>
+                                <div style="margin-bottom: 2px;">
+                                    <span style="display: inline-block; width: 6px; height: 6px; background-color: white; border-radius: 50%; margin: 0 1px;"></span>
+                                    <span style="display: inline-block; width: 6px; height: 6px; background-color: white; border-radius: 50%; margin: 0 1px;"></span>
+                                    <span style="display: inline-block; width: 6px; height: 6px; background-color: white; border-radius: 50%; margin: 0 1px;"></span>
+                                    <span style="display: inline-block; width: 6px; height: 6px; background-color: white; border-radius: 50%; margin: 0 1px;"></span>
+                                    <span style="display: inline-block; width: 6px; height: 6px; background-color: white; border-radius: 50%; margin: 0 1px;"></span>
+                                    <span style="display: inline-block; width: 6px; height: 6px; background-color: white; border-radius: 50%; margin: 0 1px;"></span>
+                                </div>
+                                <div style="font-size: 10px; letter-spacing: 1px;">metalworks</div>
+                            </div>
+                            <div style="font-size: 32px; font-weight: bold; text-align: center; flex: 1;">ORDER SHEET</div>
+                            <div style="width: 220px; font-size: 10px;">
+                                <div style="margin-bottom: 5px; display: flex;"><span style="font-weight: bold; width: 90px;">Date Ordered:</span><span style="flex: 1; border-bottom: 1px solid #333;"></span></div>
+                                <div style="margin-bottom: 5px; display: flex;"><span style="font-weight: bold; width: 90px;">Completed By:</span><span style="flex: 1; border-bottom: 1px solid #333;"></span></div>
+                                <div style="margin-bottom: 5px; display: flex;"><span style="font-weight: bold; width: 90px;">Date Finished:</span><span style="flex: 1; border-bottom: 1px solid #333;"></span></div>
+                            </div>
+                        </div>
+
+                        <!-- Info Grid -->
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px; font-size: 10px;">
+                            <!-- Left Column -->
+                            <div>
+                                <div style="display: flex; margin-bottom: 6px; align-items: center;">
+                                    <span style="font-weight: bold; min-width: 100px;">Customer:</span>
+                                    <span style="flex: 1; border-bottom: 1px solid #333; padding: 2px 5px; min-height: 16px;"></span>
+                                </div>
+                                <div style="display: flex; margin-bottom: 6px; align-items: center;">
+                                    <span style="font-weight: bold; min-width: 100px;">Steel:</span>
+                                    <div style="display: flex; gap: 8px; margin-top: 3px;">
+                                        <div style="display: flex; align-items: center; gap: 3px;"><span style="width: 12px; height: 12px; border: 1px solid #333; display: inline-block;"></span> 22</div>
+                                        <div style="display: flex; align-items: center; gap: 3px;"><span style="width: 12px; height: 12px; border: 1px solid #333; display: inline-block;"></span> 24</div>
+                                        <div style="display: flex; align-items: center; gap: 3px;"><span style="width: 12px; height: 12px; border: 1px solid #333; display: inline-block;"></span> 26</div>
+                                        <div style="display: flex; align-items: center; gap: 3px;"><span style="width: 12px; height: 12px; border: 1px solid #333; display: inline-block;"></span> 28</div>
+                                        <div style="display: flex; align-items: center; gap: 3px;"><span style="width: 12px; height: 12px; border: 1px solid #333; display: inline-block;"></span> 30</div>
+                                    </div>
+                                </div>
+                                <div style="display: flex; margin-bottom: 6px; align-items: center;">
+                                    <span style="font-weight: bold; min-width: 100px;">Al:</span>
+                                    <div style="display: flex; gap: 8px; margin-top: 3px;">
+                                        <div style="display: flex; align-items: center; gap: 3px;"><span style="width: 12px; height: 12px; border: 1px solid #333; display: inline-block;"></span> .019</div>
+                                        <div style="display: flex; align-items: center; gap: 3px;"><span style="width: 12px; height: 12px; border: 1px solid #333; display: inline-block;"></span> .027</div>
+                                        <div style="display: flex; align-items: center; gap: 3px;"><span style="width: 12px; height: 12px; border: 1px solid #333; display: inline-block;"></span> .032</div>
+                                        <div style="display: flex; align-items: center; gap: 3px;"><span style="width: 12px; height: 12px; border: 1px solid #333; display: inline-block;"></span> .040</div>
+                                        <div style="display: flex; align-items: center; gap: 3px;"><span style="width: 12px; height: 12px; border: 1px solid #333; display: inline-block;"></span> .050</div>
+                                    </div>
+                                </div>
+                                <div style="display: flex; margin-bottom: 6px; align-items: center;">
+                                    <span style="font-weight: bold; min-width: 100px;">Color:</span>
+                                    <span style="flex: 1; border-bottom: 1px solid #333; padding: 2px 5px; min-height: 16px;"></span>
+                                </div>
+                                <div style="display: flex; margin-bottom: 6px; align-items: center;">
+                                    <span style="font-weight: bold; min-width: 100px;"></span>
+                                    <span style="flex: 1; border-bottom: 1px solid #333; padding: 2px 5px; min-height: 16px;"></span>
+                                </div>
+                            </div>
+
+                            <!-- Right Column -->
+                            <div>
+                                <div style="display: flex; margin-bottom: 6px; align-items: center;">
+                                    <span style="font-weight: bold; min-width: 100px;">Job:</span>
+                                    <span style="flex: 1; border-bottom: 1px solid #333; padding: 2px 5px; min-height: 16px;"></span>
+                                </div>
+                                <div style="display: flex; margin-bottom: 6px; align-items: center;">
+                                    <span style="font-weight: bold; min-width: 100px;">Quantity:</span>
+                                    <span style="flex: 1; border-bottom: 1px solid #333; padding: 2px 5px; min-height: 16px;"></span>
+                                </div>
+                                <div style="display: flex; margin-bottom: 6px; align-items: center;">
+                                    <span style="font-weight: bold; min-width: 100px;">Length:</span>
+                                    <span style="flex: 1; border-bottom: 1px solid #333; padding: 2px 5px; min-height: 16px; ${length ? 'background-color: #f0f0f0;' : ''}">${length ? length + '"' : ''}</span>
+                                </div>
+                                <div style="display: flex; margin-bottom: 6px; align-items: center;">
+                                    <span style="font-weight: bold; min-width: 100px;">Total Material:</span>
+                                    <span style="flex: 1; border-bottom: 1px solid #333; padding: 2px 5px; min-height: 16px; ${unbentWidth ? 'background-color: #f0f0f0;' : ''}">${unbentWidth}</span>
+                                </div>
+                                <div style="display: flex; margin-bottom: 6px; align-items: center;">
+                                    <span style="font-weight: bold; min-width: 100px;">Color Mfr:</span>
+                                    <span style="flex: 1; border-bottom: 1px solid #333; padding: 2px 5px; min-height: 16px;"></span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Profile Section -->
+                        <div style="margin-top: 15px;">
+                            <div style="font-weight: bold; font-size: 11px; margin-bottom: 5px;">Profile Name: ${profileName}</div>
+                            ${holeInfo ? '<div style="font-size: 9px; color: #666; margin-bottom: 5px;">Holes: ' + holeInfo + '</div>' : ''}
+                            <div id="profileSvgContainer" style="width: 100%; height: 380px; background-image: radial-gradient(circle, #999 1px, transparent 1px); background-size: 20px 20px; border: 2px solid #666; display: flex; align-items: center; justify-content: center; overflow: hidden;">
+                                <!-- SVG will be inserted here -->
+                            </div>
+                        </div>
+
+                        <!-- Footer -->
+                        <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 15px; margin-top: 15px; font-size: 10px;">
+                            <div>
+                                <div style="font-weight: bold; margin-bottom: 3px;">Notes:</div>
+                                <div style="border: 1px solid #333; min-height: 60px; padding: 5px;"></div>
+                            </div>
+                            <div>
+                                <div style="display: flex; margin-bottom: 5px;"><span style="font-weight: bold; min-width: 80px;">Shipping Weight:</span><span style="flex: 1; border-bottom: 1px solid #333;"></span></div>
+                                <div style="display: flex; margin-bottom: 5px;"><span style="font-weight: bold; min-width: 80px;">Dimensions:</span><span style="flex: 1; border-bottom: 1px solid #333;"></span></div>
+                                <div style="display: flex; margin-bottom: 5px;"><span style="font-weight: bold; min-width: 80px;">Signature:</span><span style="flex: 1; border-bottom: 1px solid #333;"></span></div>
+                                <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px;">
+                                    <div style="display: flex; align-items: center; gap: 3px;"><span style="width: 12px; height: 12px; border: 1px solid #333; display: inline-block;"></span> Slit</div>
+                                    <div style="display: flex; align-items: center; gap: 3px;"><span style="width: 12px; height: 12px; border: 1px solid #333; display: inline-block;"></span> Punched</div>
+                                    <div style="display: flex; align-items: center; gap: 3px;"><span style="width: 12px; height: 12px; border: 1px solid #333; display: inline-block;"></span> Bent</div>
+                                    <div style="display: flex; align-items: center; gap: 3px;"><span style="width: 12px; height: 12px; border: 1px solid #333; display: inline-block;"></span> Packaged</div>
+                                    <div style="display: flex; align-items: center; gap: 3px;"><span style="width: 12px; height: 12px; border: 1px solid #333; display: inline-block;"></span> Shipped</div>
+                                    <div style="display: flex; align-items: center; gap: 3px;"><span style="width: 12px; height: 12px; border: 1px solid #333; display: inline-block;"></span> Invoiced</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+
+                // Add to document off-screen
+                orderSheet.style.position = 'fixed';
+                orderSheet.style.top = '-10000px';
+                orderSheet.style.left = '0';
+                orderSheet.style.zIndex = '-1';
+                document.body.appendChild(orderSheet);
+
+                // Insert the cloned SVG into the container
+                const profileSvgContainer = orderSheet.querySelector('#profileSvgContainer');
+                if (profileSvgContainer && svgClone) {
+                    profileSvgContainer.appendChild(svgClone);
+                }
+
+                // Wait for rendering
+                await new Promise(resolve => setTimeout(resolve, 1000));
+
+                // Capture as canvas
+                const orderSheetCanvas = await html2canvas(orderSheet, {
+                    backgroundColor: '#ffffff',
+                    scale: 2,
+                    useCORS: true,
+                    allowTaint: true,
+                    width: 856,
+                    height: 1056
+                });
+
+                // Remove temporary element
+                document.body.removeChild(orderSheet);
+
+                // Open new window with the image for printing
+                const pdfWindow = window.open('', '_blank');
+                const imgData = orderSheetCanvas.toDataURL('image/png');
+                pdfWindow.document.write(`
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Order Sheet - ${profileName || 'Profile'}</title>
+    <style>
+        @page { size: letter; margin: 0; }
+        * { margin: 0; padding: 0; }
+        body { margin: 0; padding: 0; }
+        img { width: 100%; height: auto; display: block; }
+    </style>
+</head>
+<body>
+    <img src="${imgData}" alt="Order Sheet">
+</bo` + `dy>
+</ht` + `ml>
+                `);
+                pdfWindow.document.close();
+
+                // Trigger print dialog
+                setTimeout(() => {
+                    pdfWindow.print();
+                }, 500);
+
+            } catch (error) {
+                console.error('Error generating order sheet:', error);
+                alert('Error generating order sheet PDF: ' + error.message);
+            }
+        }
+
+        function downloadProjectAndOrderSheet() {
+            // First, save the JSON project file
+            saveProject();
+
+            // Then, after a brief delay, generate the order sheet PDF
+            setTimeout(() => {
+                generateOrderSheetPDF();
+            }, 500);
+        }
+
         function exportDXF() {
             if (points.length < 2) {
                 alert('Please create a profile with at least 2 points before exporting.');
@@ -3302,6 +3641,34 @@ ORDERING:
             document.getElementById('holeSpacingWhole').value = whole;
             currentHoleSpacingSixteenths = sixteenths;
             document.getElementById('holeSpacingFraction').textContent = sixteenths === 0 ? '0' : simplifyFraction(sixteenths);
+        }
+
+        function updateFractionDisplay(fieldType) {
+            let displayElement;
+            let sixteenthsValue;
+
+            switch(fieldType) {
+                case 'holeSize':
+                    displayElement = document.getElementById('holeSizeFraction');
+                    sixteenthsValue = currentHoleSizeSixteenths;
+                    break;
+                case 'holeSpacing':
+                    displayElement = document.getElementById('holeSpacingFraction');
+                    sixteenthsValue = currentHoleSpacingSixteenths;
+                    break;
+                case 'startFromEnd':
+                    displayElement = document.getElementById('startFromEndFraction');
+                    sixteenthsValue = currentStartFromEndSixteenths;
+                    break;
+                case 'distanceFromEdge':
+                    displayElement = document.getElementById('distanceFromEdgeFraction');
+                    sixteenthsValue = currentDistanceFromEdgeSixteenths;
+                    break;
+            }
+
+            if (displayElement) {
+                displayElement.textContent = sixteenthsValue === 0 ? '0' : simplifyFraction(sixteenthsValue);
+            }
         }
 
         function adjustHemFraction(direction) {
@@ -3758,8 +4125,8 @@ ORDERING:
         function updateAddPieceButtonVisibility() {
             const addPieceBtn = document.getElementById('addPieceBtn');
             if (addPieceBtn) {
-                // Show button only when in drawing mode and current piece has 2+ points
-                addPieceBtn.style.display = (isDrawing && points.length >= 2) ? 'inline-block' : 'none';
+                // Enable button only when in drawing mode and current piece has 2+ points
+                addPieceBtn.disabled = !(isDrawing && points.length >= 2);
             }
         }
 
