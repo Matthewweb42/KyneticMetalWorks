@@ -2117,6 +2117,7 @@ function loadHtml2Canvas() {
         let points = [];
         let pieces = []; // Array to store completed pieces
         let currentPieceIndex = 0; // Track which piece is being worked on
+        let currentPieceCustomName = null; // Track custom name for piece currently being drawn
         let entities = []; // DXF entity storage
         let scale = 24; // Initialize to baseScale - this will be used for measurements only
         let offset = { x: 50, y: 50 };
@@ -2980,6 +2981,7 @@ ORDERING:
                     // Custom Labels & Positions
                     labelCustomPositions: labelCustomPositions,
                     customLabels: customLabels,
+                    pieceLabelCustomPositions: pieceLabelCustomPositions,
 
                     // View State
                     zoomLevel: zoomLevel,
@@ -3109,6 +3111,7 @@ ORDERING:
                         // Restore Custom Labels & Positions
                         if (projectData.labelCustomPositions !== undefined) labelCustomPositions = projectData.labelCustomPositions;
                         if (projectData.customLabels !== undefined) customLabels = projectData.customLabels;
+                        if (projectData.pieceLabelCustomPositions !== undefined) pieceLabelCustomPositions = projectData.pieceLabelCustomPositions;
 
                         // Restore View State
                         if (projectData.zoomLevel !== undefined) zoomLevel = projectData.zoomLevel;
@@ -3405,7 +3408,62 @@ ORDERING:
         function closeEditPopup() {
             const popup = document.getElementById('editPopup');
             popup.style.display = 'none';
+
+            // Restore mode selector visibility in case it was hidden for piece name editing
+            document.querySelector('input[name="editMode"][value="numeric"]').parentElement.style.display = '';
+            document.querySelector('input[name="editMode"][value="text"]').parentElement.style.display = '';
+
             currentEditElement = null;
+        }
+
+        function showEditPieceNamePopup(event, pieceIndex) {
+            const popup = document.getElementById('editPopup');
+            const title = document.getElementById('popupTitle');
+            const label = document.getElementById('popupLabel');
+            const customTextInput = document.getElementById('customTextInput');
+            const textModeRadio = document.getElementById('textModeRadio');
+            const lengthInputs = document.getElementById('lengthInputs');
+            const angleInput = document.getElementById('popupInput');
+            const numericModeRadio = document.getElementById('numericModeRadio');
+
+            // Set current edit element with special type 'pieceName'
+            currentEditElement = { type: 'pieceName', index: pieceIndex };
+
+            // Set to text mode only (hide mode selector for piece names)
+            textModeRadio.checked = true;
+            document.querySelector('input[name="editMode"][value="numeric"]').parentElement.style.display = 'none';
+            document.querySelector('input[name="editMode"][value="text"]').parentElement.style.display = 'none';
+
+            // Hide numeric inputs
+            lengthInputs.style.display = 'none';
+            angleInput.style.display = 'none';
+
+            // Show text input
+            customTextInput.style.display = 'block';
+
+            // Get current name - check if piece is in pieces array or is the current piece being drawn
+            let currentName;
+            if (pieceIndex < pieces.length) {
+                // Editing a completed piece
+                currentName = pieces[pieceIndex].customName || `Piece ${pieceIndex + 1}`;
+            } else {
+                // Editing the current piece being drawn
+                currentName = currentPieceCustomName || `Piece ${pieceIndex + 1}`;
+            }
+            customTextInput.value = currentName;
+
+            // Set labels
+            title.textContent = `Edit Piece Name`;
+            label.textContent = 'Name:';
+
+            // Position popup near the click
+            const rect = canvas.getBoundingClientRect();
+            popup.style.left = `${event.clientX - rect.left + 10}px`;
+            popup.style.top = `${event.clientY - rect.top + 10}px`;
+            popup.style.display = 'block';
+
+            // Focus the input
+            setTimeout(() => customTextInput.focus(), 50);
         }
 
         function toggleEditMode() {
@@ -3711,6 +3769,38 @@ ORDERING:
 
             const textMode = document.getElementById('textModeRadio').checked;
             const customTextInput = document.getElementById('customTextInput');
+
+            // Special handling for piece name editing
+            if (currentEditElement.type === 'pieceName') {
+                const newName = customTextInput.value.trim();
+                const pieceIndex = currentEditElement.index;
+
+                if (pieceIndex < pieces.length) {
+                    // Editing a completed piece
+                    if (newName) {
+                        pieces[pieceIndex].customName = newName;
+                    } else {
+                        pieces[pieceIndex].customName = null;
+                    }
+                } else {
+                    // Editing the current piece being drawn
+                    if (newName) {
+                        currentPieceCustomName = newName;
+                    } else {
+                        currentPieceCustomName = null;
+                    }
+                }
+
+                // Redraw to update label and control panel
+                redrawProfile();
+                updateCoatedSideControls();
+                closeEditPopup();
+
+                // Restore mode selector visibility for next use
+                document.querySelector('input[name="editMode"][value="numeric"]').parentElement.style.display = '';
+                document.querySelector('input[name="editMode"][value="text"]').parentElement.style.display = '';
+                return;
+            }
 
             // Create piece-aware key if pieceIndex exists
             const customKey = currentEditElement.pieceIndex !== undefined
@@ -4115,8 +4205,12 @@ ORDERING:
                 points: [...points], // Copy points array
                 hemVertexIndex: window.hemVertexIndex,
                 hemInfo: window.hemInfo ? {...window.hemInfo} : null,
-                coatedSideRight: coatedSideRight // Save colored side state
+                coatedSideRight: coatedSideRight, // Save colored side state
+                customName: currentPieceCustomName // Custom piece name (editable by double-clicking label)
             });
+
+            // Clear custom name for next piece
+            currentPieceCustomName = null;
 
             // Clear current points for new piece
             points = [];
@@ -6704,7 +6798,7 @@ ORDERING:
                 pieceControl.style.alignItems = 'center';
 
                 const labelText = document.createElement('span');
-                labelText.textContent = `Piece ${index + 1}:`;
+                labelText.textContent = (pieces[index].customName || `Piece ${index + 1}`) + ':';
                 labelText.style.minWidth = '70px';
                 labelText.style.display = 'inline-block';
 
@@ -6965,7 +7059,7 @@ ORDERING:
                 });
 
                 // Create piece label above and to the left of the piece
-                const labelText = `Piece ${pieceIndex + 1}`;
+                const labelText = (piece.customName || (pieceIndex === currentPieceIndex ? currentPieceCustomName : null)) || `Piece ${pieceIndex + 1}`;
 
                 // Check for custom position or use default
                 const customPosKey = `piece-${pieceIndex}`;
@@ -7015,6 +7109,14 @@ ORDERING:
                     startPieceLabelDrag(labelBg, label, mouseX, mouseY, pieceIndex);
                 };
                 labelBg.addEventListener('mousedown', mousedownHandler);
+
+                // Add double-click handler to edit piece name
+                const dblClickHandler = function(e) {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    showEditPieceNamePopup(e, pieceIndex);
+                };
+                labelBg.addEventListener('dblclick', dblClickHandler);
 
                 // Show grab cursor on hover
                 labelBg.addEventListener('mouseenter', () => {
