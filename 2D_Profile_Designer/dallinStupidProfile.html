@@ -2936,72 +2936,93 @@ ORDERING:
             alert(helpText);
         }
         
-        function saveProject() {
-            const projectData = {
-                // Basic Info
-                profileName: document.getElementById('profileName').value,
-                quantity: document.getElementById('quantity').value,
+        async function saveProject() {
+            try {
+                // Check if File System Access API is supported
+                if (!window.showSaveFilePicker) {
+                    alert('File picker not supported in this browser. Please use Chrome or Edge.');
+                    return;
+                }
 
-                // Product Specs
-                lengthInput: document.getElementById('lengthInput').value,
-                hasRibs: document.getElementById('hasRibs').checked,
-                hasHoles: document.getElementById('hasHoles').checked,
-                productNotes: document.getElementById('productNotes').value,
+                const projectData = {
+                    // Basic Info
+                    profileName: document.getElementById('profileName').value,
+                    quantity: document.getElementById('quantity').value,
 
-                // Hole Specifications
-                holeUnits: document.querySelector('input[name="holeUnits"]:checked')?.value || 'inches',
-                holeSizeWhole: document.getElementById('holeSizeWhole').value,
-                holeSizeSixteenths: currentHoleSizeSixteenths,
-                holeSpacingWhole: document.getElementById('holeSpacingWhole').value,
-                holeSpacingSixteenths: currentHoleSpacingSixteenths,
-                startFromEndWhole: document.getElementById('startFromEndWhole').value,
-                startFromEndSixteenths: currentStartFromEndSixteenths,
-                distanceFromEdgeWhole: document.getElementById('distanceFromEdgeWhole').value,
-                distanceFromEdgeSixteenths: currentDistanceFromEdgeSixteenths,
-                holeLocationInfo: holeLocationInfo,
+                    // Product Specs
+                    lengthInput: document.getElementById('lengthInput').value,
+                    hasRibs: document.getElementById('hasRibs').checked,
+                    hasHoles: document.getElementById('hasHoles').checked,
+                    productNotes: document.getElementById('productNotes').value,
 
-                // DXF Settings
-                dxfStandards: document.getElementById('dxfStandards').value,
-                taskPriority: document.getElementById('taskPriority').value,
+                    // Hole Specifications
+                    holeUnits: document.querySelector('input[name="holeUnits"]:checked')?.value || 'inches',
+                    holeSizeWhole: document.getElementById('holeSizeWhole').value,
+                    holeSizeSixteenths: currentHoleSizeSixteenths,
+                    holeSpacingWhole: document.getElementById('holeSpacingWhole').value,
+                    holeSpacingSixteenths: currentHoleSpacingSixteenths,
+                    startFromEndWhole: document.getElementById('startFromEndWhole').value,
+                    startFromEndSixteenths: currentStartFromEndSixteenths,
+                    distanceFromEdgeWhole: document.getElementById('distanceFromEdgeWhole').value,
+                    distanceFromEdgeSixteenths: currentDistanceFromEdgeSixteenths,
+                    holeLocationInfo: holeLocationInfo,
 
-                // Drawing State
-                points: points,
-                pieces: pieces,
-                coatedSideRight: coatedSideRight,
-                currentPieceIndex: currentPieceIndex,
+                    // DXF Settings
+                    dxfStandards: document.getElementById('dxfStandards').value,
+                    taskPriority: document.getElementById('taskPriority').value,
 
-                // Custom Labels & Positions
-                labelCustomPositions: labelCustomPositions,
-                customLabels: customLabels,
+                    // Drawing State
+                    points: points,
+                    pieces: pieces,
+                    coatedSideRight: coatedSideRight,
+                    currentPieceIndex: currentPieceIndex,
 
-                // View State
-                zoomLevel: zoomLevel,
-                panOffset: panOffset,
+                    // Custom Labels & Positions
+                    labelCustomPositions: labelCustomPositions,
+                    customLabels: customLabels,
 
-                // Hem Info
-                hasStartHem: hasStartHem,
-                hemVertexIndex: window.hemVertexIndex,
-                hemInfo: window.hemInfo,
-                currentHemSixteenths: currentHemSixteenths,
+                    // View State
+                    zoomLevel: zoomLevel,
+                    panOffset: panOffset,
 
-                // Metadata
-                savedDate: new Date().toISOString(),
-                version: '1.0'
-            };
+                    // Hem Info
+                    hasStartHem: hasStartHem,
+                    hemVertexIndex: window.hemVertexIndex,
+                    hemInfo: window.hemInfo,
+                    currentHemSixteenths: currentHemSixteenths,
 
-            const dataStr = JSON.stringify(projectData, null, 2);
-            const dataBlob = new Blob([dataStr], {type: 'application/json'});
-            const url = URL.createObjectURL(dataBlob);
+                    // Metadata
+                    savedDate: new Date().toISOString(),
+                    version: '1.0'
+                };
 
-            const link = document.createElement('a');
-            link.href = url;
-            const fileName = projectData.profileName ?
-                projectData.profileName.replace(/[^a-z0-9]/gi, '_') :
-                'profile';
-            link.download = `${fileName}-${Date.now()}.json`;
-            link.click();
+                const dataStr = JSON.stringify(projectData, null, 2);
 
-            URL.revokeObjectURL(url);
+                // Get filename from profile name
+                const profileName = document.getElementById('profileName').value || 'profile';
+                const fileName = `${profileName.replace(/[^a-z0-9]/gi, '_')}.json`;
+
+                // Show save file picker
+                const fileHandle = await window.showSaveFilePicker({
+                    suggestedName: fileName,
+                    types: [{
+                        description: 'JSON Files',
+                        accept: {'application/json': ['.json']}
+                    }]
+                });
+
+                // Write file
+                const writable = await fileHandle.createWritable();
+                await writable.write(dataStr);
+                await writable.close();
+
+            } catch (error) {
+                // User cancelled or error occurred
+                if (error.name !== 'AbortError') {
+                    console.error('Save error:', error);
+                    alert('Error saving project: ' + error.message);
+                }
+            }
         }
         
         function loadProject() {
@@ -3355,13 +3376,8 @@ ORDERING:
         }
 
         function downloadProjectAndOrderSheet() {
-            // First, save the JSON project file
+            // Save the JSON project file using file picker
             saveProject();
-
-            // Then, after a brief delay, generate the order sheet PDF
-            setTimeout(() => {
-                generateOrderSheetPDF();
-            }, 500);
         }
 
         function exportDXF() {
@@ -4558,10 +4574,12 @@ ORDERING:
         }
 
         // Draw info box below hem vertex with the entered details
-        function showHemInfoBox(hemInfo) {
+        function showHemInfoBox(hemInfo, piecePoints = null) {
             if (!hemInfo) return;
 
-            const vertex = points[hemInfo.index];
+            // Use provided piecePoints or fall back to global points
+            const pointsArray = piecePoints || points;
+            const vertex = pointsArray[hemInfo.index];
             if (!vertex) return;
             // Remove only this hem's info box if it exists
             const oldBox = document.getElementById(`hem-info-box-${hemInfo.index}`);
@@ -4597,10 +4615,10 @@ ORDERING:
                 ];
                 
                 // Check intersection with each line segment in the profile
-                for (let i = 0; i < points.length - 1; i++) {
+                for (let i = 0; i < pointsArray.length - 1; i++) {
                     const line = {
-                        start: points[i],
-                        end: points[i + 1]
+                        start: pointsArray[i],
+                        end: pointsArray[i + 1]
                     };
                     
                     // Check if any box edge intersects with the line
@@ -4742,7 +4760,7 @@ ORDERING:
                     }
                     
                     // Show new modal with correct hem index
-                    const isFirstPoint = hemIndex === 0 && points.length === 1;
+                    const isFirstPoint = hemIndex === 0 && pointsArray.length === 1;
                     showSimpleHemDetailsModal(hemIndex, isFirstPoint);
                 });
                 boxGroup.appendChild(editBtn);
@@ -4852,37 +4870,40 @@ ORDERING:
         }
 
         // Make the hem vertex the end point of the profile
-        function addHemArcAtVertex(vertexIndex) {
+        function addHemArcAtVertex(vertexIndex, piecePoints = null) {
+            // Use provided piecePoints or fall back to global points
+            const pointsArray = piecePoints || points;
+
             // Allow drawing for vertexIndex 0 if it is a hem and there is a next point
-            if (vertexIndex < 0 || vertexIndex >= points.length) {
+            if (vertexIndex < 0 || vertexIndex >= pointsArray.length) {
                 return;
             }
-            let hem = points[vertexIndex];
+            let hem = pointsArray[vertexIndex];
             let prev = null, next = null;
-            
+
             // Determine proper prev and next points for consistent direction calculation
             if (vertexIndex === 0) {
                 // For first point hem: incoming direction is FROM point 1 TO point 0
                 // outgoing direction is FROM point 0 TO point 1 (reversed for proper fold direction)
-                if (points.length > 1) {
-                    prev = points[1]; // The point we're coming FROM
-                    next = points[1]; // Use same point for outgoing to create proper fold direction
+                if (pointsArray.length > 1) {
+                    prev = pointsArray[1]; // The point we're coming FROM
+                    next = pointsArray[1]; // Use same point for outgoing to create proper fold direction
                 } else {
                     return;
                 }
-            } else if (vertexIndex === points.length - 1) {
+            } else if (vertexIndex === pointsArray.length - 1) {
                 // For last point hem: incoming direction is FROM previous point TO this point
                 // outgoing direction should be continuation of that line
                 if (vertexIndex > 0) {
-                    prev = points[vertexIndex - 1];
-                    next = points[vertexIndex - 1]; // Use same point to create proper fold direction
+                    prev = pointsArray[vertexIndex - 1];
+                    next = pointsArray[vertexIndex - 1]; // Use same point to create proper fold direction
                 } else {
                     return;
                 }
             } else {
                 // For middle point hem: use normal adjacent points
-                prev = points[vertexIndex - 1];
-                next = points[vertexIndex + 1];
+                prev = pointsArray[vertexIndex - 1];
+                next = pointsArray[vertexIndex + 1];
             }
             
             if (!hem.hemData || !prev) {
@@ -4893,14 +4914,14 @@ ORDERING:
             let incomingVector, outgoingVector;
             
             if (vertexIndex === 0) {
-                // First point hem: the line TO the next point exists, 
+                // First point hem: the line TO the next point exists,
                 // but there was originally a line BEFORE this point that got deleted
                 // The hem should curve toward where that deleted line would have been
-                if (points.length > 1) {
+                if (pointsArray.length > 1) {
                     // The existing line direction (what we can see)
                     const existingLine = {
-                        x: points[1].x - hem.x,
-                        y: points[1].y - hem.y
+                        x: pointsArray[1].x - hem.x,
+                        y: pointsArray[1].y - hem.y
                     };
                     
                     // The hem should curve opposite to the existing line direction
@@ -4911,7 +4932,7 @@ ORDERING:
                     };
                     outgoingVector = existingLine;  // The line we can see
                 }
-            } else if (vertexIndex === points.length - 1) {
+            } else if (vertexIndex === pointsArray.length - 1) {
                 // Last point hem: the line FROM the previous point exists,
                 // but there was originally a line AFTER this point that got deleted
                 // The hem should curve toward where that deleted line would have been
@@ -4966,32 +4987,32 @@ ORDERING:
             if (!hem.hemData.originalFoldDirection) {
                 // HEM Direction Detection Using Signed Area Method
                 // Determine HEM direction based on the winding order of three consecutive vertices
-                console.log('DEBUG: Starting HEM direction calculation for vertex index:', vertexIndex, 'Total points:', points.length);
+                console.log('DEBUG: Starting HEM direction calculation for vertex index:', vertexIndex, 'Total points:', pointsArray.length);
                 let baseFoldDirection;
-                
+
                 // Step 1: Identify HEM type and get three points
                 let point1, point2, point3;
-                
+
                 if (vertexIndex <= 2) {
                     // First HEM (beginning of profile)
                     // Need at least 3 points for signed area calculation
-                    if (points.length >= 3) {
-                        point1 = points[0];  // start of short segment
-                        point2 = points[1];  // bend vertex (shared point)
-                        point3 = points[2];  // end of long segment
+                    if (pointsArray.length >= 3) {
+                        point1 = pointsArray[0];  // start of short segment
+                        point2 = pointsArray[1];  // bend vertex (shared point)
+                        point3 = pointsArray[2];  // end of long segment
                         console.log('First HEM: Using points', point1, point2, point3);
                     } else {
                         // Fallback for insufficient points
-                        console.log('First HEM: Insufficient points (', points.length, '), using default LEFT direction');
+                        console.log('First HEM: Insufficient points (', pointsArray.length, '), using default LEFT direction');
                         baseFoldDirection = -1; // Default to LEFT
                     }
                 } else {
                     // Second HEM (end of profile)
-                    const n = points.length;
+                    const n = pointsArray.length;
                     if (n >= 3) {
-                        point1 = points[n-3]; // start of long segment
-                        point2 = points[n-2]; // bend vertex (shared point)
-                        point3 = points[n-1]; // end of short segment
+                        point1 = pointsArray[n-3]; // start of long segment
+                        point2 = pointsArray[n-2]; // bend vertex (shared point)
+                        point3 = pointsArray[n-1]; // end of short segment
                         console.log('Second HEM: Using points', point1, point2, point3);
                     } else {
                         // Fallback for insufficient points
@@ -6890,9 +6911,9 @@ ORDERING:
             piecePoints.forEach((point, index) => {
                 if (point.isHem && point.hemData) {
                     // Draw curve at the correct vertex (seamless with profile)
-                    addHemArcAtVertex(index);
+                    addHemArcAtVertex(index, piecePoints);
                     // Draw editable info box
-                    showHemInfoBox(point.hemData);
+                    showHemInfoBox(point.hemData, piecePoints);
                 }
             });
 
