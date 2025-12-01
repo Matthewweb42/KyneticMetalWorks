@@ -1658,7 +1658,7 @@
                             <div class="field-group" style="margin-bottom: 0;">
                                 <span class="field-label"><span id="holeSizeLabel">Hole Size:</span></span>
                                 <div style="display: flex; gap: 8px; align-items: center;">
-                                    <input type="number" id="holeSizeWhole" class="order-input" min="0" value="0" step="1" style="width: 80px; text-align: right;">
+                                    <input type="number" id="holeSizeWhole" class="order-input" min="0" value="0" step="1" style="width: 80px; text-align: right;" oninput="redrawProfile()">
                                     <span id="holeSizeControls" style="display: flex; align-items: center; gap: 6px; padding: 4px 8px; background: #f8f9fa; border-radius: 4px;">
                                         <span id="holeSizeFraction" style="min-width: 30px; text-align: center; font-weight: 500; font-size: 13px;">0</span>
                                         <span style="display: flex; flex-direction: column; gap: 2px;">
@@ -3568,6 +3568,9 @@ ORDERING:
                     displayElement.textContent = simplifyFraction(currentSixteenths);
                 }
             }
+
+            // Redraw profile to update hole slash marks
+            redrawProfile();
         }
 
         // Helper functions to get hole values in decimal format for compatibility
@@ -3640,6 +3643,9 @@ ORDERING:
             }
 
             // Spacing, distance from end, and distance from edge always stay in inches - no conversion needed
+
+            // Redraw profile to update hole slash marks
+            redrawProfile();
         }
 
         // Helper functions to set hole values from decimal format
@@ -6590,22 +6596,50 @@ ORDERING:
             const slashLength = 18; // Length of each slash mark
             const halfSlash = slashLength / 2;
 
-            // Draw 2 evenly spaced slashes at 33% and 66% along the line
-            [0.33, 0.66].forEach(fraction => {
-                const centerX = start.x + dx * fraction;
-                const centerY = start.y + dy * fraction;
+            // Get hole size and check if it's in mm or inches
+            const isMetric = document.querySelector('input[name="holeUnits"]:checked').value === 'mm';
+            const holeSizeValue = getHoleSizeValue();
 
-                // Draw slash perpendicular to the line
-                const slash = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-                slash.setAttribute('x1', centerX - perpX * halfSlash);
-                slash.setAttribute('y1', centerY - perpY * halfSlash);
-                slash.setAttribute('x2', centerX + perpX * halfSlash);
-                slash.setAttribute('y2', centerY + perpY * halfSlash);
-                slash.setAttribute('stroke', '#FF9800'); // Orange color
-                slash.setAttribute('stroke-width', '2');
-                slash.setAttribute('class', 'hole-slash');
-                linesGroup.appendChild(slash);
-            });
+            // Convert hole size to inches if in mm
+            const holeSizeInches = isMetric ? holeSizeValue / 25.4 : holeSizeValue;
+
+            // Convert to screen pixels
+            const holeSizePixels = holeSizeInches * baseScale;
+
+            // Calculate center of the line segment
+            const centerX = start.x + dx / 2;
+            const centerY = start.y + dy / 2;
+
+            // Calculate positions for the two hole edges, centered on the segment
+            // First edge: center minus half the hole size
+            const firstEdgeX = centerX - dirX * (holeSizePixels / 2);
+            const firstEdgeY = centerY - dirY * (holeSizePixels / 2);
+
+            // Second edge: center plus half the hole size
+            const secondEdgeX = centerX + dirX * (holeSizePixels / 2);
+            const secondEdgeY = centerY + dirY * (holeSizePixels / 2);
+
+            // Draw first edge slash (left edge of hole)
+            const slash1 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            slash1.setAttribute('x1', firstEdgeX - perpX * halfSlash);
+            slash1.setAttribute('y1', firstEdgeY - perpY * halfSlash);
+            slash1.setAttribute('x2', firstEdgeX + perpX * halfSlash);
+            slash1.setAttribute('y2', firstEdgeY + perpY * halfSlash);
+            slash1.setAttribute('stroke', '#FF9800'); // Orange color
+            slash1.setAttribute('stroke-width', '2');
+            slash1.setAttribute('class', 'hole-slash');
+            linesGroup.appendChild(slash1);
+
+            // Draw second edge slash (right edge of hole)
+            const slash2 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            slash2.setAttribute('x1', secondEdgeX - perpX * halfSlash);
+            slash2.setAttribute('y1', secondEdgeY - perpY * halfSlash);
+            slash2.setAttribute('x2', secondEdgeX + perpX * halfSlash);
+            slash2.setAttribute('y2', secondEdgeY + perpY * halfSlash);
+            slash2.setAttribute('stroke', '#FF9800'); // Orange color
+            slash2.setAttribute('stroke-width', '2');
+            slash2.setAttribute('class', 'hole-slash');
+            linesGroup.appendChild(slash2);
         }
 
         function toggleCoatedSide() {
