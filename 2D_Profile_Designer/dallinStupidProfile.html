@@ -1807,6 +1807,7 @@
                 <div class="action-buttons">
                     <button class="btn btn-warning" onclick="undoLastAction()" id="undoBtn">Undo</button>
                     <button class="btn btn-primary" onclick="addNewPiece()" id="addPieceBtn" disabled>Add Piece</button>
+                    <button class="btn btn-primary" onclick="showSlopingRoofModal()">Create Sloping Roof</button>
                     <button class="btn btn-danger" onclick="clearCanvas()">Clear Profile</button>
                     <button class="btn btn-info" onclick="loadProject()" style="background: #3498db !important; color: white !important; border: 1px solid #3498db !important;">Open</button>
                     <button class="btn btn-success" onclick="downloadProjectAndOrderSheet()" style="background: #27ae60 !important; color: white !important; border: 1px solid #27ae60 !important;">Save</button>
@@ -5269,6 +5270,182 @@ ORDERING:
         function applyHemPopup(pointIndex) {
             closeHemPopup();
             redrawProfile();
+        }
+
+        function showSlopingRoofModal() {
+            // Create modal overlay
+            const modal = document.createElement('div');
+            modal.id = 'slopingRoofModal';
+            modal.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: rgba(0,0,0,0.5);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                z-index: 10000;
+            `;
+
+            // Create modal content
+            const content = document.createElement('div');
+            content.style.cssText = `
+                background: white;
+                padding: 25px;
+                border-radius: 8px;
+                box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+                max-width: 400px;
+                width: 90%;
+            `;
+
+            content.innerHTML = `
+                <h3 style="margin-top: 0; color: #2c3e50;">Create Sloping Roof Profile</h3>
+
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; margin-bottom: 5px; font-weight: bold;">Slope Angle (degrees):</label>
+                    <input type="number" id="slopeAngle" min="0.1" max="89" step="0.1" value="30"
+                           style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                </div>
+
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; margin-bottom: 5px; font-weight: bold;">Horizontal Run (inches):</label>
+                    <input type="number" id="horizontalRun" min="0.1" step="0.125" value="2"
+                           style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                </div>
+
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; margin-bottom: 5px; font-weight: bold;">Gutter Depth (inches):</label>
+                    <input type="number" id="gutterDepth" min="0.1" step="0.125" value="2"
+                           style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                </div>
+
+                <div style="margin-bottom: 20px;">
+                    <label style="display: block; margin-bottom: 5px; font-weight: bold;">Gutter Width (inches):</label>
+                    <input type="number" id="gutterWidth" min="0.1" step="0.125" value="4"
+                           style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                </div>
+
+                <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                    <button onclick="closeSlopingRoofModal()"
+                            style="padding: 10px 20px; background: #95a5a6; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                        Cancel
+                    </button>
+                    <button onclick="applySlopingRoof()"
+                            style="padding: 10px 20px; background: #3498db; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                        Create
+                    </button>
+                </div>
+            `;
+
+            modal.appendChild(content);
+            document.body.appendChild(modal);
+
+            // Focus first input
+            setTimeout(() => document.getElementById('slopeAngle').focus(), 100);
+        }
+
+        function closeSlopingRoofModal() {
+            const modal = document.getElementById('slopingRoofModal');
+            if (modal) modal.remove();
+        }
+
+        function applySlopingRoof() {
+            const angle = parseFloat(document.getElementById('slopeAngle').value);
+            const run = parseFloat(document.getElementById('horizontalRun').value);
+            const depth = parseFloat(document.getElementById('gutterDepth').value);
+            const width = parseFloat(document.getElementById('gutterWidth').value);
+
+            // Validate inputs
+            if (isNaN(angle) || angle <= 0 || angle >= 90) {
+                alert('Please enter a valid slope angle between 0.1 and 89.9 degrees');
+                return;
+            }
+            if (isNaN(run) || run <= 0 || isNaN(depth) || depth <= 0 || isNaN(width) || width <= 0) {
+                alert('Please enter valid positive values for all measurements');
+                return;
+            }
+
+            closeSlopingRoofModal();
+            generateSlopingRoof(angle, run, depth, width);
+        }
+
+        function generateSlopingRoof(angleDegrees, runInches, depthInches, widthInches) {
+            // Save state for undo
+            saveState('Create Sloping Roof', { angle: angleDegrees, run: runInches, depth: depthInches, width: widthInches });
+
+            // Clear existing points if any
+            points = [];
+            entities = [];
+
+            // Convert angle to radians
+            const angleRadians = angleDegrees * Math.PI / 180;
+
+            // Calculate pixel measurements
+            const risePixels = runInches * Math.tan(angleRadians) * baseScale;
+            const runPixels = runInches * baseScale;
+            const depthPixels = depthInches * baseScale;
+            const widthPixels = widthInches * baseScale;
+
+            // First, create all points relative to origin (0,0)
+            const tempP1 = { x: 0, y: 0 };
+            const tempP2 = { x: tempP1.x + runPixels, y: tempP1.y - risePixels };
+            const tempP3 = { x: tempP2.x, y: tempP2.y + depthPixels };
+            const tempP4 = { x: tempP3.x + widthPixels, y: tempP3.y };
+
+            const horizontalDistanceFromP1 = tempP4.x - tempP1.x;
+            const heightAtP5 = horizontalDistanceFromP1 * Math.tan(angleRadians);
+            const tempP5 = { x: tempP4.x, y: tempP1.y - heightAtP5 };
+            const tempP6 = { x: tempP5.x + runPixels, y: tempP5.y - risePixels };
+
+            // Calculate bounding box of the entire profile
+            const allTempPoints = [tempP1, tempP2, tempP3, tempP4, tempP5, tempP6];
+            const minX = Math.min(...allTempPoints.map(p => p.x));
+            const maxX = Math.max(...allTempPoints.map(p => p.x));
+            const minY = Math.min(...allTempPoints.map(p => p.y));
+            const maxY = Math.max(...allTempPoints.map(p => p.y));
+
+            const profileWidth = maxX - minX;
+            const profileHeight = maxY - minY;
+
+            // Calculate canvas center
+            const canvasRect = canvas.getBoundingClientRect();
+            const centerX = canvasRect.width / 2;
+            const centerY = canvasRect.height / 2;
+
+            // Calculate offset to center the entire profile
+            const offsetX = centerX - (minX + profileWidth / 2);
+            const offsetY = centerY - (minY + profileHeight / 2);
+
+            // Apply offset to all points to center the profile
+            const p1 = { x: tempP1.x + offsetX, y: tempP1.y + offsetY };
+            const p2 = { x: tempP2.x + offsetX, y: tempP2.y + offsetY };
+            const p3 = { x: tempP3.x + offsetX, y: tempP3.y + offsetY };
+            const p4 = { x: tempP4.x + offsetX, y: tempP4.y + offsetY };
+            const p5 = { x: tempP5.x + offsetX, y: tempP5.y + offsetY };
+            const p6 = { x: tempP6.x + offsetX, y: tempP6.y + offsetY };
+
+            // Add all points
+            points.push(p1, p2, p3, p4, p5, p6);
+
+            // Add DXF entities
+            entities.push({ type: 'POINT', x: p1.x, y: p1.y, layer: 'PROFILE' });
+            entities.push({ type: 'POINT', x: p2.x, y: p2.y, layer: 'PROFILE' });
+            entities.push({ type: 'POINT', x: p3.x, y: p3.y, layer: 'PROFILE' });
+            entities.push({ type: 'POINT', x: p4.x, y: p4.y, layer: 'PROFILE' });
+            entities.push({ type: 'POINT', x: p5.x, y: p5.y, layer: 'PROFILE' });
+            entities.push({ type: 'POINT', x: p6.x, y: p6.y, layer: 'PROFILE' });
+
+            entities.push({ type: 'LINE', start: p1, end: p2, layer: 'PROFILE' });
+            entities.push({ type: 'LINE', start: p2, end: p3, layer: 'PROFILE' });
+            entities.push({ type: 'LINE', start: p3, end: p4, layer: 'PROFILE' });
+            entities.push({ type: 'LINE', start: p4, end: p5, layer: 'PROFILE' });
+            entities.push({ type: 'LINE', start: p5, end: p6, layer: 'PROFILE' });
+
+            // Redraw the profile
+            redrawProfile();
+            updateStats();
         }
 
         function drawPoint(point, index) {
