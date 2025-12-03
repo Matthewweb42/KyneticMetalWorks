@@ -1812,6 +1812,7 @@
                     <button class="btn btn-info" onclick="loadProject()" style="background: #3498db !important; color: white !important; border: 1px solid #3498db !important;">Open</button>
                     <button class="btn btn-success" onclick="downloadProjectAndOrderSheet()" style="background: #27ae60 !important; color: white !important; border: 1px solid #27ae60 !important;">Save</button>
                     <button class="btn btn-success" onclick="downloadPDF()" id="downloadBtn" style="background: #16a085 !important; color: white !important; border: 1px solid #16a085 !important;">Print Sheet</button>
+                    <button class="btn btn-info" onclick="exportDXF()" style="background: #9b59b6 !important; color: white !important; border: 1px solid #9b59b6 !important;">Download DXF</button>
                 </div>
             </div>
             
@@ -4176,6 +4177,7 @@ ORDERING:
             }
             if (points.length > 1) {
                 drawLine(points[points.length - 2], point, points.length - 2);
+                drawCoatingArrow(points[points.length - 2], point, coatedSideRight); // Draw coating arrow immediately
                 clearPreviewLine(); // Remove preview line and label immediately
                 drawMeasurements(); // Draw permanent label
                 // Remove preview angle label immediately
