@@ -3776,6 +3776,15 @@ ORDERING:
                 const newName = customTextInput.value.trim();
                 const pieceIndex = currentEditElement.index;
 
+                // Save old name for undo
+                let oldName;
+                if (pieceIndex < pieces.length) {
+                    oldName = pieces[pieceIndex].customName;
+                } else {
+                    oldName = currentPieceCustomName;
+                }
+                saveState('Edit Piece Name', { pieceIndex, oldName, newName });
+
                 if (pieceIndex < pieces.length) {
                     // Editing a completed piece
                     if (newName) {
@@ -3811,6 +3820,11 @@ ORDERING:
             if (textMode) {
                 // Text mode - save custom label text
                 const customText = customTextInput.value.trim();
+
+                // Save state for undo
+                const oldLabel = customLabels[customKey];
+                saveState('Edit Custom Label', { customKey, oldLabel, newLabel: customText });
+
                 if (customText) {
                     customLabels[customKey] = customText;
                 } else {
@@ -3825,6 +3839,7 @@ ORDERING:
             }
 
             // Numeric mode - clear any custom label and modify geometry
+            const oldLabel = customLabels[customKey];
             delete customLabels[customKey];
 
             if (currentEditElement.type === 'length') {
@@ -4066,6 +4081,9 @@ ORDERING:
             }
 
             if (isDragging) {
+                // Save state for undo before finishing the drag
+                saveState('Drag Point', { pointIndex: dragPointIndex, pieceIndex: dragPieceIndex });
+
                 isDragging = false;
 
                 const allPoints = document.querySelectorAll('.point');
@@ -4200,6 +4218,9 @@ ORDERING:
                 alert('Current piece needs at least 2 points before starting a new piece.');
                 return;
             }
+
+            // Save state for undo
+            saveState('Add Piece', { pieceIndex: currentPieceIndex });
 
             // Save current piece
             pieces.push({
@@ -6838,6 +6859,9 @@ ORDERING:
         }
 
         function cancelHoleSelection() {
+            // Save state for undo
+            saveState('Cancel Hole Selection', { oldHoleLocationInfo: holeLocationInfo });
+
             // Uncheck the hole checkbox
             document.getElementById('hasHoles').checked = false;
             // Clear selection mode
@@ -6914,6 +6938,9 @@ ORDERING:
         }
 
         function toggleCoatedSide() {
+            // Save state for undo
+            saveState('Toggle Coated Side', { oldValue: coatedSideRight });
+
             // Check which toggle triggered this (single or current piece)
             const singleToggle = document.getElementById('singlePieceToggle');
             const currentToggle = document.getElementById('currentPieceSideToggle');
@@ -6938,6 +6965,9 @@ ORDERING:
         function togglePieceCoatedSide(pieceIndex) {
             // Toggle the coated side for a specific piece
             if (pieceIndex >= 0 && pieceIndex < pieces.length) {
+                // Save state for undo
+                saveState('Toggle Piece Coated Side', { pieceIndex, oldValue: pieces[pieceIndex].coatedSideRight });
+
                 pieces[pieceIndex].coatedSideRight = !pieces[pieceIndex].coatedSideRight;
                 redrawProfile();
                 updateCoatedSideControls();
@@ -7313,6 +7343,9 @@ ORDERING:
         }
 
         function clearCanvas() {
+            // Save state for undo
+            saveState('Clear Profile', {});
+
             points = [];
             pieces = []; // Clear all pieces
             currentPieceIndex = 0; // Reset piece counter
@@ -7460,6 +7493,9 @@ ORDERING:
                 }
             }
 
+            // Save state for undo
+            saveState('Edit Length', { lineIndex, newLength });
+
             // Force redraw of all measurements with collision detection
             drawMeasurements();
         }
@@ -7525,6 +7561,9 @@ ORDERING:
                 }
             }
 
+            // Save state for undo
+            saveState('Edit Angle', { vertexIndex, newAngle });
+
             // Force redraw of all measurements with collision detection
             drawMeasurements();
         }
@@ -7586,6 +7625,9 @@ ORDERING:
             if (isCompletedPiece) {
                 pieces[pieceIndex].points = piecePoints;
             }
+
+            // Save state for undo
+            saveState('Edit Piece Length', { lineIndex, newLength, pieceIndex });
 
             // Force redraw of all measurements with collision detection
             drawMeasurements();
@@ -7665,6 +7707,9 @@ ORDERING:
             if (isCompletedPiece) {
                 pieces[pieceIndex].points = piecePoints;
             }
+
+            // Save state for undo
+            saveState('Edit Piece Angle', { vertexIndex, newAngle, pieceIndex });
 
             // Force redraw of all measurements with collision detection
             drawMeasurements();
