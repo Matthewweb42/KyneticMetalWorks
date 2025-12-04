@@ -1863,14 +1863,7 @@
                 printSheet.offsetHeight;
             }
         
-        // Hide main UI, show print sheet
-        container.style.display = 'none';
-        printSheet.style.display = 'block';
-        
-        // Force a repaint to ensure the print sheet is visible
-        printSheet.offsetHeight;
-        
-        // Check for populated fields
+            // Check for populated fields
         const populatedFields = printSheet.querySelectorAll('[data-field]');
         let nonEmptyFields = 0;
         populatedFields.forEach(field => {
@@ -2409,6 +2402,12 @@ function loadHtml2Canvas() {
             const colorInput = document.getElementById('color');
             const colorPickerPopup = document.getElementById('colorPickerPopup');
             const colorManufacturerInput = document.getElementById('colorManufacturer');
+            
+            // Early return if elements don't exist
+            if (!colorInput || !colorPickerPopup || !colorManufacturerInput) {
+                console.log('Color picker elements not found, skipping initialization');
+                return;
+            }
             
             // Set default color
             colorInput.value = 'White';
@@ -7853,9 +7852,16 @@ function getHemDirection(prev, curr, next) {
 
         // Update gauge options based on metal type
 function updateGaugeOptions() {
-    const metalType = document.getElementById('metalType').value;
+    const metalTypeEl = document.getElementById('metalType');
     const gaugeSelect = document.getElementById('metalGauge');
     
+    // Early return if elements don't exist
+    if (!metalTypeEl || !gaugeSelect) {
+        console.log('Metal type or gauge elements not found, skipping updateGaugeOptions');
+        return;
+    }
+    
+    const metalType = metalTypeEl.value;
     gaugeSelect.innerHTML = '';
     
     if (metalType === 'steel') {
@@ -8134,34 +8140,371 @@ Request submitted: ${new Date().toLocaleString()}`;
 
 function generateDXFData() {
     const dxf = [];
-    dxf.push(
-        '0', 'SECTION',
-        '2', 'HEADER',
-        '9', '$ACADVER',
-        '1', 'AC1027',
-        '0', 'ENDSEC'
-    );
     
-    dxf.push('0', 'SECTION', '2', 'ENTITIES');
+    // Check if holes are enabled
+    const hasHoles = document.getElementById('hasHoles')?.checked && holeLocationInfo;
     
-    for (let i = 0; i < points.length - 1; i++) {
-        const start = screenToDxf(points[i]);
-        const end = screenToDxf(points[i + 1]);
-        
-        dxf.push(
-            '0', 'LINE',
-            '8', '0',
-            '10', start.x.toFixed(4),
-            '20', start.y.toFixed(4),
-            '30', '0.0',
-            '11', end.x.toFixed(4),
-            '21', end.y.toFixed(4),
-            '31', '0.0'
-        );
+    // Get product metadata (with safe fallbacks for missing elements)
+    const profileNameEl = document.getElementById('profileName');
+    const profileName = profileNameEl ? profileNameEl.value.trim() || 'Unnamed Profile' : 'Unnamed Profile';
+    
+    const lengthInputEl = document.getElementById('lengthInput');
+    const productLength = lengthInputEl ? parseFloat(lengthInputEl.value) || 10 : 10; // feet
+    const productLengthInches = productLength * 12;
+    
+    // Get gauge - try metalGauge first, fall back to default
+    const gaugeEl = document.getElementById('metalGauge');
+    const gauge = gaugeEl ? gaugeEl.value || '24' : '24';
+    
+    // Get material type - try metalType first, fall back to default  
+    const materialTypeEl = document.getElementById('metalType');
+    const materialType = materialTypeEl ? materialTypeEl.value || 'galvanized' : 'galvanized';
+    
+    // Calculate flat pattern width (material width) = sum of all segment lengths
+    let materialWidth = 0;
+    const bendPositions = []; // Track where bends occur (cumulative position)
+    const bendAngles = [];    // Track bend angles
+    
+    const allPieces = [...pieces];
+    if (points.length > 0) {
+        allPieces.push({ points: points });
     }
     
-    dxf.push('0', 'ENDSEC', '0', 'EOF');
-    return dxf.join('\r\n');
+    // Calculate total material width from profile segments
+    allPieces.forEach((piece) => {
+        const piecePoints = piece.points;
+        for (let i = 0; i < piecePoints.length - 1; i++) {
+            const start = screenToDxf(piecePoints[i]);
+            const end = screenToDxf(piecePoints[i + 1]);
+            const segmentLength = Math.sqrt(
+                Math.pow(end.x - start.x, 2) + Math.pow(end.y - start.y, 2)
+            );
+            
+            // Record bend position (before adding this segment)
+            if (i > 0) {
+                bendPositions.push(materialWidth);
+                // Calculate bend angle between this segment and previous
+                const prevStart = screenToDxf(piecePoints[i - 1]);
+                const prevEnd = screenToDxf(piecePoints[i]);
+                const prevAngle = Math.atan2(prevEnd.y - prevStart.y, prevEnd.x - prevStart.x);
+                const currAngle = Math.atan2(end.y - start.y, end.x - start.x);
+                let bendAngle = (currAngle - prevAngle) * (180 / Math.PI);
+                // Normalize to -180 to 180
+                while (bendAngle > 180) bendAngle -= 360;
+                while (bendAngle < -180) bendAngle += 360;
+                bendAngles.push(bendAngle);
+            }
+            
+            materialWidth += segmentLength;
+        }
+    });
+    
+    // Add hem data to bends if available
+    if (typeof hemData !== 'undefined' && hemData.length > 0) {
+        // Hems are additional bends at the edges
+        console.log('Hem data available:', hemData);
+    }
+    
+    console.log('Flat Pattern Calculation:', {
+        materialWidth: materialWidth.toFixed(4) + ' inches',
+        productLength: productLengthInches.toFixed(2) + ' inches',
+        bendCount: bendPositions.length,
+        bendPositions,
+        bendAngles
+    });
+    
+    // HEADER section
+    dxf.push('0', 'SECTION');
+    dxf.push('2', 'HEADER');
+    dxf.push('9', '$ACADVER');
+    dxf.push('1', 'AC1009');  // AutoCAD R12 format - most compatible
+    dxf.push('9', '$INSUNITS');
+    dxf.push('70', '1');  // 1 = Inches
+    dxf.push('0', 'ENDSEC');
+    
+    // TABLES section - define all layers
+    dxf.push('0', 'SECTION');
+    dxf.push('2', 'TABLES');
+    
+    // Layer table
+    dxf.push('0', 'TABLE');
+    dxf.push('2', 'LAYER');
+    dxf.push('70', '5');  // Number of layers
+    
+    // Layer OUTLINE - cut lines (white)
+    dxf.push('0', 'LAYER');
+    dxf.push('2', 'OUTLINE');
+    dxf.push('70', '0');
+    dxf.push('62', '7');  // White
+    dxf.push('6', 'CONTINUOUS');
+    
+    // Layer HOLES - punch positions (red)
+    dxf.push('0', 'LAYER');
+    dxf.push('2', 'HOLES');
+    dxf.push('70', '0');
+    dxf.push('62', '1');  // Red
+    dxf.push('6', 'CONTINUOUS');
+    
+    // Layer BEND_LINES - bend positions (yellow)
+    dxf.push('0', 'LAYER');
+    dxf.push('2', 'BEND_LINES');
+    dxf.push('70', '0');
+    dxf.push('62', '2');  // Yellow
+    dxf.push('6', 'CONTINUOUS');
+    
+    // Layer INFO - metadata text (cyan)
+    dxf.push('0', 'LAYER');
+    dxf.push('2', 'INFO');
+    dxf.push('70', '0');
+    dxf.push('62', '4');  // Cyan
+    dxf.push('6', 'CONTINUOUS');
+    
+    // Layer PROFILE - 2D profile reference (green)
+    dxf.push('0', 'LAYER');
+    dxf.push('2', 'PROFILE');
+    dxf.push('70', '0');
+    dxf.push('62', '3');  // Green
+    dxf.push('6', 'CONTINUOUS');
+    
+    dxf.push('0', 'ENDTAB');
+    dxf.push('0', 'ENDSEC');
+    
+    // ENTITIES section
+    dxf.push('0', 'SECTION');
+    dxf.push('2', 'ENTITIES');
+    
+    // ========== FLAT PATTERN (for slit machine) ==========
+    // Draw rectangle: width = materialWidth, height = productLength
+    const flatX = 0;
+    const flatY = 0;
+    
+    // Bottom edge
+    dxf.push('0', 'LINE');
+    dxf.push('8', 'OUTLINE');
+    dxf.push('10', flatX.toFixed(6));
+    dxf.push('20', flatY.toFixed(6));
+    dxf.push('30', '0.0');
+    dxf.push('11', (flatX + materialWidth).toFixed(6));
+    dxf.push('21', flatY.toFixed(6));
+    dxf.push('31', '0.0');
+    
+    // Right edge
+    dxf.push('0', 'LINE');
+    dxf.push('8', 'OUTLINE');
+    dxf.push('10', (flatX + materialWidth).toFixed(6));
+    dxf.push('20', flatY.toFixed(6));
+    dxf.push('30', '0.0');
+    dxf.push('11', (flatX + materialWidth).toFixed(6));
+    dxf.push('21', (flatY + productLengthInches).toFixed(6));
+    dxf.push('31', '0.0');
+    
+    // Top edge
+    dxf.push('0', 'LINE');
+    dxf.push('8', 'OUTLINE');
+    dxf.push('10', (flatX + materialWidth).toFixed(6));
+    dxf.push('20', (flatY + productLengthInches).toFixed(6));
+    dxf.push('30', '0.0');
+    dxf.push('11', flatX.toFixed(6));
+    dxf.push('21', (flatY + productLengthInches).toFixed(6));
+    dxf.push('31', '0.0');
+    
+    // Left edge
+    dxf.push('0', 'LINE');
+    dxf.push('8', 'OUTLINE');
+    dxf.push('10', flatX.toFixed(6));
+    dxf.push('20', (flatY + productLengthInches).toFixed(6));
+    dxf.push('30', '0.0');
+    dxf.push('11', flatX.toFixed(6));
+    dxf.push('21', flatY.toFixed(6));
+    dxf.push('31', '0.0');
+    
+    // ========== BEND LINES (for bend machine) ==========
+    // Draw vertical lines at each bend position
+    bendPositions.forEach((bendX, index) => {
+        // Bend line
+        dxf.push('0', 'LINE');
+        dxf.push('8', 'BEND_LINES');
+        dxf.push('10', (flatX + bendX).toFixed(6));
+        dxf.push('20', flatY.toFixed(6));
+        dxf.push('30', '0.0');
+        dxf.push('11', (flatX + bendX).toFixed(6));
+        dxf.push('21', (flatY + productLengthInches).toFixed(6));
+        dxf.push('31', '0.0');
+        
+        // Add bend angle as text annotation
+        const angleText = bendAngles[index] ? bendAngles[index].toFixed(1) + '°' : '';
+        if (angleText) {
+            dxf.push('0', 'TEXT');
+            dxf.push('8', 'BEND_LINES');
+            dxf.push('10', (flatX + bendX + 0.1).toFixed(6));
+            dxf.push('20', (flatY + productLengthInches + 0.5).toFixed(6));
+            dxf.push('30', '0.0');
+            dxf.push('40', '0.25');  // Text height
+            dxf.push('1', angleText);
+        }
+    });
+    
+    // ========== HOLES (for punch machine) ==========
+    // Holes are placed along the LENGTH (Y axis) of the flat pattern
+    // - distanceFromEdge: how far from the profile edge (X position in flat pattern)
+    // - startFromEnd: how far from each end of the product length (Y positions)
+    // - holeSpacing: distance between holes along the length
+    // - holeSize: diameter of holes
+    if (hasHoles) {
+        const isMetric = document.querySelector('input[name="holeUnits"]:checked').value === 'mm';
+        const holeDiameter = getHoleSizeValue();
+        let holeRadius = holeDiameter / 2;
+        if (isMetric) {
+            holeRadius = holeRadius / 25.4;  // Convert mm to inches
+        }
+        const holeSpacing = getHoleSpacingValue();      // Inches between holes along length
+        const startFromEnd = getStartFromEndValue();     // Inches from each end of product length
+        const distanceFromEdge = getDistanceFromEdgeValue(); // Inches from profile edge (width direction)
+        
+        console.log('Hole Parameters:', {
+            holeDiameter: holeDiameter + (isMetric ? 'mm' : '"'),
+            holeRadius: holeRadius.toFixed(4) + '"',
+            holeSpacing: holeSpacing + '"',
+            startFromEnd: startFromEnd + '"',
+            distanceFromEdge: distanceFromEdge + '"',
+            productLength: productLengthInches + '"',
+            materialWidth: materialWidth.toFixed(4) + '"'
+        });
+        
+        // X position: CENTER the holes on the material width
+        // The holes run along the length of the profile, centered width-wise
+        const holeX = flatX + (materialWidth / 2);
+        
+        // Y positions: start at startFromEnd, end at (productLength - startFromEnd)
+        // Place holes along the length of the product
+        let currentY = flatY + startFromEnd;
+        const endY = flatY + productLengthInches - startFromEnd;
+        let holeCount = 0;
+        
+        while (currentY <= endY + 0.001) {  // Small tolerance for floating point
+            dxf.push('0', 'CIRCLE');
+            dxf.push('8', 'HOLES');
+            dxf.push('10', holeX.toFixed(6));      // X = distance from edge
+            dxf.push('20', currentY.toFixed(6));   // Y = position along length
+            dxf.push('30', '0.0');
+            dxf.push('40', holeRadius.toFixed(6)); // Radius (diameter/2)
+            
+            holeCount++;
+            currentY += holeSpacing;
+        }
+        
+        console.log('Holes placed:', {
+            count: holeCount,
+            xPosition: holeX.toFixed(4) + '" from left edge',
+            firstHoleY: (flatY + startFromEnd).toFixed(4) + '"',
+            lastHoleY: endY.toFixed(4) + '"'
+        });
+    }
+    
+    // ========== PRODUCT INFO (metadata layer) ==========
+    const infoX = flatX;
+    const infoY = flatY + productLengthInches + 2;  // Above the flat pattern
+    const textHeight = 0.5;
+    const lineSpacing = 0.8;
+    let infoLine = 0;
+    
+    // Product name
+    dxf.push('0', 'TEXT');
+    dxf.push('8', 'INFO');
+    dxf.push('10', infoX.toFixed(6));
+    dxf.push('20', (infoY + lineSpacing * (hasHoles ? 6 : 4)).toFixed(6));
+    dxf.push('30', '0.0');
+    dxf.push('40', textHeight.toFixed(6));
+    dxf.push('1', 'PROFILE: ' + profileName);
+    
+    // Material info
+    dxf.push('0', 'TEXT');
+    dxf.push('8', 'INFO');
+    dxf.push('10', infoX.toFixed(6));
+    dxf.push('20', (infoY + lineSpacing * (hasHoles ? 5 : 3)).toFixed(6));
+    dxf.push('30', '0.0');
+    dxf.push('40', textHeight.toFixed(6));
+    dxf.push('1', 'MATERIAL: ' + gauge + ' GA ' + materialType.toUpperCase());
+    
+    // Total Length (prominent)
+    dxf.push('0', 'TEXT');
+    dxf.push('8', 'INFO');
+    dxf.push('10', infoX.toFixed(6));
+    dxf.push('20', (infoY + lineSpacing * (hasHoles ? 4 : 2)).toFixed(6));
+    dxf.push('30', '0.0');
+    dxf.push('40', textHeight.toFixed(6));
+    dxf.push('1', 'TOTAL LENGTH: ' + productLengthInches.toFixed(2) + '" (' + productLength.toFixed(2) + ' ft)');
+    
+    // Material Width
+    dxf.push('0', 'TEXT');
+    dxf.push('8', 'INFO');
+    dxf.push('10', infoX.toFixed(6));
+    dxf.push('20', (infoY + lineSpacing * (hasHoles ? 3 : 1)).toFixed(6));
+    dxf.push('30', '0.0');
+    dxf.push('40', textHeight.toFixed(6));
+    dxf.push('1', 'MATERIAL WIDTH: ' + materialWidth.toFixed(3) + '"');
+    
+    // Bend count
+    dxf.push('0', 'TEXT');
+    dxf.push('8', 'INFO');
+    dxf.push('10', infoX.toFixed(6));
+    dxf.push('20', (infoY + lineSpacing * (hasHoles ? 2 : 0)).toFixed(6));
+    dxf.push('30', '0.0');
+    dxf.push('40', textHeight.toFixed(6));
+    dxf.push('1', 'BENDS: ' + bendPositions.length);
+    
+    // Hole info if applicable - now with full details
+    if (hasHoles) {
+        const holeDia = getHoleSizeValue();
+        const isMetric = document.querySelector('input[name="holeUnits"]:checked').value === 'mm';
+        const holeSpacing = getHoleSpacingValue();
+        const startFromEnd = getStartFromEndValue();
+        const distanceFromEdge = getDistanceFromEdgeValue();
+        
+        // Hole diameter and spacing
+        dxf.push('0', 'TEXT');
+        dxf.push('8', 'INFO');
+        dxf.push('10', infoX.toFixed(6));
+        dxf.push('20', (infoY + lineSpacing * 1).toFixed(6));
+        dxf.push('30', '0.0');
+        dxf.push('40', textHeight.toFixed(6));
+        dxf.push('1', 'HOLES: DIA=' + holeDia.toFixed(3) + (isMetric ? 'mm' : '"') + ' SPACING=' + holeSpacing.toFixed(3) + '"');
+        
+        // Hole positioning
+        dxf.push('0', 'TEXT');
+        dxf.push('8', 'INFO');
+        dxf.push('10', infoX.toFixed(6));
+        dxf.push('20', infoY.toFixed(6));
+        dxf.push('30', '0.0');
+        dxf.push('40', textHeight.toFixed(6));
+        dxf.push('1', 'HOLE POS: FROM_EDGE=' + distanceFromEdge.toFixed(3) + '" FROM_END=' + startFromEnd.toFixed(3) + '"');
+    }
+    
+    // ========== 2D PROFILE REFERENCE (offset to the right) ==========
+    const profileOffsetX = materialWidth + 5;  // 5 inches to the right of flat pattern
+    const profileOffsetY = 0;
+    
+    allPieces.forEach((piece) => {
+        const piecePoints = piece.points;
+        for (let i = 0; i < piecePoints.length - 1; i++) {
+            const start = screenToDxf(piecePoints[i]);
+            const end = screenToDxf(piecePoints[i + 1]);
+            
+            dxf.push('0', 'LINE');
+            dxf.push('8', 'PROFILE');
+            dxf.push('10', (start.x + profileOffsetX).toFixed(6));
+            dxf.push('20', (start.y + profileOffsetY).toFixed(6));
+            dxf.push('30', '0.0');
+            dxf.push('11', (end.x + profileOffsetX).toFixed(6));
+            dxf.push('21', (end.y + profileOffsetY).toFixed(6));
+            dxf.push('31', '0.0');
+        }
+    });
+    
+    dxf.push('0', 'ENDSEC');
+    dxf.push('0', 'EOF');
+    
+    return dxf.join('\n');
 }
 
 function showSuccessMessage() {
