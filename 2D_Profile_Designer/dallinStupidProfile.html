@@ -3400,7 +3400,7 @@ ORDERING:
             
             const link = document.createElement('a');
             link.href = url;
-            link.download = `${profileName.replace(/[^a-z0-9]/gi, '_')}-${Date.now()}.dxf`;
+            link.download = `${profileName}.dxf`;
             link.click();
             
             URL.revokeObjectURL(url);
@@ -8149,8 +8149,13 @@ function generateDXFData() {
     const profileName = profileNameEl ? profileNameEl.value.trim() || 'Unnamed Profile' : 'Unnamed Profile';
     
     const lengthInputEl = document.getElementById('lengthInput');
-    const productLength = lengthInputEl ? parseFloat(lengthInputEl.value) || 10 : 10; // feet
-    const productLengthInches = productLength * 12;
+    const productLengthInches = lengthInputEl ? parseFloat(lengthInputEl.value) : 0;
+    
+    // Validate that length is provided
+    if (!productLengthInches || productLengthInches <= 0) {
+        alert('Please enter a valid length in inches before exporting DXF.');
+        return null;
+    }
     
     // Get gauge - try metalGauge first, fall back to default
     const gaugeEl = document.getElementById('metalGauge');
@@ -8165,10 +8170,46 @@ function generateDXFData() {
     const bendPositions = []; // Track where bends occur (cumulative position)
     const bendAngles = [];    // Track bend angles
     
+    // Hem tracking
+    let startHemLength = 0;   // Hem at start of profile (first point)
+    let endHemLength = 0;     // Hem at end of profile (last point)
+    let startHemType = null;  // "closed" or "open"
+    let endHemType = null;
+    const hemBendPositions = [];  // Track hem bend line positions
+    const hemBendLabels = [];     // Track hem bend labels
+    
     const allPieces = [...pieces];
     if (points.length > 0) {
         allPieces.push({ points: points });
     }
+    
+    // First, collect hem data from all pieces
+    allPieces.forEach((piece) => {
+        const piecePoints = piece.points;
+        if (piecePoints.length > 0) {
+            // Check first point for start hem
+            const firstPoint = piecePoints[0];
+            if (firstPoint.isHem && firstPoint.hemData) {
+                const hemLen = typeof firstPoint.hemData.length === 'number' 
+                    ? firstPoint.hemData.length 
+                    : parseFloat(firstPoint.hemData.length) || 0;
+                startHemLength = hemLen;
+                startHemType = firstPoint.hemData.type || 'closed';
+                console.log('Start hem found:', { length: startHemLength, type: startHemType });
+            }
+            
+            // Check last point for end hem
+            const lastPoint = piecePoints[piecePoints.length - 1];
+            if (lastPoint.isHem && lastPoint.hemData) {
+                const hemLen = typeof lastPoint.hemData.length === 'number' 
+                    ? lastPoint.hemData.length 
+                    : parseFloat(lastPoint.hemData.length) || 0;
+                endHemLength = hemLen;
+                endHemType = lastPoint.hemData.type || 'closed';
+                console.log('End hem found:', { length: endHemLength, type: endHemType });
+            }
+        }
+    });
     
     // Calculate total material width from profile segments
     allPieces.forEach((piece) => {
@@ -8181,8 +8222,9 @@ function generateDXFData() {
             );
             
             // Record bend position (before adding this segment)
+            // Note: bend positions are offset by start hem length
             if (i > 0) {
-                bendPositions.push(materialWidth);
+                bendPositions.push(startHemLength + materialWidth);
                 // Calculate bend angle between this segment and previous
                 const prevStart = screenToDxf(piecePoints[i - 1]);
                 const prevEnd = screenToDxf(piecePoints[i]);
@@ -8199,18 +8241,34 @@ function generateDXFData() {
         }
     });
     
-    // Add hem data to bends if available
-    if (typeof hemData !== 'undefined' && hemData.length > 0) {
-        // Hems are additional bends at the edges
-        console.log('Hem data available:', hemData);
+    // Calculate hem bend positions (these are fold lines for the hems)
+    if (startHemLength > 0) {
+        hemBendPositions.push(startHemLength);  // Hem fold line at end of start hem
+        const hemLabel = startHemType === 'closed' ? 'HEM 180°' : 'HEM OPEN';
+        hemBendLabels.push(hemLabel);
+    }
+    if (endHemLength > 0) {
+        hemBendPositions.push(startHemLength + materialWidth);  // Hem fold line at start of end hem
+        const hemLabel = endHemType === 'closed' ? 'HEM 180°' : 'HEM OPEN';
+        hemBendLabels.push(hemLabel);
     }
     
+    // Add hem lengths to total material width
+    const profileWidth = materialWidth;  // Save original profile width
+    materialWidth = startHemLength + materialWidth + endHemLength;  // Total includes hems
+    
     console.log('Flat Pattern Calculation:', {
-        materialWidth: materialWidth.toFixed(4) + ' inches',
+        profileWidth: profileWidth.toFixed(4) + ' inches (without hems)',
+        materialWidth: materialWidth.toFixed(4) + ' inches (with hems)',
+        startHem: startHemLength > 0 ? startHemLength.toFixed(4) + '" (' + startHemType + ')' : 'none',
+        endHem: endHemLength > 0 ? endHemLength.toFixed(4) + '" (' + endHemType + ')' : 'none',
         productLength: productLengthInches.toFixed(2) + ' inches',
         bendCount: bendPositions.length,
+        hemBendCount: hemBendPositions.length,
         bendPositions,
-        bendAngles
+        bendAngles,
+        hemBendPositions,
+        hemBendLabels
     });
     
     // HEADER section
@@ -8229,7 +8287,7 @@ function generateDXFData() {
     // Layer table
     dxf.push('0', 'TABLE');
     dxf.push('2', 'LAYER');
-    dxf.push('70', '5');  // Number of layers
+    dxf.push('70', '6');  // Number of layers
     
     // Layer OUTLINE - cut lines (white)
     dxf.push('0', 'LAYER');
@@ -8250,6 +8308,13 @@ function generateDXFData() {
     dxf.push('2', 'BEND_LINES');
     dxf.push('70', '0');
     dxf.push('62', '2');  // Yellow
+    dxf.push('6', 'CONTINUOUS');
+    
+    // Layer HEMS - hem fold lines (magenta)
+    dxf.push('0', 'LAYER');
+    dxf.push('2', 'HEMS');
+    dxf.push('70', '0');
+    dxf.push('62', '6');  // Magenta
     dxf.push('6', 'CONTINUOUS');
     
     // Layer INFO - metadata text (cyan)
@@ -8344,9 +8409,34 @@ function generateDXFData() {
         }
     });
     
+    // ========== HEM LINES (for hem folds) ==========
+    // Draw vertical lines at each hem fold position on the HEMS layer
+    hemBendPositions.forEach((hemX, index) => {
+        // Hem fold line
+        dxf.push('0', 'LINE');
+        dxf.push('8', 'HEMS');
+        dxf.push('10', (flatX + hemX).toFixed(6));
+        dxf.push('20', flatY.toFixed(6));
+        dxf.push('30', '0.0');
+        dxf.push('11', (flatX + hemX).toFixed(6));
+        dxf.push('21', (flatY + productLengthInches).toFixed(6));
+        dxf.push('31', '0.0');
+        
+        // Add hem label as text annotation
+        const hemLabel = hemBendLabels[index] || 'HEM';
+        dxf.push('0', 'TEXT');
+        dxf.push('8', 'HEMS');
+        dxf.push('10', (flatX + hemX + 0.1).toFixed(6));
+        dxf.push('20', (flatY + productLengthInches + 0.8).toFixed(6));
+        dxf.push('30', '0.0');
+        dxf.push('40', '0.25');  // Text height
+        dxf.push('1', hemLabel);
+    });
+    
     // ========== HOLES (for punch machine) ==========
     // Holes are placed along the LENGTH (Y axis) of the flat pattern
-    // - distanceFromEdge: how far from the profile edge (X position in flat pattern)
+    // Holes are placed on a SPECIFIC SEGMENT selected by the user (holeLocationInfo)
+    // - distanceFromEdge: how far from the start of that segment (X position in flat pattern)
     // - startFromEnd: how far from each end of the product length (Y positions)
     // - holeSpacing: distance between holes along the length
     // - holeSize: diameter of holes
@@ -8359,7 +8449,44 @@ function generateDXFData() {
         }
         const holeSpacing = getHoleSpacingValue();      // Inches between holes along length
         const startFromEnd = getStartFromEndValue();     // Inches from each end of product length
-        const distanceFromEdge = getDistanceFromEdgeValue(); // Inches from profile edge (width direction)
+        const distanceFromEdge = getDistanceFromEdgeValue(); // Inches from segment start (width direction)
+        
+        // Calculate X position based on selected segment
+        // First, find cumulative distance to the start of the selected segment
+        let cumulativeDistanceToSegmentStart = 0;
+        let selectedSegmentLength = 0;
+        let foundSegment = false;
+        
+        if (holeLocationInfo) {
+            const targetPieceIndex = holeLocationInfo.pieceIndex !== undefined ? holeLocationInfo.pieceIndex : 0;
+            const targetLineIndex = holeLocationInfo.lineIndex !== undefined ? holeLocationInfo.lineIndex : 0;
+            
+            // For current points (not yet in pieces array), pieceIndex might be -1 or match pieces.length
+            // In that case, use the current 'points' array which is the last item in allPieces
+            const effectivePieceIndex = (targetPieceIndex === -1 || targetPieceIndex >= pieces.length) 
+                ? allPieces.length - 1 
+                : targetPieceIndex;
+            
+            // Calculate distance to the selected segment
+            for (let pieceIdx = 0; pieceIdx < allPieces.length && !foundSegment; pieceIdx++) {
+                const piecePoints = allPieces[pieceIdx].points;
+                for (let i = 0; i < piecePoints.length - 1; i++) {
+                    const start = screenToDxf(piecePoints[i]);
+                    const end = screenToDxf(piecePoints[i + 1]);
+                    const segmentLength = Math.sqrt(
+                        Math.pow(end.x - start.x, 2) + Math.pow(end.y - start.y, 2)
+                    );
+                    
+                    if (pieceIdx === effectivePieceIndex && i === targetLineIndex) {
+                        // Found the selected segment
+                        selectedSegmentLength = segmentLength;
+                        foundSegment = true;
+                        break;
+                    }
+                    cumulativeDistanceToSegmentStart += segmentLength;
+                }
+            }
+        }
         
         console.log('Hole Parameters:', {
             holeDiameter: holeDiameter + (isMetric ? 'mm' : '"'),
@@ -8368,12 +8495,18 @@ function generateDXFData() {
             startFromEnd: startFromEnd + '"',
             distanceFromEdge: distanceFromEdge + '"',
             productLength: productLengthInches + '"',
-            materialWidth: materialWidth.toFixed(4) + '"'
+            materialWidth: materialWidth.toFixed(4) + '"',
+            profileWidth: profileWidth.toFixed(4) + '"',
+            startHemLength: startHemLength.toFixed(4) + '"',
+            cumulativeDistanceToSegmentStart: cumulativeDistanceToSegmentStart.toFixed(4) + '"',
+            selectedSegmentLength: selectedSegmentLength.toFixed(4) + '"',
+            foundSegment: foundSegment,
+            holeLocationInfo: holeLocationInfo
         });
         
-        // X position: CENTER the holes on the material width
-        // The holes run along the length of the profile, centered width-wise
-        const holeX = flatX + (materialWidth / 2);
+        // X position: start hem + cumulative distance to segment start + distance from edge of that segment
+        // distanceFromEdge is how far from the START of the selected segment the hole center should be
+        const holeX = flatX + startHemLength + cumulativeDistanceToSegmentStart + distanceFromEdge;
         
         // Y positions: start at startFromEnd, end at (productLength - startFromEnd)
         // Place holes along the length of the product
@@ -8406,13 +8539,20 @@ function generateDXFData() {
     const infoY = flatY + productLengthInches + 2;  // Above the flat pattern
     const textHeight = 0.5;
     const lineSpacing = 0.8;
-    let infoLine = 0;
+    
+    // Calculate number of info lines for proper spacing
+    const hasHems = (startHemLength > 0 || endHemLength > 0);
+    let totalInfoLines = 5;  // Base: profile, material, length, width, bends
+    if (hasHoles) totalInfoLines += 2;  // Hole diameter/spacing + positioning
+    if (hasHems) totalInfoLines += 1;   // Hem info line
+    
+    let currentLine = totalInfoLines - 1;
     
     // Product name
     dxf.push('0', 'TEXT');
     dxf.push('8', 'INFO');
     dxf.push('10', infoX.toFixed(6));
-    dxf.push('20', (infoY + lineSpacing * (hasHoles ? 6 : 4)).toFixed(6));
+    dxf.push('20', (infoY + lineSpacing * currentLine--).toFixed(6));
     dxf.push('30', '0.0');
     dxf.push('40', textHeight.toFixed(6));
     dxf.push('1', 'PROFILE: ' + profileName);
@@ -8421,7 +8561,7 @@ function generateDXFData() {
     dxf.push('0', 'TEXT');
     dxf.push('8', 'INFO');
     dxf.push('10', infoX.toFixed(6));
-    dxf.push('20', (infoY + lineSpacing * (hasHoles ? 5 : 3)).toFixed(6));
+    dxf.push('20', (infoY + lineSpacing * currentLine--).toFixed(6));
     dxf.push('30', '0.0');
     dxf.push('40', textHeight.toFixed(6));
     dxf.push('1', 'MATERIAL: ' + gauge + ' GA ' + materialType.toUpperCase());
@@ -8430,28 +8570,50 @@ function generateDXFData() {
     dxf.push('0', 'TEXT');
     dxf.push('8', 'INFO');
     dxf.push('10', infoX.toFixed(6));
-    dxf.push('20', (infoY + lineSpacing * (hasHoles ? 4 : 2)).toFixed(6));
+    dxf.push('20', (infoY + lineSpacing * currentLine--).toFixed(6));
     dxf.push('30', '0.0');
     dxf.push('40', textHeight.toFixed(6));
-    dxf.push('1', 'TOTAL LENGTH: ' + productLengthInches.toFixed(2) + '" (' + productLength.toFixed(2) + ' ft)');
+    dxf.push('1', 'TOTAL LENGTH: ' + productLengthInches.toFixed(2) + '"');
     
-    // Material Width
+    // Material Width (including hems)
     dxf.push('0', 'TEXT');
     dxf.push('8', 'INFO');
     dxf.push('10', infoX.toFixed(6));
-    dxf.push('20', (infoY + lineSpacing * (hasHoles ? 3 : 1)).toFixed(6));
+    dxf.push('20', (infoY + lineSpacing * currentLine--).toFixed(6));
     dxf.push('30', '0.0');
     dxf.push('40', textHeight.toFixed(6));
-    dxf.push('1', 'MATERIAL WIDTH: ' + materialWidth.toFixed(3) + '"');
+    dxf.push('1', 'MATERIAL WIDTH: ' + materialWidth.toFixed(3) + '"' + (hasHems ? ' (incl. hems)' : ''));
     
     // Bend count
     dxf.push('0', 'TEXT');
     dxf.push('8', 'INFO');
     dxf.push('10', infoX.toFixed(6));
-    dxf.push('20', (infoY + lineSpacing * (hasHoles ? 2 : 0)).toFixed(6));
+    dxf.push('20', (infoY + lineSpacing * currentLine--).toFixed(6));
     dxf.push('30', '0.0');
     dxf.push('40', textHeight.toFixed(6));
     dxf.push('1', 'BENDS: ' + bendPositions.length);
+    
+    // Hem info if applicable
+    if (hasHems) {
+        let hemInfoText = 'HEMS: ';
+        if (startHemLength > 0) {
+            hemInfoText += 'START=' + startHemLength.toFixed(3) + '" (' + (startHemType === 'closed' ? '180°' : 'OPEN') + ')';
+        }
+        if (startHemLength > 0 && endHemLength > 0) {
+            hemInfoText += ', ';
+        }
+        if (endHemLength > 0) {
+            hemInfoText += 'END=' + endHemLength.toFixed(3) + '" (' + (endHemType === 'closed' ? '180°' : 'OPEN') + ')';
+        }
+        
+        dxf.push('0', 'TEXT');
+        dxf.push('8', 'INFO');
+        dxf.push('10', infoX.toFixed(6));
+        dxf.push('20', (infoY + lineSpacing * currentLine--).toFixed(6));
+        dxf.push('30', '0.0');
+        dxf.push('40', textHeight.toFixed(6));
+        dxf.push('1', hemInfoText);
+    }
     
     // Hole info if applicable - now with full details
     if (hasHoles) {
@@ -8465,7 +8627,7 @@ function generateDXFData() {
         dxf.push('0', 'TEXT');
         dxf.push('8', 'INFO');
         dxf.push('10', infoX.toFixed(6));
-        dxf.push('20', (infoY + lineSpacing * 1).toFixed(6));
+        dxf.push('20', (infoY + lineSpacing * currentLine--).toFixed(6));
         dxf.push('30', '0.0');
         dxf.push('40', textHeight.toFixed(6));
         dxf.push('1', 'HOLES: DIA=' + holeDia.toFixed(3) + (isMetric ? 'mm' : '"') + ' SPACING=' + holeSpacing.toFixed(3) + '"');
@@ -8474,7 +8636,7 @@ function generateDXFData() {
         dxf.push('0', 'TEXT');
         dxf.push('8', 'INFO');
         dxf.push('10', infoX.toFixed(6));
-        dxf.push('20', infoY.toFixed(6));
+        dxf.push('20', (infoY + lineSpacing * currentLine--).toFixed(6));
         dxf.push('30', '0.0');
         dxf.push('40', textHeight.toFixed(6));
         dxf.push('1', 'HOLE POS: FROM_EDGE=' + distanceFromEdge.toFixed(3) + '" FROM_END=' + startFromEnd.toFixed(3) + '"');
@@ -8499,6 +8661,109 @@ function generateDXFData() {
             dxf.push('21', (end.y + profileOffsetY).toFixed(6));
             dxf.push('31', '0.0');
         }
+        
+        // Draw hems on profile reference
+        piecePoints.forEach((point, index) => {
+            if (point.isHem && point.hemData) {
+                const hemLengthIn = typeof point.hemData.length === 'number' 
+                    ? point.hemData.length 
+                    : parseFloat(point.hemData.length) || 0.5;
+                const hemType = point.hemData.type || 'closed';
+                const hemSide = point.hemData.side || 'default';
+                
+                // Get the hem point position in DXF coords
+                const hemPt = screenToDxf(point);
+                
+                // Determine incoming line direction (from previous point or to next point)
+                let incomingNorm = { x: 0, y: -1 };  // Default: pointing up
+                
+                if (index === 0 && piecePoints.length > 1) {
+                    // First point - direction from first to second point
+                    const nextPt = screenToDxf(piecePoints[1]);
+                    const dx = nextPt.x - hemPt.x;
+                    const dy = nextPt.y - hemPt.y;
+                    const len = Math.sqrt(dx * dx + dy * dy);
+                    if (len > 0) {
+                        incomingNorm = { x: dx / len, y: dy / len };
+                    }
+                } else if (index === piecePoints.length - 1 && piecePoints.length > 1) {
+                    // Last point - direction from second-to-last to last point
+                    const prevPt = screenToDxf(piecePoints[piecePoints.length - 2]);
+                    const dx = hemPt.x - prevPt.x;
+                    const dy = hemPt.y - prevPt.y;
+                    const len = Math.sqrt(dx * dx + dy * dy);
+                    if (len > 0) {
+                        incomingNorm = { x: dx / len, y: dy / len };
+                    }
+                }
+                
+                // Determine fold direction based on hemSide
+                // We need to match what's shown on screen canvas
+                // In screen coords Y goes down, in DXF Y goes up - so we flip the Y component
+                const foldDirection = (hemSide === 'flipped') ? -1 : 1;
+                
+                // Calculate perpendicular direction for fold
+                // Rotate 90 degrees CW = (dy, -dx) to match screen rendering after DXF Y-flip
+                const perpendicular = {
+                    x: incomingNorm.y * foldDirection,
+                    y: -incomingNorm.x * foldDirection
+                };
+                
+                // Radius for the hem arc (smaller for closed, larger for open)
+                const radius = hemType === 'closed' ? 0.05 : 0.10;
+                
+                // Arc center
+                const centerX = hemPt.x + perpendicular.x * radius;
+                const centerY = hemPt.y + perpendicular.y * radius;
+                
+                // Arc start (at the hem point)
+                const arcStartX = hemPt.x + profileOffsetX;
+                const arcStartY = hemPt.y + profileOffsetY;
+                
+                // Arc end (180 degrees around)
+                const arcEndX = hemPt.x + perpendicular.x * radius * 2 + profileOffsetX;
+                const arcEndY = hemPt.y + perpendicular.y * radius * 2 + profileOffsetY;
+                
+                // Draw hem arc using ARC entity
+                // DXF ARC: center point, radius, start angle, end angle
+                const arcCenterX = centerX + profileOffsetX;
+                const arcCenterY = centerY + profileOffsetY;
+                
+                // Calculate start and end angles for the arc
+                // Start angle: from center to arc start point (the hem point on the profile)
+                const startAngle = Math.atan2(hemPt.y - centerY, hemPt.x - centerX) * (180 / Math.PI);
+                // End angle: 180 degrees from start (arc goes to the folded edge)
+                // DXF arcs go counter-clockwise, so we need to set angles appropriately
+                const endAngle = startAngle + 180;
+                
+                dxf.push('0', 'ARC');
+                dxf.push('8', 'PROFILE');
+                dxf.push('10', arcCenterX.toFixed(6));  // Center X
+                dxf.push('20', arcCenterY.toFixed(6));  // Center Y
+                dxf.push('30', '0.0');                   // Center Z
+                dxf.push('40', radius.toFixed(6));       // Radius
+                // DXF arcs go CCW from start to end angle
+                // To flip arc direction, swap start and end
+                dxf.push('50', (foldDirection > 0 ? endAngle : startAngle).toFixed(6));  // Start angle
+                dxf.push('51', (foldDirection > 0 ? startAngle : endAngle).toFixed(6));  // End angle
+                
+                // Draw the folded edge (the material that folds back)
+                // It extends from the arc end back along the incoming direction
+                const foldedEdgeEndX = hemPt.x + perpendicular.x * radius * 2;
+                const foldedEdgeEndY = hemPt.y + perpendicular.y * radius * 2;
+                const foldedEdgeStartX = foldedEdgeEndX - incomingNorm.x * hemLengthIn;
+                const foldedEdgeStartY = foldedEdgeEndY - incomingNorm.y * hemLengthIn;
+                
+                dxf.push('0', 'LINE');
+                dxf.push('8', 'PROFILE');
+                dxf.push('10', (foldedEdgeStartX + profileOffsetX).toFixed(6));
+                dxf.push('20', (foldedEdgeStartY + profileOffsetY).toFixed(6));
+                dxf.push('30', '0.0');
+                dxf.push('11', (foldedEdgeEndX + profileOffsetX).toFixed(6));
+                dxf.push('21', (foldedEdgeEndY + profileOffsetY).toFixed(6));
+                dxf.push('31', '0.0');
+            }
+        });
     });
     
     dxf.push('0', 'ENDSEC');
