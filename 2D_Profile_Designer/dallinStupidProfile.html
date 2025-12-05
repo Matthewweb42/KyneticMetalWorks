@@ -8504,34 +8504,45 @@ function generateDXFData() {
             holeLocationInfo: holeLocationInfo
         });
         
-        // X position: start hem + cumulative distance to segment start + distance from edge of that segment
-        // distanceFromEdge is how far from the START of the selected segment the hole center should be
-        const holeX = flatX + startHemLength + cumulativeDistanceToSegmentStart + distanceFromEdge;
-        
-        // Y positions: start at startFromEnd, end at (productLength - startFromEnd)
-        // Place holes along the length of the product
-        let currentY = flatY + startFromEnd;
-        const endY = flatY + productLengthInches - startFromEnd;
-        let holeCount = 0;
-        
-        while (currentY <= endY + 0.001) {  // Small tolerance for floating point
-            dxf.push('0', 'CIRCLE');
-            dxf.push('8', 'HOLES');
-            dxf.push('10', holeX.toFixed(6));      // X = distance from edge
-            dxf.push('20', currentY.toFixed(6));   // Y = position along length
-            dxf.push('30', '0.0');
-            dxf.push('40', holeRadius.toFixed(6)); // Radius (diameter/2)
+        // Validate that the profile is wide enough for the specified edge distance
+        if (distanceFromEdge >= profileWidth) {
+            console.warn('Hole validation failed: distanceFromEdge (' + distanceFromEdge + '") >= profileWidth (' + profileWidth.toFixed(4) + '")');
+            alert('Warning: The profile is too narrow (' + profileWidth.toFixed(2) + '") for the specified "From Edge" distance (' + distanceFromEdge + '"). Holes will be skipped in the DXF export.');
+        } else if (!foundSegment) {
+            console.warn('Hole validation failed: Could not find the selected segment');
+            alert('Warning: Could not locate the selected hole segment. Please re-select a segment for holes.');
+        } else {
+            // X position: start hem + distance from profile edge
+            // distanceFromEdge is how far from the FIRST EDGE of the entire profile the hole center should be
+            const holeX = flatX + startHemLength + distanceFromEdge;
             
-            holeCount++;
-            currentY += holeSpacing;
+            // Y positions: start at startFromEnd, end at (productLength - startFromEnd)
+            // Place holes along the length of the product
+            let currentY = flatY + startFromEnd;
+            const endY = flatY + productLengthInches - startFromEnd;
+            let holeCount = 0;
+            
+            while (currentY <= endY + 0.001) {  // Small tolerance for floating point
+                dxf.push('0', 'CIRCLE');
+                dxf.push('8', 'HOLES');
+                dxf.push('10', holeX.toFixed(6));      // X = distance from first edge of profile
+                dxf.push('20', currentY.toFixed(6));   // Y = position along length
+                dxf.push('30', '0.0');
+                dxf.push('40', holeRadius.toFixed(6)); // Radius (diameter/2)
+                
+                holeCount++;
+                currentY += holeSpacing;
+            }
+            
+            console.log('Holes placed:', {
+                count: holeCount,
+                xPosition: holeX.toFixed(4) + '" from left edge of flat pattern',
+                profileEdgeOffset: distanceFromEdge + '" from first edge of profile',
+                profileWidth: profileWidth.toFixed(4) + '"',
+                firstHoleY: (flatY + startFromEnd).toFixed(4) + '"',
+                lastHoleY: endY.toFixed(4) + '"'
+            });
         }
-        
-        console.log('Holes placed:', {
-            count: holeCount,
-            xPosition: holeX.toFixed(4) + '" from left edge',
-            firstHoleY: (flatY + startFromEnd).toFixed(4) + '"',
-            lastHoleY: endY.toFixed(4) + '"'
-        });
     }
     
     // ========== PRODUCT INFO (metadata layer) ==========
