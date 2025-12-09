@@ -907,6 +907,82 @@
             width: 150px;
         }
 
+        /* Advanced Dropdown Menu */
+        .dropdown {
+            position: relative;
+            display: inline-block;
+        }
+
+        .dropdown-btn {
+            background: #34495e !important;
+            color: white !important;
+            border: 1px solid #34495e !important;
+            padding: 6px 12px;
+            font-size: 12px;
+            cursor: pointer;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .dropdown-btn:hover {
+            background: #2c3e50 !important;
+        }
+
+        .dropdown-btn::after {
+            content: '▼';
+            font-size: 8px;
+        }
+
+        .dropdown-content {
+            display: none;
+            position: absolute;
+            background: white;
+            min-width: 180px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            border-radius: 6px;
+            z-index: 1000;
+            top: 100%;
+            left: 0;
+            margin-top: 4px;
+            overflow: hidden;
+        }
+
+        .dropdown-content.show {
+            display: block;
+        }
+
+        .dropdown-item {
+            display: block;
+            width: 100%;
+            padding: 10px 14px;
+            text-align: left;
+            border: none;
+            background: white;
+            cursor: pointer;
+            font-size: 12px;
+            color: #2c3e50;
+            transition: background 0.2s;
+        }
+
+        .dropdown-item:hover {
+            background: #ecf0f1;
+        }
+
+        .dropdown-item:not(:last-child) {
+            border-bottom: 1px solid #eee;
+        }
+
+        .dropdown-item.disabled {
+            color: #aaa;
+            cursor: not-allowed;
+        }
+
+        .dropdown-item.disabled:hover {
+            background: white;
+        }
+
         /* Material Type Toggle */
         .material-type-toggle {
             display: flex;
@@ -1806,13 +1882,19 @@
 
                 <div class="action-buttons">
                     <button class="btn btn-warning" onclick="undoLastAction()" id="undoBtn">Undo</button>
-                    <button class="btn btn-primary" onclick="addNewPiece()" id="addPieceBtn" disabled>Add Piece</button>
-                    <button class="btn btn-primary" onclick="showSlopingRoofModal()">Create Sloping Roof</button>
-                    <button class="btn btn-danger" onclick="clearCanvas()">Clear Profile</button>
+                    <button class="btn btn-danger" onclick="clearCanvas()">Clear</button>
                     <button class="btn btn-info" onclick="loadProject()" style="background: #3498db !important; color: white !important; border: 1px solid #3498db !important;">Open</button>
                     <button class="btn btn-success" onclick="downloadProjectAndOrderSheet()" style="background: #27ae60 !important; color: white !important; border: 1px solid #27ae60 !important;">Save</button>
                     <button class="btn btn-success" onclick="downloadPDF()" id="downloadBtn" style="background: #16a085 !important; color: white !important; border: 1px solid #16a085 !important;">Print Sheet</button>
-                    <button class="btn btn-info" onclick="exportDXF()" style="background: #9b59b6 !important; color: white !important; border: 1px solid #9b59b6 !important;">Download DXF</button>
+                    <div class="dropdown" id="advancedDropdown">
+                        <button class="dropdown-btn" onclick="toggleAdvancedDropdown(event)">Advanced</button>
+                        <div class="dropdown-content" id="advancedDropdownContent">
+                            <button class="dropdown-item" onclick="addNewPiece(); closeAdvancedDropdown();" id="addPieceDropdownBtn">Add Piece</button>
+                            <button class="dropdown-item" onclick="showSlopingRoofModal(); closeAdvancedDropdown();">Create Sloping Roof</button>
+                            <button class="dropdown-item" onclick="toggleMirrorSymmetry(); closeAdvancedDropdown();">Mirror Symmetry</button>
+                            <button class="dropdown-item" onclick="exportDXF(); closeAdvancedDropdown();" style="color: #9b59b6;">Download DXF</button>
+                        </div>
+                    </div>
                 </div>
             </div>
             
@@ -2129,6 +2211,15 @@ function loadHtml2Canvas() {
         let lastPanPoint = { x: 0, y: 0 };
         let isSpacePressed = false;
         let hasStartHem = false; // Flag to track if a start hem has been created
+
+        // Mirror Symmetry System
+        let mirrorSymmetry = {
+            enabled: false,
+            axisType: null,  // 'vertical' or 'horizontal'
+            axisPosition: null,  // Screen coordinate of the mirror axis
+            showAxisLine: true,
+            waitingForAxisClick: false  // True when waiting for user to click to set axis
+        };
 
         // DXF layers
         const LAYERS = {
@@ -2618,6 +2709,1035 @@ function loadHtml2Canvas() {
             if (undoButton) {
                 undoButton.disabled = undoHistory.length === 0;
                 undoButton.style.opacity = undoHistory.length === 0 ? '0.5' : '1';
+            }
+        }
+
+        // Advanced Dropdown Functions
+        function toggleAdvancedDropdown(event) {
+            event.stopPropagation();
+            const content = document.getElementById('advancedDropdownContent');
+            content.classList.toggle('show');
+        }
+
+        function closeAdvancedDropdown() {
+            const content = document.getElementById('advancedDropdownContent');
+            if (content) {
+                content.classList.remove('show');
+            }
+        }
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', function(event) {
+            const dropdown = document.getElementById('advancedDropdown');
+            if (dropdown && !dropdown.contains(event.target)) {
+                closeAdvancedDropdown();
+            }
+        });
+
+        // Mirror Symmetry Functions
+        function showMirrorAxisModal() {
+            // Create modal overlay
+            const overlay = document.createElement('div');
+            overlay.id = 'mirror-axis-modal-overlay';
+            overlay.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0,0,0,0.5);
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                z-index: 10000;
+            `;
+
+            const modal = document.createElement('div');
+            modal.id = 'mirror-axis-modal';
+            modal.style.cssText = `
+                background: white;
+                padding: 30px;
+                border-radius: 12px;
+                box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+                text-align: center;
+                min-width: 300px;
+            `;
+
+            modal.innerHTML = `
+                <h3 style="margin-bottom: 20px; color: #2c3e50;">Select Mirror Axis</h3>
+                <p style="margin-bottom: 20px; color: #7f8c8d; font-size: 14px;">
+                    Choose the axis type, then click on the canvas to set the axis position.
+                </p>
+                <div style="display: flex; gap: 15px; justify-content: center;">
+                    <button id="mirror-vertical-btn" style="
+                        padding: 15px 30px;
+                        font-size: 16px;
+                        cursor: pointer;
+                        border: 2px solid #3498db;
+                        background: white;
+                        color: #3498db;
+                        border-radius: 8px;
+                        transition: all 0.2s;
+                    ">
+                        <div style="font-size: 24px;">│</div>
+                        <div>Vertical</div>
+                    </button>
+                    <button id="mirror-horizontal-btn" style="
+                        padding: 15px 30px;
+                        font-size: 16px;
+                        cursor: pointer;
+                        border: 2px solid #e74c3c;
+                        background: white;
+                        color: #e74c3c;
+                        border-radius: 8px;
+                        transition: all 0.2s;
+                    ">
+                        <div style="font-size: 24px;">─</div>
+                        <div>Horizontal</div>
+                    </button>
+                </div>
+                <button id="mirror-cancel-btn" style="
+                    margin-top: 20px;
+                    padding: 10px 25px;
+                    font-size: 14px;
+                    cursor: pointer;
+                    border: 1px solid #bdc3c7;
+                    background: #ecf0f1;
+                    color: #7f8c8d;
+                    border-radius: 6px;
+                ">Cancel</button>
+            `;
+
+            overlay.appendChild(modal);
+            document.body.appendChild(overlay);
+
+            // Add button event listeners
+            document.getElementById('mirror-vertical-btn').onclick = () => {
+                closeMirrorAxisModal();
+                enableMirrorMode('vertical');
+            };
+            document.getElementById('mirror-horizontal-btn').onclick = () => {
+                closeMirrorAxisModal();
+                enableMirrorMode('horizontal');
+            };
+            document.getElementById('mirror-cancel-btn').onclick = closeMirrorAxisModal;
+
+            // Close on overlay click
+            overlay.onclick = (e) => {
+                if (e.target === overlay) closeMirrorAxisModal();
+            };
+        }
+
+        function closeMirrorAxisModal() {
+            const overlay = document.getElementById('mirror-axis-modal-overlay');
+            if (overlay) overlay.remove();
+        }
+
+        function enableMirrorMode(axisType) {
+            mirrorSymmetry.axisType = axisType;
+            mirrorSymmetry.waitingForAxisClick = false;
+            mirrorSymmetry.enabled = true;
+            
+            // Auto-place axis in center of canvas
+            if (axisType === 'vertical') {
+                mirrorSymmetry.axisPosition = canvas.clientWidth / 2;
+            } else {
+                mirrorSymmetry.axisPosition = canvas.clientHeight / 2;
+            }
+
+            // Show confirmation popup
+            showMirrorAxisConfirmationPopup(axisType);
+            
+            // Update indicator
+            updateMirrorModeIndicator(`${axisType.charAt(0).toUpperCase() + axisType.slice(1)} mirror axis active (centered)`);
+            
+            // Draw the axis immediately
+            drawPersistentMirrorAxis();
+            redrawProfile();
+            
+            console.log(`Mirror mode enabled: ${axisType}. Axis placed at center: ${mirrorSymmetry.axisPosition}`);
+        }
+
+        function showMirrorAxisConfirmationPopup(axisType) {
+            const popup = document.createElement('div');
+            popup.id = 'mirror-axis-instruction-popup';
+            popup.style.cssText = `
+                position: fixed;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                background: white;
+                padding: 25px 35px;
+                border-radius: 12px;
+                box-shadow: 0 4px 25px rgba(0,0,0,0.3);
+                z-index: 10001;
+                text-align: center;
+                animation: fadeInScale 0.3s ease;
+            `;
+            
+            const axisSymbol = axisType === 'vertical' ? '│' : '─';
+            const axisColor = axisType === 'vertical' ? '#3498db' : '#e74c3c';
+            
+            popup.innerHTML = `
+                <div style="font-size: 48px; color: ${axisColor}; margin-bottom: 15px;">${axisSymbol}</div>
+                <h3 style="margin: 0 0 10px 0; color: #2c3e50;">${axisType.charAt(0).toUpperCase() + axisType.slice(1)} Mirror Active</h3>
+                <p style="margin: 0; color: #7f8c8d; font-size: 15px;">
+                    Axis placed at center of canvas.<br>
+                    <span style="font-size: 13px; color: #95a5a6;">Draw your profile - it will be mirrored automatically.</span>
+                </p>
+            `;
+            
+            document.body.appendChild(popup);
+            
+            // Auto-dismiss after 2 seconds
+            setTimeout(() => {
+                if (popup.parentNode) {
+                    popup.style.animation = 'fadeOutScale 0.3s ease';
+                    setTimeout(() => popup.remove(), 280);
+                }
+            }, 2000);
+            
+            // Add animation styles if not already present
+            if (!document.getElementById('mirror-popup-animations')) {
+                const style = document.createElement('style');
+                style.id = 'mirror-popup-animations';
+                style.textContent = `
+                    @keyframes fadeInScale {
+                        from { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
+                        to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+                    }
+                    @keyframes fadeOutScale {
+                        from { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+                        to { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
+                    }
+                `;
+                document.head.appendChild(style);
+            }
+        }
+
+        function drawPreviewMirrorAxis(mouseX, mouseY) {
+            // Remove existing preview axis
+            clearPreviewMirrorAxis();
+            
+            if (!mirrorSymmetry.waitingForAxisClick || !mirrorSymmetry.axisType) return;
+            
+            const axisLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            axisLine.setAttribute('id', 'preview-mirror-axis');
+            
+            if (mirrorSymmetry.axisType === 'vertical') {
+                axisLine.setAttribute('x1', mouseX);
+                axisLine.setAttribute('y1', 0);
+                axisLine.setAttribute('x2', mouseX);
+                axisLine.setAttribute('y2', canvas.clientHeight * 2);
+            } else {
+                axisLine.setAttribute('x1', 0);
+                axisLine.setAttribute('y1', mouseY);
+                axisLine.setAttribute('x2', canvas.clientWidth * 2);
+                axisLine.setAttribute('y2', mouseY);
+            }
+            
+            axisLine.setAttribute('stroke', '#e74c3c');
+            axisLine.setAttribute('stroke-width', '2');
+            axisLine.setAttribute('stroke-dasharray', '10,5');
+            axisLine.setAttribute('opacity', '0.4');
+            linesGroup.appendChild(axisLine);
+        }
+
+        function clearPreviewMirrorAxis() {
+            const previewAxis = document.getElementById('preview-mirror-axis');
+            if (previewAxis) previewAxis.remove();
+        }
+
+        function disableMirrorMode() {
+            mirrorSymmetry.enabled = false;
+            mirrorSymmetry.axisType = null;
+            mirrorSymmetry.axisPosition = null;
+            mirrorSymmetry.waitingForAxisClick = false;
+            
+            // Clear preview axis if visible
+            clearPreviewMirrorAxis();
+            
+            // Clear persistent axis
+            clearPersistentMirrorAxis();
+            
+            // Remove indicator
+            removeMirrorModeIndicator();
+            
+            // Reset cursor
+            canvas.style.cursor = 'crosshair';
+            
+            // Update button state
+            updateMirrorButtonState();
+            
+            // Redraw
+            redrawProfile();
+            
+            console.log('Mirror mode disabled.');
+        }
+
+        function completeMirrorProfile() {
+            // Called when the last point is placed on the mirror axis
+            // This adds all mirrored points to the actual points array and exits mirror mode
+            // The axis point is REMOVED - the line goes straight through from corner to mirrored corner
+            
+            if (!mirrorSymmetry.enabled || mirrorSymmetry.axisPosition === null) return;
+            if (points.length < 2) return;
+            
+            console.log('Completing mirror profile...');
+            
+            // Save state before completing mirror
+            saveState('Complete Mirror', {});
+            
+            // Remove the axis point (last point) - it will be replaced by direct connection to mirrored points
+            const axisPoint = points.pop();
+            console.log('Removed axis point:', axisPoint);
+            
+            // Get all mirrored points in reverse order
+            // Start from last point (now the point before axis) and go backwards to the first point
+            const mirroredPoints = [];
+            for (let i = points.length - 1; i >= 0; i--) {
+                const point = points[i];
+                if (point.isHem) continue; // Skip hems for now
+                
+                const mirrored = getMirroredPoint(point.x, point.y);
+                mirroredPoints.push({
+                    x: mirrored.x,
+                    y: mirrored.y,
+                    isMirrored: true // Mark as mirrored point
+                });
+            }
+            
+            // Add all mirrored points to the points array
+            mirroredPoints.forEach((mirroredPoint, index) => {
+                points.push(mirroredPoint);
+                
+                // Create DXF POINT entity
+                entities.push({
+                    type: 'POINT',
+                    x: mirroredPoint.x,
+                    y: mirroredPoint.y,
+                    layer: LAYERS.PROFILE
+                });
+                
+                // Create DXF LINE entity from previous point
+                if (points.length > 1) {
+                    const prevPoint = points[points.length - 2];
+                    entities.push({
+                        type: 'LINE',
+                        start: { x: prevPoint.x, y: prevPoint.y },
+                        end: { x: mirroredPoint.x, y: mirroredPoint.y },
+                        layer: LAYERS.PROFILE
+                    });
+                }
+            });
+            
+            // Disable mirror mode
+            mirrorSymmetry.enabled = false;
+            mirrorSymmetry.axisType = null;
+            mirrorSymmetry.axisPosition = null;
+            mirrorSymmetry.waitingForAxisClick = false;
+            
+            // Clear preview axis if visible
+            clearPreviewMirrorAxis();
+            
+            // Clear persistent axis
+            clearPersistentMirrorAxis();
+            
+            // Remove indicator
+            removeMirrorModeIndicator();
+            
+            // Update button state
+            updateMirrorButtonState();
+            
+            // Redraw the entire profile with the new points
+            redrawProfile();
+            
+            // Update stats
+            updateStats();
+            
+            console.log('Mirror profile completed. Total points:', points.length);
+        }
+
+        function checkAndCompleteMirror(point) {
+            // Check if the point is on the mirror axis
+            if (!mirrorSymmetry.enabled || mirrorSymmetry.axisPosition === null) return false;
+            
+            const tolerance = 5; // pixels
+            let isOnAxis = false;
+            
+            if (mirrorSymmetry.axisType === 'vertical') {
+                isOnAxis = Math.abs(point.x - mirrorSymmetry.axisPosition) < tolerance;
+            } else if (mirrorSymmetry.axisType === 'horizontal') {
+                isOnAxis = Math.abs(point.y - mirrorSymmetry.axisPosition) < tolerance;
+            }
+            
+            if (isOnAxis && points.length >= 2) {
+                // Point is on axis - complete the mirror profile
+                completeMirrorProfile();
+                return true;
+            }
+            
+            return false;
+        }
+
+        function toggleMirrorSymmetry() {
+            if (mirrorSymmetry.enabled || mirrorSymmetry.waitingForAxisClick) {
+                // If already in mirror mode, disable it
+                disableMirrorMode();
+            } else {
+                // Show modal to select axis type
+                showMirrorAxisModal();
+            }
+        }
+
+        function updateMirrorModeIndicator(message) {
+            let indicator = document.getElementById('mirror-mode-indicator');
+            if (!indicator) {
+                indicator = document.createElement('div');
+                indicator.id = 'mirror-mode-indicator';
+                indicator.style.cssText = `
+                    position: fixed;
+                    top: 70px;
+                    left: 50%;
+                    transform: translateX(-50%);
+                    background: #e74c3c;
+                    color: white;
+                    padding: 10px 20px;
+                    border-radius: 20px;
+                    font-weight: bold;
+                    font-size: 14px;
+                    z-index: 9999;
+                    box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+                `;
+                document.body.appendChild(indicator);
+            }
+            indicator.textContent = message;
+        }
+
+        function removeMirrorModeIndicator() {
+            const indicator = document.getElementById('mirror-mode-indicator');
+            if (indicator) indicator.remove();
+        }
+
+        function updateMirrorButtonState() {
+            const mirrorBtn = document.querySelector('.dropdown-item[onclick*="toggleMirrorSymmetry"]');
+            if (mirrorBtn) {
+                const isActive = mirrorSymmetry.enabled || mirrorSymmetry.waitingForAxisClick;
+                mirrorBtn.textContent = isActive ? '✓ Mirror Symmetry (On)' : 'Mirror Symmetry';
+                mirrorBtn.style.color = isActive ? '#27ae60' : '#2c3e50';
+            }
+        }
+
+        function setMirrorAxis(x, y) {
+            // Clear the preview axis
+            clearPreviewMirrorAxis();
+            
+            // Set axis position based on axis type
+            if (mirrorSymmetry.axisType === 'vertical') {
+                mirrorSymmetry.axisPosition = x;
+            } else {
+                mirrorSymmetry.axisPosition = y;
+            }
+            
+            mirrorSymmetry.waitingForAxisClick = false;
+            mirrorSymmetry.enabled = true;
+            
+            // Update indicator
+            updateMirrorModeIndicator(`Mirror Mode: ${mirrorSymmetry.axisType} (Active)`);
+            
+            // Update button
+            updateMirrorButtonState();
+            
+            // Draw the persistent axis immediately
+            drawPersistentMirrorAxis();
+            
+            // Redraw to show mirrored geometry
+            redrawProfile();
+            
+            console.log(`Mirror axis set at ${mirrorSymmetry.axisType === 'vertical' ? 'X' : 'Y'}: ${mirrorSymmetry.axisPosition}`);
+        }
+
+        function drawPersistentMirrorAxis() {
+            if (!mirrorSymmetry.enabled || mirrorSymmetry.axisPosition === null) return;
+            
+            // Remove existing persistent axis if any
+            const existingAxis = document.getElementById('persistent-mirror-axis');
+            if (existingAxis) existingAxis.remove();
+            const existingLabel = document.getElementById('persistent-mirror-axis-label');
+            if (existingLabel) existingLabel.remove();
+
+            const axisLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            axisLine.setAttribute('id', 'persistent-mirror-axis');
+            
+            if (mirrorSymmetry.axisType === 'vertical') {
+                axisLine.setAttribute('x1', mirrorSymmetry.axisPosition);
+                axisLine.setAttribute('y1', -5000);
+                axisLine.setAttribute('x2', mirrorSymmetry.axisPosition);
+                axisLine.setAttribute('y2', 5000);
+            } else {
+                axisLine.setAttribute('x1', -5000);
+                axisLine.setAttribute('y1', mirrorSymmetry.axisPosition);
+                axisLine.setAttribute('x2', 5000);
+                axisLine.setAttribute('y2', mirrorSymmetry.axisPosition);
+            }
+            
+            axisLine.setAttribute('stroke', '#e74c3c');
+            axisLine.setAttribute('stroke-width', '2');
+            axisLine.setAttribute('stroke-dasharray', '10,5');
+            axisLine.setAttribute('opacity', '0.6');
+            linesGroup.appendChild(axisLine);
+
+            // Add label
+            const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            label.setAttribute('id', 'persistent-mirror-axis-label');
+            if (mirrorSymmetry.axisType === 'vertical') {
+                label.setAttribute('x', mirrorSymmetry.axisPosition);
+                label.setAttribute('y', 20);
+                label.setAttribute('text-anchor', 'middle');
+            } else {
+                label.setAttribute('x', 20);
+                label.setAttribute('y', mirrorSymmetry.axisPosition - 5);
+                label.setAttribute('text-anchor', 'start');
+            }
+            label.setAttribute('fill', '#e74c3c');
+            label.setAttribute('font-size', '10px');
+            label.setAttribute('font-weight', 'bold');
+            label.textContent = 'MIRROR';
+            labelsGroup.appendChild(label);
+        }
+
+        function clearPersistentMirrorAxis() {
+            const existingAxis = document.getElementById('persistent-mirror-axis');
+            if (existingAxis) existingAxis.remove();
+            const existingLabel = document.getElementById('persistent-mirror-axis-label');
+            if (existingLabel) existingLabel.remove();
+        }
+
+        function getMirroredPoint(x, y) {
+            if (!mirrorSymmetry.enabled || mirrorSymmetry.axisPosition === null) {
+                return { x, y };
+            }
+            
+            if (mirrorSymmetry.axisType === 'vertical') {
+                return { x: 2 * mirrorSymmetry.axisPosition - x, y: y };
+            } else {
+                return { x: x, y: 2 * mirrorSymmetry.axisPosition - y };
+            }
+        }
+
+        function drawMirrorAxis() {
+            if (!mirrorSymmetry.enabled || !mirrorSymmetry.showAxisLine || mirrorSymmetry.axisPosition === null) return;
+
+            const axisLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            
+            if (mirrorSymmetry.axisType === 'vertical') {
+                axisLine.setAttribute('x1', mirrorSymmetry.axisPosition);
+                axisLine.setAttribute('y1', 0);
+                axisLine.setAttribute('x2', mirrorSymmetry.axisPosition);
+                axisLine.setAttribute('y2', canvas.clientHeight * 2);
+            } else {
+                axisLine.setAttribute('x1', 0);
+                axisLine.setAttribute('y1', mirrorSymmetry.axisPosition);
+                axisLine.setAttribute('x2', canvas.clientWidth * 2);
+                axisLine.setAttribute('y2', mirrorSymmetry.axisPosition);
+            }
+            
+            axisLine.setAttribute('stroke', '#e74c3c');
+            axisLine.setAttribute('stroke-width', '2');
+            axisLine.setAttribute('stroke-dasharray', '10,5');
+            axisLine.setAttribute('opacity', '0.6');
+            axisLine.classList.add('mirror-axis');
+            linesGroup.appendChild(axisLine);
+
+            // Add label
+            const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            if (mirrorSymmetry.axisType === 'vertical') {
+                label.setAttribute('x', mirrorSymmetry.axisPosition);
+                label.setAttribute('y', 20);
+                label.setAttribute('text-anchor', 'middle');
+            } else {
+                label.setAttribute('x', 20);
+                label.setAttribute('y', mirrorSymmetry.axisPosition - 5);
+                label.setAttribute('text-anchor', 'start');
+            }
+            label.setAttribute('fill', '#e74c3c');
+            label.setAttribute('font-size', '10px');
+            label.setAttribute('font-weight', 'bold');
+            label.classList.add('mirror-axis-label');
+            label.textContent = 'MIRROR';
+            labelsGroup.appendChild(label);
+        }
+
+        function drawMirroredGeometry(piecePoints, pieceCoatedSide) {
+            if (!mirrorSymmetry.enabled || mirrorSymmetry.axisPosition === null) return;
+            if (piecePoints.length < 2) return;
+
+            // For a unified profile, we draw the mirrored half as a continuation
+            // The mirrored lines should look the same as the original (solid, same style)
+            
+            // Find the last point (should be on or near the axis for proper connection)
+            const lastPoint = piecePoints[piecePoints.length - 1];
+            
+            // Check if the last point is on the axis (connection point)
+            const lastOnAxis = (mirrorSymmetry.axisType === 'vertical' && Math.abs(lastPoint.x - mirrorSymmetry.axisPosition) < 5) ||
+                               (mirrorSymmetry.axisType === 'horizontal' && Math.abs(lastPoint.y - mirrorSymmetry.axisPosition) < 5);
+
+            // When last point is ON the axis, the lines connect seamlessly
+            // Skip mirroring from the axis point since it's shared between original and mirrored
+            const startIndex = lastOnAxis ? piecePoints.length - 2 : piecePoints.length - 1;
+
+            // Draw mirrored lines in REVERSE order (from axis back to start) for proper connection
+            // This creates a continuous profile: original start -> axis -> mirrored back to start
+            for (let i = startIndex; i > 0; i--) {
+                const start = piecePoints[i];
+                const end = piecePoints[i - 1];
+
+                // Skip mirroring hems
+                if (start.isHem || end.isHem) continue;
+
+                const mirrorStart = getMirroredPoint(start.x, start.y);
+                const mirrorEnd = getMirroredPoint(end.x, end.y);
+
+                // Draw line - same style as original
+                const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                line.setAttribute('x1', mirrorStart.x);
+                line.setAttribute('y1', mirrorStart.y);
+                line.setAttribute('x2', mirrorEnd.x);
+                line.setAttribute('y2', mirrorEnd.y);
+                line.setAttribute('class', 'line mirrored-line');
+                linesGroup.appendChild(line);
+
+                // Draw coating arrow on mirrored side (flipped)
+                drawCoatingArrow(mirrorStart, mirrorEnd, !pieceCoatedSide);
+                
+                // Check if this is the first mirrored segment connected at axis (shares line with original)
+                // When lastOnAxis is true and i == startIndex (first iteration), the line from startIndex to startIndex-1
+                // is on the same line as the original segment from startIndex to startIndex+1 (the axis point)
+                const isSharedAxisLine = lastOnAxis && i === startIndex;
+                console.log('Mirror loop:', { i, startIndex, lastOnAxis, isSharedAxisLine });
+                
+                if (isSharedAxisLine) {
+                    // Draw combined measurement for the shared line crossing the axis
+                    // mirrorStart is the mirror of the point right before axis
+                    // We measure from mirrorStart to the original point before axis (full line through axis)
+                    const originalPointBeforeAxis = piecePoints[startIndex];
+                    console.log('Drawing COMBINED label from mirrorStart to originalPointBeforeAxis');
+                    drawCombinedLengthLabel(mirrorStart, originalPointBeforeAxis);
+                } else {
+                    // Draw length measurement (same style as original)
+                    console.log('Drawing normal mirrored label');
+                    drawMirroredLengthLabel(mirrorStart, mirrorEnd, false);
+                }
+            }
+
+            // Draw connecting angle at axis if the last point is on the axis
+            // BUT only if the angle is not 180 degrees (i.e., the line doesn't go straight through)
+            if (lastOnAxis && piecePoints.length >= 2) {
+                const secondToLast = piecePoints[piecePoints.length - 2];
+                const mirrorSecondToLast = getMirroredPoint(secondToLast.x, secondToLast.y);
+                
+                // Check if the second-to-last point is NOT on axis
+                const secondOnAxis = (mirrorSymmetry.axisType === 'vertical' && Math.abs(secondToLast.x - mirrorSymmetry.axisPosition) < 5) ||
+                                     (mirrorSymmetry.axisType === 'horizontal' && Math.abs(secondToLast.y - mirrorSymmetry.axisPosition) < 5);
+                
+                if (!secondOnAxis) {
+                    // Check if the line goes straight through (180 degree angle = no visible bend)
+                    // Calculate the angle between the original line and its mirror
+                    const vec1 = { x: secondToLast.x - lastPoint.x, y: secondToLast.y - lastPoint.y };
+                    const vec2 = { x: mirrorSecondToLast.x - lastPoint.x, y: mirrorSecondToLast.y - lastPoint.y };
+                    const dot = vec1.x * vec2.x + vec1.y * vec2.y;
+                    const mag1 = Math.sqrt(vec1.x * vec1.x + vec1.y * vec1.y);
+                    const mag2 = Math.sqrt(vec2.x * vec2.x + vec2.y * vec2.y);
+                    
+                    if (mag1 > 0.1 && mag2 > 0.1) {
+                        const cosAngle = dot / (mag1 * mag2);
+                        // If cosAngle is close to -1, the vectors point in opposite directions (180° = straight line)
+                        // Only draw angle if it's NOT a straight line (cosAngle > -0.99)
+                        if (cosAngle > -0.99) {
+                            // Draw the angle at the axis point (where profile meets its mirror)
+                            drawAxisConnectionAngle(secondToLast, lastPoint, mirrorSecondToLast);
+                        }
+                    }
+                }
+            }
+
+            // Draw mirrored points (excluding points on the axis since they're shared)
+            for (let i = 0; i < piecePoints.length - 1; i++) {
+                const point = piecePoints[i];
+                if (point.isHem) continue;
+                
+                const mirrored = getMirroredPoint(point.x, point.y);
+                
+                // Check if point is on the axis
+                const isOnAxis = (mirrorSymmetry.axisType === 'vertical' && Math.abs(point.x - mirrorSymmetry.axisPosition) < 5) ||
+                                 (mirrorSymmetry.axisType === 'horizontal' && Math.abs(point.y - mirrorSymmetry.axisPosition) < 5);
+                
+                if (!isOnAxis) {
+                    // Draw point - same style as original
+                    const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                    circle.setAttribute('cx', mirrored.x);
+                    circle.setAttribute('cy', mirrored.y);
+                    circle.setAttribute('r', 3);
+                    circle.setAttribute('class', 'point mirrored-point');
+                    pointsGroup.appendChild(circle);
+                }
+            }
+
+            // Draw angle measurements for mirrored interior vertices
+            for (let i = 1; i < piecePoints.length - 1; i++) {
+                const point = piecePoints[i];
+                if (point.isHem) continue;
+                
+                const prev = piecePoints[i - 1];
+                const next = piecePoints[i + 1];
+                
+                // Skip if adjacent points are hems
+                if (prev.isHem || next.isHem) continue;
+                
+                // Mirror the points - angles are preserved under reflection
+                // Keep same order as original (prev, current, next)
+                const mirroredPrev = getMirroredPoint(prev.x, prev.y);
+                const mirroredCurrent = getMirroredPoint(point.x, point.y);
+                const mirroredNext = getMirroredPoint(next.x, next.y);
+                
+                drawMirroredAngleLabel(mirroredPrev, mirroredCurrent, mirroredNext, false);
+            }
+        }
+
+        function drawAxisConnectionAngle(prev, axisPoint, mirroredPrev) {
+            // Calculate the angle at the axis where the profile meets its mirror
+            const vec1 = { x: prev.x - axisPoint.x, y: prev.y - axisPoint.y };
+            const vec2 = { x: mirroredPrev.x - axisPoint.x, y: mirroredPrev.y - axisPoint.y };
+            const dot = vec1.x * vec2.x + vec1.y * vec2.y;
+            const mag1 = Math.sqrt(vec1.x * vec1.x + vec1.y * vec1.y);
+            const mag2 = Math.sqrt(vec2.x * vec2.x + vec2.y * vec2.y);
+            
+            if (mag1 < 1 || mag2 < 1) return;
+            
+            const cosAngle = Math.max(-1, Math.min(1, dot / (mag1 * mag2)));
+            const interiorAngle = Math.acos(cosAngle) * 180 / Math.PI;
+            const angle = 180 - interiorAngle;
+            
+            const labelText = `${Math.round(angle)}°`;
+            
+            // Position label using bisector
+            const norm1 = { x: vec1.x / mag1, y: vec1.y / mag1 };
+            const norm2 = { x: vec2.x / mag2, y: vec2.y / mag2 };
+            const bisectorX = norm1.x + norm2.x;
+            const bisectorY = norm1.y + norm2.y;
+            const bisectorLen = Math.sqrt(bisectorX * bisectorX + bisectorY * bisectorY);
+            
+            let labelX, labelY;
+            if (bisectorLen > 0.1) {
+                const offset = 30;
+                labelX = axisPoint.x + (bisectorX / bisectorLen) * offset;
+                labelY = axisPoint.y + (bisectorY / bisectorLen) * offset;
+            } else {
+                labelX = axisPoint.x + 25;
+                labelY = axisPoint.y - 25;
+            }
+            
+            // Draw angle arc
+            drawAngleArc(prev, axisPoint, mirroredPrev, angle);
+            
+            // Create label (same style as regular angle labels)
+            const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            label.setAttribute('x', labelX);
+            label.setAttribute('y', labelY);
+            label.setAttribute('text-anchor', 'middle');
+            label.setAttribute('dominant-baseline', 'central');
+            label.setAttribute('class', 'angle-label');
+            label.textContent = labelText;
+            labelsGroup.appendChild(label);
+        }
+
+        function drawMirroredLengthLabel(start, end, faint = true) {
+            // Calculate length using DXF coordinates
+            const startDxf = screenToDxf(start);
+            const endDxf = screenToDxf(end);
+            const deltaX = endDxf.x - startDxf.x;
+            const deltaY = endDxf.y - startDxf.y;
+            const length = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+            
+            const labelText = formatLength(length);
+            
+            // Position label at midpoint, offset perpendicular to line
+            const midX = (start.x + end.x) / 2;
+            const midY = (start.y + end.y) / 2;
+            
+            // Calculate perpendicular offset
+            const dx = end.x - start.x;
+            const dy = end.y - start.y;
+            const len = Math.sqrt(dx * dx + dy * dy);
+            if (len < 1) return;
+            
+            const perpX = -dy / len;
+            const perpY = dx / len;
+            const offset = 20;
+            
+            const labelX = midX + perpX * offset;
+            const labelY = midY + perpY * offset;
+            
+            // Create label - same style as original
+            const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            label.setAttribute('x', labelX);
+            label.setAttribute('y', labelY);
+            label.setAttribute('text-anchor', 'middle');
+            label.setAttribute('dominant-baseline', 'central');
+            label.setAttribute('class', 'measurement-label mirrored-measurement');
+            label.textContent = labelText;
+            labelsGroup.appendChild(label);
+        }
+
+        function drawCombinedLengthLabel(mirrorPoint, originalPoint) {
+            // This draws a combined length label for the line that crosses the axis
+            // The full line goes from mirrorPoint through the axis to originalPoint
+            
+            // Calculate total length using DXF coordinates
+            const mirrorDxf = screenToDxf(mirrorPoint);
+            const originalDxf = screenToDxf(originalPoint);
+            const deltaX = originalDxf.x - mirrorDxf.x;
+            const deltaY = originalDxf.y - mirrorDxf.y;
+            const totalLength = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+            
+            const labelText = formatLength(totalLength);
+            
+            // Position label at true midpoint of the combined line (which is on the axis)
+            const midX = (mirrorPoint.x + originalPoint.x) / 2;
+            const midY = (mirrorPoint.y + originalPoint.y) / 2;
+            
+            // Calculate perpendicular offset
+            const dx = originalPoint.x - mirrorPoint.x;
+            const dy = originalPoint.y - mirrorPoint.y;
+            const len = Math.sqrt(dx * dx + dy * dy);
+            if (len < 1) return;
+            
+            const perpX = -dy / len;
+            const perpY = dx / len;
+            const offset = 20;
+            
+            const labelX = midX + perpX * offset;
+            const labelY = midY + perpY * offset;
+            
+            // Create combined label
+            const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            label.setAttribute('x', labelX);
+            label.setAttribute('y', labelY);
+            label.setAttribute('text-anchor', 'middle');
+            label.setAttribute('dominant-baseline', 'central');
+            label.setAttribute('class', 'measurement-label combined-measurement');
+            label.textContent = labelText;
+            labelsGroup.appendChild(label);
+        }
+
+        function drawMirroredAngleLabel(prev, current, next, faint = true) {
+            // Calculate angle
+            const vec1 = { x: prev.x - current.x, y: prev.y - current.y };
+            const vec2 = { x: next.x - current.x, y: next.y - current.y };
+            const dot = vec1.x * vec2.x + vec1.y * vec2.y;
+            const mag1 = Math.sqrt(vec1.x * vec1.x + vec1.y * vec1.y);
+            const mag2 = Math.sqrt(vec2.x * vec2.x + vec2.y * vec2.y);
+            
+            if (mag1 < 1 || mag2 < 1) return;
+            
+            const cosAngle = Math.max(-1, Math.min(1, dot / (mag1 * mag2)));
+            const interiorAngle = Math.acos(cosAngle) * 180 / Math.PI;
+            const angle = 180 - interiorAngle;
+            
+            const labelText = `${Math.round(angle)}°`;
+            
+            // Position label - use bisector direction
+            const norm1 = { x: vec1.x / mag1, y: vec1.y / mag1 };
+            const norm2 = { x: vec2.x / mag2, y: vec2.y / mag2 };
+            const bisectorX = norm1.x + norm2.x;
+            const bisectorY = norm1.y + norm2.y;
+            const bisectorLen = Math.sqrt(bisectorX * bisectorX + bisectorY * bisectorY);
+            
+            let labelX, labelY;
+            if (bisectorLen > 0.1) {
+                const offset = 25;
+                labelX = current.x + (bisectorX / bisectorLen) * offset;
+                labelY = current.y + (bisectorY / bisectorLen) * offset;
+            } else {
+                labelX = current.x + 20;
+                labelY = current.y - 20;
+            }
+            
+            // Draw angle arc
+            drawMirroredAngleArc(prev, current, next, angle, faint);
+            
+            // Create label - same style as original
+            const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            label.setAttribute('x', labelX);
+            label.setAttribute('y', labelY);
+            label.setAttribute('text-anchor', 'middle');
+            label.setAttribute('dominant-baseline', 'central');
+            label.setAttribute('class', 'angle-label mirrored-angle');
+            label.textContent = labelText;
+            labelsGroup.appendChild(label);
+        }
+
+        function drawMirroredAngleArc(prev, current, next, angle, faint = true) {
+            const radius = 15;
+            
+            // Calculate vectors
+            const vec1 = { x: prev.x - current.x, y: prev.y - current.y };
+            const vec2 = { x: next.x - current.x, y: next.y - current.y };
+            const mag1 = Math.sqrt(vec1.x * vec1.x + vec1.y * vec1.y);
+            const mag2 = Math.sqrt(vec2.x * vec2.x + vec2.y * vec2.y);
+            
+            if (mag1 < 1 || mag2 < 1) return;
+            
+            // Calculate angles for arc
+            const angle1 = Math.atan2(vec1.y, vec1.x);
+            const angle2 = Math.atan2(vec2.y, vec2.x);
+            
+            // Create arc path
+            const startX = current.x + Math.cos(angle1) * radius;
+            const startY = current.y + Math.sin(angle1) * radius;
+            const endX = current.x + Math.cos(angle2) * radius;
+            const endY = current.y + Math.sin(angle2) * radius;
+            
+            // Determine sweep direction
+            let angleDiff = angle2 - angle1;
+            while (angleDiff > Math.PI) angleDiff -= 2 * Math.PI;
+            while (angleDiff < -Math.PI) angleDiff += 2 * Math.PI;
+            const sweepFlag = angleDiff > 0 ? 1 : 0;
+            const largeArcFlag = Math.abs(angleDiff) > Math.PI ? 1 : 0;
+            
+            const arc = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            const pathData = `M ${startX} ${startY} A ${radius} ${radius} 0 ${largeArcFlag} ${sweepFlag} ${endX} ${endY}`;
+            arc.setAttribute('d', pathData);
+            arc.setAttribute('class', 'angle-arc mirrored-angle-arc');
+            linesGroup.appendChild(arc);
+        }
+
+        function drawMirroredPoint(point) {
+            const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+            circle.setAttribute('cx', point.x);
+            circle.setAttribute('cy', point.y);
+            circle.setAttribute('r', 3);
+            circle.setAttribute('class', 'point mirrored-point');
+            pointsGroup.appendChild(circle);
+        }
+
+        function drawMirroredCoatingArrow(start, end, pieceCoatedSide) {
+            const dx = end.x - start.x;
+            const dy = end.y - start.y;
+            const length = Math.sqrt(dx * dx + dy * dy);
+
+            if (length < 20) return;
+
+            const dirX = dx / length;
+            const dirY = dy / length;
+            const perpX = -dirY;
+            const perpY = dirX;
+
+            const midX = start.x + dx / 2;
+            const midY = start.y + dy / 2;
+
+            const arrowSize = 12;
+            const arrowOffset = 3;
+            const arrowDepth = 6;
+
+            const direction = pieceCoatedSide ? 1 : -1;
+            const offsetX = perpX * arrowOffset * direction;
+            const offsetY = perpY * arrowOffset * direction;
+
+            const tipX = midX + offsetX + perpX * arrowDepth * direction;
+            const tipY = midY + offsetY + perpY * arrowDepth * direction;
+
+            const base1X = midX + offsetX - dirX * arrowSize / 2;
+            const base1Y = midY + offsetY - dirY * arrowSize / 2;
+            const base2X = midX + offsetX + dirX * arrowSize / 2;
+            const base2Y = midY + offsetY + dirY * arrowSize / 2;
+
+            const arrow = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            const pathData = `M ${base1X} ${base1Y} L ${tipX} ${tipY} L ${base2X} ${base2Y}`;
+            arrow.setAttribute('d', pathData);
+            arrow.setAttribute('stroke', '#3498db');
+            arrow.setAttribute('stroke-width', '2');
+            arrow.setAttribute('fill', 'none');
+            arrow.setAttribute('opacity', '0.5');
+            arrow.classList.add('mirrored-arrow');
+            linesGroup.appendChild(arrow);
+        }
+
+        function drawMirroredPreviewLine(snappedX, snappedY) {
+            if (!mirrorSymmetry.enabled || mirrorSymmetry.axisPosition === null) return;
+            if (points.length === 0) return;
+
+            const lastPoint = points[points.length - 1];
+            const mirroredLast = getMirroredPoint(lastPoint.x, lastPoint.y);
+            const mirroredCurrent = getMirroredPoint(snappedX, snappedY);
+
+            // Create or update mirrored preview line
+            let mirroredPreview = document.getElementById('mirrored-preview');
+            if (!mirroredPreview) {
+                mirroredPreview = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                mirroredPreview.setAttribute('id', 'mirrored-preview');
+                mirroredPreview.setAttribute('stroke', '#3498db');
+                mirroredPreview.setAttribute('stroke-width', '2');
+                mirroredPreview.setAttribute('stroke-dasharray', '5,5');
+                mirroredPreview.setAttribute('opacity', '0.5');
+                linesGroup.appendChild(mirroredPreview);
+            }
+            mirroredPreview.setAttribute('x1', mirroredLast.x);
+            mirroredPreview.setAttribute('y1', mirroredLast.y);
+            mirroredPreview.setAttribute('x2', mirroredCurrent.x);
+            mirroredPreview.setAttribute('y2', mirroredCurrent.y);
+
+            // Create or update mirrored preview point
+            let mirroredPreviewPoint = document.getElementById('mirrored-preview-point');
+            if (!mirroredPreviewPoint) {
+                mirroredPreviewPoint = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                mirroredPreviewPoint.setAttribute('id', 'mirrored-preview-point');
+                mirroredPreviewPoint.setAttribute('r', '4');
+                mirroredPreviewPoint.setAttribute('fill', '#3498db');
+                mirroredPreviewPoint.setAttribute('opacity', '0.5');
+                pointsGroup.appendChild(mirroredPreviewPoint);
+            }
+            mirroredPreviewPoint.setAttribute('cx', mirroredCurrent.x);
+            mirroredPreviewPoint.setAttribute('cy', mirroredCurrent.y);
+        }
+
+        function clearMirroredPreviewLine() {
+            const mirroredPreview = document.getElementById('mirrored-preview');
+            if (mirroredPreview) mirroredPreview.remove();
+            const mirroredPreviewPoint = document.getElementById('mirrored-preview-point');
+            if (mirroredPreviewPoint) mirroredPreviewPoint.remove();
+        }
+
+        function drawMirroredLineSegment(start, end) {
+            if (!mirrorSymmetry.enabled || mirrorSymmetry.axisPosition === null) return;
+            
+            // Skip hems
+            if (start.isHem || end.isHem) return;
+            
+            const mirrorStart = getMirroredPoint(start.x, start.y);
+            const mirrorEnd = getMirroredPoint(end.x, end.y);
+
+            const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            line.setAttribute('x1', mirrorStart.x);
+            line.setAttribute('y1', mirrorStart.y);
+            line.setAttribute('x2', mirrorEnd.x);
+            line.setAttribute('y2', mirrorEnd.y);
+            line.setAttribute('stroke', '#3498db');
+            line.setAttribute('stroke-width', '2');
+            line.setAttribute('opacity', '0.5');
+            line.classList.add('mirrored-line');
+            linesGroup.appendChild(line);
+            
+            // Draw mirrored coating arrow
+            drawMirroredCoatingArrow(mirrorStart, mirrorEnd, !coatedSideRight);
+            
+            // Draw mirrored point at the end (if not on axis)
+            const isOnAxis = mirrorSymmetry.axisType === 'vertical' 
+                ? Math.abs(end.x - mirrorSymmetry.axisPosition) < 2
+                : Math.abs(end.y - mirrorSymmetry.axisPosition) < 2;
+            
+            if (!isOnAxis) {
+                drawMirroredPoint(mirrorEnd);
             }
         }
 
@@ -3911,6 +5031,12 @@ ORDERING:
             // Transform screen coordinates to account for zoom and pan
             const transformed = screenToTransformedCoordinates(screenX, screenY);
 
+            // Draw preview mirror axis if waiting for axis click
+            if (mirrorSymmetry.waitingForAxisClick) {
+                const snapped = applySnapping(transformed.x, transformed.y, true, true);
+                drawPreviewMirrorAxis(snapped.x, snapped.y);
+            }
+
             // Apply snapping when drawing (but not when dragging)
             let displayCoords = { x: transformed.x, y: transformed.y };
             if (isDrawing && !isDragging) {
@@ -4097,19 +5223,28 @@ ORDERING:
 
         function handleCanvasClick(e) {
             if (isDragging) return;
+            if (isSpacePressed) return; // Don't place points when space key is pressed
+            
+            // Get click coordinates
+            const rect = canvas.getBoundingClientRect();
+            const screenX = e.clientX - rect.left;
+            const screenY = e.clientY - rect.top;
+            const transformed = screenToTransformedCoordinates(screenX, screenY);
+            
+            // Handle mirror axis setting mode
+            if (mirrorSymmetry.waitingForAxisClick) {
+                // Apply snapping to axis position
+                const snapped = applySnapping(transformed.x, transformed.y, true, true);
+                setMirrorAxis(snapped.x, snapped.y);
+                return;
+            }
+            
             if (isEditMode) return;
             if (!isDrawing) return;
-            if (isSpacePressed) return; // Don't place points when space key is pressed
             // Only block clicks on interactive elements (points, labels, popups)
             const ignoreTags = ['circle', 'rect', 'text', 'foreignObject'];
             if (ignoreTags.includes(e.target.tagName)) return;
             // Accept clicks anywhere inside the SVG
-            const rect = canvas.getBoundingClientRect();
-            const screenX = e.clientX - rect.left;
-            const screenY = e.clientY - rect.top;
-            
-            // Transform screen coordinates to account for zoom and pan
-            const transformed = screenToTransformedCoordinates(screenX, screenY);
             addPoint(transformed.x, transformed.y);
         }
 
@@ -4177,11 +5312,21 @@ ORDERING:
             if (points.length > 1) {
                 drawLine(points[points.length - 2], point, points.length - 2);
                 drawCoatingArrow(points[points.length - 2], point, coatedSideRight); // Draw coating arrow immediately
+                // Draw mirrored line segment immediately if mirror mode is active
+                drawMirroredLineSegment(points[points.length - 2], point);
                 clearPreviewLine(); // Remove preview line and label immediately
                 drawMeasurements(); // Draw permanent label
                 // Remove preview angle label immediately
                 const angleLabel = document.getElementById('preview-angle-label');
                 if (angleLabel) angleLabel.remove();
+                
+                // Check if this point completes a mirror profile (point on axis)
+                if (checkAndCompleteMirror(point)) {
+                    // Mirror was completed - skip hem logic and return early
+                    updateAddPieceButtonVisibility();
+                    updateCoatedSideControls();
+                    return;
+                }
             }
             updateStats();
             clearPreviewLine();
@@ -5645,6 +6790,9 @@ ORDERING:
                 const angleLabel = document.getElementById('preview-angle-label');
                 if (angleLabel) angleLabel.remove();
             }
+
+            // Draw mirrored preview line if mirror mode is active
+            drawMirroredPreviewLine(snappedX, snappedY);
         }
 
         function clearPreviewLine() {
@@ -5655,6 +6803,8 @@ ORDERING:
             // Also clear snap guides
             const snapGuides = document.querySelectorAll('.snap-guide');
             snapGuides.forEach(guide => guide.remove());
+            // Clear mirrored preview elements
+            clearMirroredPreviewLine();
         }
 
         // Track all placed labels for collision detection
@@ -5961,6 +7111,19 @@ ORDERING:
                 // Skip measurement for regular hems but not for first point hems with exactly 2 points
                 if (isRegularHem && !isFirstPointHem) {
                     continue;
+                }
+
+                // Skip measurement for the last segment when in mirror mode and last point is on axis
+                // (the combined measurement will be drawn by drawMirroredGeometry instead)
+                if (mirrorSymmetry.enabled && mirrorSymmetry.axisPosition !== null && i === lineCount - 1) {
+                    const lastPoint = piecePoints[piecePoints.length - 1];
+                    const lastOnAxis = (mirrorSymmetry.axisType === 'vertical' && Math.abs(lastPoint.x - mirrorSymmetry.axisPosition) < 5) ||
+                                       (mirrorSymmetry.axisType === 'horizontal' && Math.abs(lastPoint.y - mirrorSymmetry.axisPosition) < 5);
+                    console.log('Skip check:', { i, lineCount, lastOnAxis, lastPointX: lastPoint.x, axisPos: mirrorSymmetry.axisPosition, diff: Math.abs(lastPoint.x - mirrorSymmetry.axisPosition) });
+                    if (lastOnAxis) {
+                        console.log('SKIPPING last segment measurement');
+                        continue;
+                    }
                 }
 
                 // Calculate length using DXF coordinates
@@ -7191,6 +8354,11 @@ ORDERING:
             labelsGroup.innerHTML = '';
             pieceLabelsGroup.innerHTML = '';
 
+            // Always draw mirror axis first if enabled (so it's behind everything)
+            if (mirrorSymmetry.enabled) {
+                drawPersistentMirrorAxis();
+            }
+
             // Draw all completed pieces
             pieces.forEach((piece, pieceIndex) => {
                 drawPiece(piece, pieceIndex);
@@ -7202,6 +8370,13 @@ ORDERING:
             }
 
             drawMeasurements();
+            
+            // Draw mirrored geometry AFTER measurements so labels don't get cleared
+            if (mirrorSymmetry.enabled && points.length > 0) {
+                const pieceCoatedSide = coatedSideRight;
+                drawMirroredGeometry(points, pieceCoatedSide);
+            }
+            
             updateStats(); // Ensure material usage updates after any change
         }
 
@@ -7212,6 +8387,11 @@ ORDERING:
             const pieceCoatedSide = piece.coatedSideRight !== undefined
                 ? piece.coatedSideRight
                 : coatedSideRight;
+
+            // Draw mirror axis first (behind everything) - only for current piece
+            if (pieceIndex === currentPieceIndex) {
+                drawMirrorAxis();
+            }
 
             // Draw points for this piece
             piecePoints.forEach((point, index) => {
@@ -7252,6 +8432,9 @@ ORDERING:
                     showHemInfoBox(point.hemData, piecePoints);
                 }
             });
+
+            // Note: Mirrored geometry is now drawn in redrawProfile() AFTER drawMeasurements()
+            // to prevent labels from being cleared
 
             // Add piece label only if there are multiple pieces
             // (pieces.length > 0 means at least one completed piece exists, indicating multi-piece mode)
